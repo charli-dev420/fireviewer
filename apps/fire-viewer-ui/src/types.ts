@@ -52,7 +52,7 @@ export interface AssetManifest {
 export interface GeoFrame {
   originWgs84: [number, number, number];
   localFrame: 'ENU';
-  metersPerUnit: 1;
+  metersPerUnit: 0.01;
   horizontalUncertaintyM: number;
 }
 

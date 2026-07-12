@@ -68,9 +68,13 @@
           "minItems": 3,
           "prefixItems": [
             {
+              "maximum": 180.0,
+              "minimum": -180.0,
               "type": "number"
             },
             {
+              "maximum": 90.0,
+              "minimum": -90.0,
               "type": "number"
             },
             {
@@ -86,10 +90,12 @@
           "type": "string"
         },
         "meters_per_unit": {
+          "const": 0.01,
           "title": "Meters Per Unit",
           "type": "number"
         },
         "vertical_datum": {
+          "const": "EPSG:4979",
           "title": "Vertical Datum",
           "type": "string"
         }

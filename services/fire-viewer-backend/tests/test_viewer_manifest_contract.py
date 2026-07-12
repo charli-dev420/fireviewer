@@ -11,7 +11,14 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from fire_viewer.core.config import Settings
-from fire_viewer.db.models import Episode, IncidentSeries, ManifestRevision, ModelAsset
+from fire_viewer.db.models import (
+    Episode,
+    IncidentSeries,
+    ManifestRevision,
+    ModelAsset,
+    SpatialZone,
+    SpatialZoneRevision,
+)
 from fire_viewer.domain.enums import AssetLod, AssetState, IncidentStatus, PublicVisibility
 from fire_viewer.domain.schemas import ViewerManifest
 from fire_viewer.main import create_app
@@ -53,22 +60,38 @@ def _seed_published_asset(
     episode: Episode,
 ) -> None:
     generated_at = datetime(2026, 7, 12, 8, 20, tzinfo=UTC)
+    spatial_zone = SpatialZone(
+        zone_id="zone-contract-fixture-0001",
+        label="Fictitious contract fixture zone",
+    )
+    session.add(spatial_zone)
+    session.flush()
+    spatial_zone_revision = SpatialZoneRevision(
+        spatial_zone_id=spatial_zone.id,
+        revision=1,
+        origin_lon=6.0214,
+        origin_lat=43.2897,
+        source_orthometric_height_m=412.7,
+        geoid_undulation_m=49.31100405064734,
+        origin_ellipsoid_height_m=462.01100405064733,
+        min_east_m=-2_500.0,
+        max_east_m=2_500.0,
+        min_north_m=-2_500.0,
+        max_north_m=2_500.0,
+        min_up_m=-500.0,
+        max_up_m=2_000.0,
+    )
+    session.add(spatial_zone_revision)
+    session.flush()
     asset = ModelAsset(
         asset_id="asset-contract-fixture-0001",
-        incident_id=incident.id,
-        episode_id=episode.id,
+        spatial_zone_revision_id=spatial_zone_revision.id,
         version=1,
         lod=AssetLod.DESKTOP,
         state=AssetState.PUBLISHED,
         glb_url="https://assets.example.invalid/fire-viewer/FR-83-00042/E01/v1.glb",
         sha256="a" * 64,
         size_bytes=123_456,
-        origin_lon=0.0,
-        origin_lat=0.0,
-        origin_altitude_m=0.0,
-        local_frame="ENU",
-        meters_per_unit=1.0,
-        vertical_datum="FIXTURE",
         terrain_source_year=2024,
         generated_at=generated_at,
         published_at=generated_at,
@@ -80,6 +103,7 @@ def _seed_published_asset(
             incident_id=incident.id,
             episode_id=episode.id,
             asset_id=asset.id,
+            spatial_zone_revision_id=spatial_zone_revision.id,
             revision=1,
             is_current=True,
             reason="Published contract fixture for the public viewer.",

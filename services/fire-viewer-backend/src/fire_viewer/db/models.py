@@ -41,6 +41,15 @@ def enum_column(enum_type: type, *, name: str) -> Enum:
     return Enum(enum_type, name=name, native_enum=False, validate_strings=True)
 
 
+def sha256_hex_check(column: str) -> str:
+    """Portable SQL predicate for a lowercase hexadecimal SHA-256 digest."""
+
+    remaining = column
+    for character in "0123456789abcdef":
+        remaining = f"replace({remaining}, '{character}', '')"
+    return f"length({column}) = 64 AND length({remaining}) = 0"
+
+
 class TimestampMixin:
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
@@ -111,9 +120,11 @@ class IncidentSeries(Base, TimestampMixin):
         back_populates="proposed_incident",
         foreign_keys="Observation.proposed_incident_id",
     )
-    assets: Mapped[list[ModelAsset]] = relationship(back_populates="incident")
     jobs: Mapped[list[Job]] = relationship(back_populates="incident")
     manifest_revisions: Mapped[list[ManifestRevision]] = relationship(back_populates="incident")
+    archive_snapshot: Mapped[ZoneArchiveSnapshot | None] = relationship(
+        back_populates="incident", uselist=False
+    )
 
     __table_args__ = (
         UniqueConstraint("territory_code", "sequence", name="uq_incident_territory_sequence"),
@@ -153,7 +164,6 @@ class Episode(Base, TimestampMixin):
     proposed_observations: Mapped[list[Observation]] = relationship(
         back_populates="proposed_episode", foreign_keys="Observation.proposed_episode_id"
     )
-    assets: Mapped[list[ModelAsset]] = relationship(back_populates="episode")
     jobs: Mapped[list[Job]] = relationship(back_populates="episode")
 
     __table_args__ = (
@@ -248,16 +258,166 @@ class Observation(Base):
     )
 
 
+class SpatialZone(Base, TimestampMixin):
+    """Stable identity for a reusable, local rural 3D zone."""
+
+    __tablename__ = "spatial_zone"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    zone_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    label: Mapped[str | None] = mapped_column(String(255))
+
+    revisions: Mapped[list[SpatialZoneRevision]] = relationship(
+        back_populates="zone", order_by="SpatialZoneRevision.revision"
+    )
+
+
+class SpatialZoneRevision(Base):
+    """Immutable spatial reference and local envelope for one zone revision.
+
+    The persisted frame is deliberately independent from a model asset: a zone can be
+    shared by multiple incidents, while an extension creates a new revision instead of
+    moving existing incidents.
+    """
+
+    __tablename__ = "spatial_zone_revision"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    spatial_zone_id: Mapped[int] = mapped_column(
+        ForeignKey("spatial_zone.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    origin_lon: Mapped[float] = mapped_column(Float, nullable=False)
+    origin_lat: Mapped[float] = mapped_column(Float, nullable=False)
+    source_orthometric_height_m: Mapped[float] = mapped_column(Float, nullable=False)
+    geoid_undulation_m: Mapped[float] = mapped_column(Float, nullable=False)
+    origin_ellipsoid_height_m: Mapped[float] = mapped_column(Float, nullable=False)
+    source_vertical_datum: Mapped[str] = mapped_column(
+        String(128), nullable=False, default="NGF-IGN69"
+    )
+    vertical_transform_id: Mapped[str] = mapped_column(String(64), nullable=False, default="RAF20")
+    vertical_grid_filename: Mapped[str] = mapped_column(
+        String(255), nullable=False, default="fr_ign_RAF20.tif"
+    )
+    vertical_grid_sha256: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        default="dc0cc2a38f0ea1029fe72cca3b5b7ed6dfe7e1db2a8d8482b7326ce3d6f25605",
+    )
+    vertical_datum: Mapped[str] = mapped_column(String(128), nullable=False, default="EPSG:4979")
+    local_frame: Mapped[str] = mapped_column(String(16), nullable=False, default="ENU")
+    meters_per_unit: Mapped[float] = mapped_column(Float, nullable=False, default=0.01)
+    unity_profile: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="unity-eun-100-v1"
+    )
+    gltf_to_unity_profile: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="gltf-eun-negz-metric-v1"
+    )
+    min_east_m: Mapped[float] = mapped_column(Float, nullable=False)
+    max_east_m: Mapped[float] = mapped_column(Float, nullable=False)
+    min_north_m: Mapped[float] = mapped_column(Float, nullable=False)
+    max_north_m: Mapped[float] = mapped_column(Float, nullable=False)
+    min_up_m: Mapped[float] = mapped_column(Float, nullable=False)
+    max_up_m: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+    zone: Mapped[SpatialZone] = relationship(back_populates="revisions")
+    assets: Mapped[list[ModelAsset]] = relationship(back_populates="spatial_zone_revision")
+    manifest_revisions: Mapped[list[ManifestRevision]] = relationship(
+        back_populates="spatial_zone_revision"
+    )
+    archive_snapshots: Mapped[list[ZoneArchiveSnapshot]] = relationship(
+        back_populates="spatial_zone_revision"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("spatial_zone_id", "revision", name="uq_spatial_zone_revision"),
+        CheckConstraint("revision >= 1", name="ck_spatial_zone_revision_positive"),
+        CheckConstraint("origin_lon >= -5.5 AND origin_lon <= 10.0", name="ck_spatial_zone_lon"),
+        CheckConstraint("origin_lat >= 42.0 AND origin_lat <= 51.5", name="ck_spatial_zone_lat"),
+        CheckConstraint(
+            "origin_lon > -1e308 AND origin_lon < 1e308 "
+            "AND origin_lat > -1e308 AND origin_lat < 1e308 "
+            "AND source_orthometric_height_m > -1e308 "
+            "AND source_orthometric_height_m < 1e308 "
+            "AND geoid_undulation_m > -1e308 AND geoid_undulation_m < 1e308 "
+            "AND origin_ellipsoid_height_m > -1e308 "
+            "AND origin_ellipsoid_height_m < 1e308",
+            name="ck_spatial_zone_origin_finite",
+        ),
+        CheckConstraint(
+            "abs(origin_ellipsoid_height_m - source_orthometric_height_m "
+            "- geoid_undulation_m) <= 0.001",
+            name="ck_spatial_zone_vertical_derivation",
+        ),
+        CheckConstraint(
+            "NOT (origin_lon >= 8.3 AND origin_lon <= 9.8 "
+            "AND origin_lat >= 41.0 AND origin_lat <= 43.3)",
+            name="ck_spatial_zone_not_corsica",
+        ),
+        CheckConstraint("source_vertical_datum = 'NGF-IGN69'", name="ck_spatial_zone_source_datum"),
+        CheckConstraint("vertical_transform_id = 'RAF20'", name="ck_spatial_zone_transform"),
+        CheckConstraint(
+            "vertical_grid_filename = 'fr_ign_RAF20.tif'", name="ck_spatial_zone_grid_filename"
+        ),
+        CheckConstraint(
+            "vertical_grid_sha256 = "
+            "'dc0cc2a38f0ea1029fe72cca3b5b7ed6dfe7e1db2a8d8482b7326ce3d6f25605'",
+            name="ck_spatial_zone_grid_hash",
+        ),
+        CheckConstraint("vertical_datum = 'EPSG:4979'", name="ck_spatial_zone_datum"),
+        CheckConstraint("local_frame = 'ENU'", name="ck_spatial_zone_frame"),
+        CheckConstraint("meters_per_unit = 0.01", name="ck_spatial_zone_scale"),
+        CheckConstraint("unity_profile = 'unity-eun-100-v1'", name="ck_spatial_zone_unity_profile"),
+        CheckConstraint(
+            "gltf_to_unity_profile = 'gltf-eun-negz-metric-v1'",
+            name="ck_spatial_zone_gltf_profile",
+        ),
+        CheckConstraint(
+            "min_east_m < max_east_m AND min_east_m <= 0 AND max_east_m >= 0",
+            name="ck_spatial_zone_east_bounds",
+        ),
+        CheckConstraint(
+            "min_east_m > -1e308 AND min_east_m < 1e308 "
+            "AND max_east_m > -1e308 AND max_east_m < 1e308 "
+            "AND min_north_m > -1e308 AND min_north_m < 1e308 "
+            "AND max_north_m > -1e308 AND max_north_m < 1e308 "
+            "AND min_up_m > -1e308 AND min_up_m < 1e308 "
+            "AND max_up_m > -1e308 AND max_up_m < 1e308",
+            name="ck_spatial_zone_bounds_finite",
+        ),
+        CheckConstraint(
+            "min_north_m < max_north_m AND min_north_m <= 0 AND max_north_m >= 0",
+            name="ck_spatial_zone_north_bounds",
+        ),
+        CheckConstraint(
+            "min_up_m < max_up_m AND min_up_m <= 0 AND max_up_m >= 0",
+            name="ck_spatial_zone_up_bounds",
+        ),
+    )
+
+
 class ModelAsset(Base):
     __tablename__ = "model_asset"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     asset_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
-    incident_id: Mapped[int] = mapped_column(
-        ForeignKey("incident_series.id", ondelete="RESTRICT"), nullable=False, index=True
+    legacy_incident_id: Mapped[int | None] = mapped_column(
+        ForeignKey("incident_series.id", ondelete="RESTRICT"), index=True
     )
-    episode_id: Mapped[int] = mapped_column(
-        ForeignKey("episode.id", ondelete="RESTRICT"), nullable=False, index=True
+    legacy_episode_id: Mapped[int | None] = mapped_column(
+        ForeignKey("episode.id", ondelete="RESTRICT"), index=True
+    )
+    legacy_origin_lon: Mapped[float | None] = mapped_column(Float)
+    legacy_origin_lat: Mapped[float | None] = mapped_column(Float)
+    legacy_origin_altitude_m: Mapped[float | None] = mapped_column(Float)
+    legacy_local_frame: Mapped[str | None] = mapped_column(String(16))
+    legacy_meters_per_unit: Mapped[float | None] = mapped_column(Float)
+    legacy_vertical_datum: Mapped[str | None] = mapped_column(String(128))
+    spatial_zone_revision_id: Mapped[int | None] = mapped_column(
+        ForeignKey("spatial_zone_revision.id", ondelete="RESTRICT"), index=True
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     lod: Mapped[AssetLod] = mapped_column(enum_column(AssetLod, name="asset_lod"), nullable=False)
@@ -267,12 +427,6 @@ class ModelAsset(Base):
     glb_url: Mapped[str] = mapped_column(String(2_048), nullable=False)
     sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
-    origin_lon: Mapped[float] = mapped_column(Float, nullable=False)
-    origin_lat: Mapped[float] = mapped_column(Float, nullable=False)
-    origin_altitude_m: Mapped[float] = mapped_column(Float, nullable=False)
-    local_frame: Mapped[str] = mapped_column(String(16), nullable=False, default="ENU")
-    meters_per_unit: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
-    vertical_datum: Mapped[str] = mapped_column(String(128), nullable=False)
     terrain_source_year: Mapped[int | None] = mapped_column(Integer)
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -281,21 +435,31 @@ class ModelAsset(Base):
         DateTime(timezone=True), default=utcnow, nullable=False
     )
 
-    incident: Mapped[IncidentSeries] = relationship(back_populates="assets")
-    episode: Mapped[Episode] = relationship(back_populates="assets")
+    spatial_zone_revision: Mapped[SpatialZoneRevision | None] = relationship(
+        back_populates="assets"
+    )
     manifest_revisions: Mapped[list[ManifestRevision]] = relationship(back_populates="asset")
+    archive_snapshots: Mapped[list[ZoneArchiveSnapshot]] = relationship(back_populates="asset")
 
     __table_args__ = (
-        UniqueConstraint(
-            "incident_id",
-            "episode_id",
-            "version",
-            "lod",
-            name="uq_asset_version_lod",
-        ),
+        UniqueConstraint("spatial_zone_revision_id", "version", "lod", name="uq_asset_version_lod"),
         CheckConstraint("version >= 1", name="ck_asset_version"),
         CheckConstraint("size_bytes > 0", name="ck_asset_size"),
-        CheckConstraint("meters_per_unit > 0", name="ck_asset_scale"),
+        CheckConstraint(
+            "spatial_zone_revision_id IS NOT NULL OR state IN ('QUARANTINED', 'DELETED_TOMBSTONE')",
+            name="ck_asset_zone_revision_required",
+        ),
+        CheckConstraint(
+            "(legacy_incident_id IS NULL AND legacy_episode_id IS NULL "
+            "AND legacy_origin_lon IS NULL AND legacy_origin_lat IS NULL "
+            "AND legacy_origin_altitude_m IS NULL AND legacy_local_frame IS NULL "
+            "AND legacy_meters_per_unit IS NULL AND legacy_vertical_datum IS NULL) "
+            "OR (legacy_incident_id IS NOT NULL AND legacy_episode_id IS NOT NULL "
+            "AND legacy_origin_lon IS NOT NULL AND legacy_origin_lat IS NOT NULL "
+            "AND legacy_origin_altitude_m IS NOT NULL AND legacy_local_frame IS NOT NULL "
+            "AND legacy_meters_per_unit IS NOT NULL AND legacy_vertical_datum IS NOT NULL)",
+            name="ck_asset_legacy_provenance",
+        ),
     )
 
 
@@ -347,6 +511,9 @@ class ManifestRevision(Base):
         ForeignKey("episode.id", ondelete="RESTRICT"), nullable=False
     )
     asset_id: Mapped[int | None] = mapped_column(ForeignKey("model_asset.id", ondelete="RESTRICT"))
+    spatial_zone_revision_id: Mapped[int | None] = mapped_column(
+        ForeignKey("spatial_zone_revision.id", ondelete="RESTRICT"), index=True
+    )
     revision: Mapped[int] = mapped_column(Integer, nullable=False)
     is_current: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     reason: Mapped[str] = mapped_column(String(500), nullable=False)
@@ -357,6 +524,12 @@ class ManifestRevision(Base):
 
     incident: Mapped[IncidentSeries] = relationship(back_populates="manifest_revisions")
     asset: Mapped[ModelAsset | None] = relationship(back_populates="manifest_revisions")
+    spatial_zone_revision: Mapped[SpatialZoneRevision | None] = relationship(
+        back_populates="manifest_revisions"
+    )
+    archive_snapshot: Mapped[ZoneArchiveSnapshot | None] = relationship(
+        back_populates="manifest_revision", uselist=False
+    )
 
     __table_args__ = (
         UniqueConstraint("incident_id", "revision", name="uq_manifest_revision"),
@@ -368,6 +541,61 @@ class ManifestRevision(Base):
             postgresql_where=text("is_current"),
         ),
         CheckConstraint("revision >= 1", name="ck_manifest_revision"),
+        CheckConstraint(
+            "spatial_zone_revision_id IS NULL OR asset_id IS NOT NULL",
+            name="ck_manifest_zone_requires_asset",
+        ),
+    )
+
+
+class ZoneArchiveSnapshot(Base):
+    """The one immutable PNG capture retained when an incident is archived."""
+
+    __tablename__ = "zone_archive_snapshot"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    archive_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    incident_id: Mapped[int] = mapped_column(
+        ForeignKey("incident_series.id", ondelete="RESTRICT"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    manifest_revision_id: Mapped[int] = mapped_column(
+        ForeignKey("manifest_revision.id", ondelete="RESTRICT"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    asset_id: Mapped[int] = mapped_column(
+        ForeignKey("model_asset.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    spatial_zone_revision_id: Mapped[int] = mapped_column(
+        ForeignKey("spatial_zone_revision.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    image_url: Mapped[str] = mapped_column(String(2_048), nullable=False)
+    media_type: Mapped[str] = mapped_column(String(64), nullable=False, default="image/png")
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    asset_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    render_profile: Mapped[str] = mapped_column(String(128), nullable=False)
+    rendered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+    incident: Mapped[IncidentSeries] = relationship(back_populates="archive_snapshot")
+    manifest_revision: Mapped[ManifestRevision] = relationship(back_populates="archive_snapshot")
+    asset: Mapped[ModelAsset] = relationship(back_populates="archive_snapshots")
+    spatial_zone_revision: Mapped[SpatialZoneRevision] = relationship(
+        back_populates="archive_snapshots"
+    )
+
+    __table_args__ = (
+        CheckConstraint("media_type = 'image/png'", name="ck_zone_archive_png"),
+        CheckConstraint(sha256_hex_check("sha256"), name="ck_zone_archive_sha256"),
+        CheckConstraint(sha256_hex_check("asset_sha256"), name="ck_zone_archive_asset_sha256"),
+        CheckConstraint("lower(image_url) NOT LIKE '%.glb%'", name="ck_zone_archive_not_glb"),
+        CheckConstraint("lower(image_url) LIKE '%.png'", name="ck_zone_archive_png_url"),
     )
 
 

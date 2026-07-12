@@ -7,7 +7,14 @@ from sqlalchemy.orm import Session, selectinload
 
 from fire_viewer.core.config import Settings
 from fire_viewer.core.time import as_utc
-from fire_viewer.db.models import Episode, IncidentSeries, ManifestRevision, ModelAsset
+from fire_viewer.db.models import (
+    Episode,
+    IncidentSeries,
+    ManifestRevision,
+    ModelAsset,
+    SpatialZoneRevision,
+    ZoneArchiveSnapshot,
+)
 from fire_viewer.domain.enums import AssetState, IncidentStatus, PublicVisibility
 from fire_viewer.domain.errors import DomainError, NotFoundError
 from fire_viewer.domain.schemas import (
@@ -20,6 +27,7 @@ from fire_viewer.domain.schemas import (
     PointGeometryInput,
     ViewerManifest,
 )
+from fire_viewer.domain.spatial import SpatialProfileError, validate_raf20_derivation
 
 
 def _load_incident(session: Session, fire_id: str) -> IncidentSeries:
@@ -104,12 +112,35 @@ def get_viewer_manifest(
     current = _current_episode(incident)
     location = _public_location(incident, current)
     withheld = location is None
+    archived = False
+    if current.status == IncidentStatus.CLOSED:
+        archived = (
+            session.execute(
+                select(ZoneArchiveSnapshot.id)
+                .join(
+                    ManifestRevision,
+                    ManifestRevision.id == ZoneArchiveSnapshot.manifest_revision_id,
+                )
+                .where(
+                    ZoneArchiveSnapshot.incident_id == incident.id,
+                    ManifestRevision.incident_id == incident.id,
+                    ManifestRevision.episode_id == current.id,
+                    ManifestRevision.is_current.is_(True),
+                )
+            ).scalar_one_or_none()
+            is not None
+        )
 
     revision_row = session.execute(
-        select(ManifestRevision, ModelAsset)
+        select(ManifestRevision, ModelAsset, SpatialZoneRevision)
         .outerjoin(ModelAsset, ModelAsset.id == ManifestRevision.asset_id)
+        .outerjoin(
+            SpatialZoneRevision,
+            SpatialZoneRevision.id == ManifestRevision.spatial_zone_revision_id,
+        )
         .where(
             ManifestRevision.incident_id == incident.id,
+            ManifestRevision.episode_id == current.id,
             ManifestRevision.is_current.is_(True),
         )
     ).one_or_none()
@@ -122,34 +153,59 @@ def get_viewer_manifest(
 
     if withheld:
         model_state = "withheld"
-    elif revision_row is None or revision_row[1] is None:
+    elif archived:
+        # The immutable archive retains a PNG internally.  It intentionally does not leak a
+        # historic GLB, a viewer frame, or an archive URL through the public v2 manifest.
+        model_state = "not_available"
+    elif revision_row is None or revision_row[1] is None or revision_row[2] is None:
         model_state = "not_available"
     else:
-        _revision, asset = revision_row
-        if asset.state != AssetState.PUBLISHED:
+        _revision, asset, spatial_zone_revision = revision_row
+        if (
+            asset.state != AssetState.PUBLISHED
+            or asset.spatial_zone_revision_id != spatial_zone_revision.id
+        ):
             model_state = "not_available"
         else:
-            model_state = "available"
-            asset_payload = ManifestAsset(
-                asset_id=asset.asset_id,
-                version=asset.version,
-                url=asset.glb_url,
-                sha256=asset.sha256,
-                size_bytes=asset.size_bytes,
-                lod=asset.lod,
-            )
-            frame_payload = ManifestFrame(
-                origin_wgs84=(asset.origin_lon, asset.origin_lat, asset.origin_altitude_m),
-                local_frame="ENU",
-                meters_per_unit=asset.meters_per_unit,
-                vertical_datum=asset.vertical_datum,
-            )
-            terrain_source_year = asset.terrain_source_year
-            generated_at = as_utc(asset.generated_at)
+            try:
+                validate_raf20_derivation(
+                    spatial_zone_revision.origin_lon,
+                    spatial_zone_revision.origin_lat,
+                    spatial_zone_revision.source_orthometric_height_m,
+                    spatial_zone_revision.geoid_undulation_m,
+                    spatial_zone_revision.origin_ellipsoid_height_m,
+                )
+            except SpatialProfileError:
+                # A manually injected or corrupted revision is never projected publicly.
+                model_state = "not_available"
+            else:
+                model_state = "available"
+                asset_payload = ManifestAsset(
+                    asset_id=asset.asset_id,
+                    version=asset.version,
+                    url=asset.glb_url,
+                    sha256=asset.sha256,
+                    size_bytes=asset.size_bytes,
+                    lod=asset.lod,
+                )
+                frame_payload = ManifestFrame(
+                    origin_wgs84=(
+                        spatial_zone_revision.origin_lon,
+                        spatial_zone_revision.origin_lat,
+                        spatial_zone_revision.origin_ellipsoid_height_m,
+                    ),
+                    local_frame=spatial_zone_revision.local_frame,
+                    meters_per_unit=spatial_zone_revision.meters_per_unit,
+                    vertical_datum=spatial_zone_revision.vertical_datum,
+                )
+                terrain_source_year = asset.terrain_source_year
+                generated_at = as_utc(asset.generated_at)
 
     notice = settings.public_notice
     if incident.public_note:
         notice = f"{notice} {incident.public_note}"
+    if archived:
+        notice = f"{notice} 3D viewer asset is no longer available for this archived incident."
 
     return ViewerManifest(
         schema_version="2.0",

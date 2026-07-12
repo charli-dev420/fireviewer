@@ -10,6 +10,9 @@
 export const VIEWER_MANIFEST_SCHEMA_VERSION = '2.0' as const;
 
 export const VIEWER_MANIFEST_FIRE_ID_RE = /^FR-[0-9A-Z]{2,3}-[0-9]{5}$/;
+export const VIEWER_MANIFEST_LOCAL_FRAME = 'ENU' as const;
+export const VIEWER_MANIFEST_METERS_PER_UNIT = 0.01 as const;
+export const VIEWER_MANIFEST_VERTICAL_DATUM = 'EPSG:4979' as const;
 
 const STATUS_CODES = [
   'CANDIDATE',
@@ -54,9 +57,9 @@ export interface ViewerManifestAsset {
 
 export interface ViewerManifestFrame {
   origin_wgs84: [number, number, number];
-  local_frame: 'ENU';
-  meters_per_unit: number;
-  vertical_datum: string;
+  local_frame: typeof VIEWER_MANIFEST_LOCAL_FRAME;
+  meters_per_unit: typeof VIEWER_MANIFEST_METERS_PER_UNIT;
+  vertical_datum: typeof VIEWER_MANIFEST_VERTICAL_DATUM;
 }
 
 export interface ViewerManifestFreshness {
@@ -185,6 +188,19 @@ function tuple(value: unknown, path: string, length: number): number[] {
   return value.map((item, index) => finiteNumber(item, `${path}[${index}]`));
 }
 
+function boundedNumber(
+  value: unknown,
+  path: string,
+  minimum: number,
+  maximum: number,
+): number {
+  const parsed = finiteNumber(value, path);
+  if (parsed < minimum || parsed > maximum) {
+    return fail(path, `doit être compris entre ${minimum} et ${maximum}.`);
+  }
+  return parsed;
+}
+
 function parseStatus(value: unknown): ViewerManifestStatus {
   const record = strictRecord(value, 'status', ['code', 'validated_at', 'review_required']);
   return {
@@ -249,14 +265,26 @@ function parseFrame(value: unknown): ViewerManifestFrame | null {
     'vertical_datum',
   ]);
   const origin = tuple(record.origin_wgs84, 'frame.origin_wgs84', 3);
-  if (record.local_frame !== 'ENU') {
-    return fail('frame.local_frame', 'doit être "ENU".');
+  const longitude = boundedNumber(origin[0], 'frame.origin_wgs84[0]', -180, 180);
+  const latitude = boundedNumber(origin[1], 'frame.origin_wgs84[1]', -90, 90);
+  const ellipsoidHeight = finiteNumber(origin[2], 'frame.origin_wgs84[2]');
+  if (record.local_frame !== VIEWER_MANIFEST_LOCAL_FRAME) {
+    return fail('frame.local_frame', `doit être "${VIEWER_MANIFEST_LOCAL_FRAME}".`);
+  }
+  if (record.meters_per_unit !== VIEWER_MANIFEST_METERS_PER_UNIT) {
+    return fail(
+      'frame.meters_per_unit',
+      `doit être ${VIEWER_MANIFEST_METERS_PER_UNIT} (100 unités Unity par mètre).`,
+    );
+  }
+  if (record.vertical_datum !== VIEWER_MANIFEST_VERTICAL_DATUM) {
+    return fail('frame.vertical_datum', `doit être "${VIEWER_MANIFEST_VERTICAL_DATUM}".`);
   }
   return {
-    origin_wgs84: [origin[0], origin[1], origin[2]],
-    local_frame: 'ENU',
-    meters_per_unit: finiteNumber(record.meters_per_unit, 'frame.meters_per_unit'),
-    vertical_datum: string(record.vertical_datum, 'frame.vertical_datum'),
+    origin_wgs84: [longitude, latitude, ellipsoidHeight],
+    local_frame: VIEWER_MANIFEST_LOCAL_FRAME,
+    meters_per_unit: VIEWER_MANIFEST_METERS_PER_UNIT,
+    vertical_datum: VIEWER_MANIFEST_VERTICAL_DATUM,
   };
 }
 

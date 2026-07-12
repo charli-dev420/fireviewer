@@ -13,6 +13,9 @@ def test_minimal_incident_schema_is_migrated(app) -> None:
         "source",
         "audit_event",
         "manifest_revision",
+        "spatial_zone",
+        "spatial_zone_revision",
+        "zone_archive_snapshot",
         "idempotency_record",
         "outbox_event",
     }.issubset(tables)

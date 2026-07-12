@@ -36,7 +36,31 @@ L'UI conserve un parseur strict séparé de son agrégat de démonstration. **NO
 
 ## Contrat spatial
 
-Le manifeste doit porter l'origine WGS84, le repère local ENU, le datum vertical et `meters_per_unit`. La roadmap cible une convention 1:1 mètre/unité. Le projet Unity de Die existant utilise une convention de présentation 100:1 ; son intégration est suspendue jusqu'à une ADR et des tests de précision.
+L'[ADR-002](adr/ADR-002-spatial-local-unity-contract.md) fixe un profil de terrain local
+pour la France continentale rurale. Toute origine est `EPSG:4979` et toute valeur tableau
+`origin_wgs84` est `[longitude, latitude, hauteur_ellipsoïdale]`. Une hauteur source
+NGF-IGN69 est convertie par RAF20 local, épinglé par URI et SHA-256, sans téléchargement
+réseau à l'exécution. Corse et outre-mer nécessitent un profil distinct et restent hors
+périmètre.
+
+Le repère physique est ENU en mètres. Le GLB stocke `(E, U, -N)` avec
+`gltf_meters_per_unit = 1.0`; Unity reçoit `(100E, 100U, 100N)`. Le monde de rendu Unity
+est donc décrit par `ViewerManifest.frame.meters_per_unit = 0.01`, sans facteur implicite
+dans une scène ou un prefab. Un `spatial_snapshot` immuable associe l'asset à une révision
+de zone et à l'archive PNG de la révision de manifeste. Aucun globe, tuilage ou runtime
+Cesium ne fait partie de cette architecture.
+
+```text
+NGF-IGN69 H --RAF20 local--> EPSG:4979 [lon, lat, h] --origine--> ENU mètres
+                                                                  |-- GLB (E, U, -N), 1 m/u
+                                                                  `-- Unity (100E, 100U, 100N), 0.01 m/u
+```
+
+**VÉRIFIÉ** : les points de contrôle fictifs WGS84/ENU/Unity, le facteur ×100, le hash
+RAF20 et la migration SQLite sont traversés par les tests backend. **NON VÉRIFIÉ** :
+l'import d'un GLB réel dans Unity, la production matérielle du PNG et l'exécution de la
+migration sur une instance PostgreSQL restent nécessaires avant de déclarer un terrain 3D
+aligné en intégration.
 
 ## Limites de sécurité
 

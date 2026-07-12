@@ -58,6 +58,14 @@ describe('parseViewerManifest', () => {
     expect(parseViewerManifest(notAvailableFixture).status.code).toBe('REJECTED');
   });
 
+  it('accepte le profil spatial Unity canonique du manifeste disponible', () => {
+    expect(parseViewerManifest(availableFixture).frame).toMatchObject({
+      local_frame: 'ENU',
+      meters_per_unit: 0.01,
+      vertical_datum: 'EPSG:4979',
+    });
+  });
+
   it('applique les invariants des trois états de modèle', () => {
     const available = parseViewerManifest(availableFixture);
     expect(available.model_state).toBe('available');
@@ -83,6 +91,38 @@ describe('parseViewerManifest', () => {
     invalid.asset = null;
 
     expect(() => parseViewerManifest(invalid)).toThrow('"available"');
+  });
+
+  it.each([1, 100])('rejette une échelle Unity non canonique (%s)', (metersPerUnit) => {
+    const invalid = clonedFixture(availableFixture);
+    (invalid.frame as Record<string, unknown>).meters_per_unit = metersPerUnit;
+
+    expect(() => parseViewerManifest(invalid)).toThrow('frame.meters_per_unit');
+  });
+
+  it('rejette un repère local autre que ENU', () => {
+    const invalid = clonedFixture(availableFixture);
+    (invalid.frame as Record<string, unknown>).local_frame = 'EUN';
+
+    expect(() => parseViewerManifest(invalid)).toThrow('frame.local_frame');
+  });
+
+  it('rejette un datum vertical libre', () => {
+    const invalid = clonedFixture(availableFixture);
+    (invalid.frame as Record<string, unknown>).vertical_datum = 'NGF-IGN69';
+
+    expect(() => parseViewerManifest(invalid)).toThrow('frame.vertical_datum');
+  });
+
+  it.each([
+    ['longitude hors bornes', [180.000001, 0, 0]],
+    ['latitude hors bornes', [0, -90.000001, 0]],
+    ['hauteur non finie', [0, 0, Number.NaN]],
+  ] as const)('rejette une origine WGS84 invalide : %s', (_label, origin) => {
+    const invalid = clonedFixture(availableFixture);
+    (invalid.frame as Record<string, unknown>).origin_wgs84 = origin;
+
+    expect(() => parseViewerManifest(invalid)).toThrow('frame.origin_wgs84');
   });
 
   it('produit un résumé sans données issues du fixture de démonstration', () => {

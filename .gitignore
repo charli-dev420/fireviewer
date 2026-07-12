@@ -24,6 +24,11 @@
 **/*.sqlite3
 **/data/
 
+# Donnée géodésique publique, épinglée et nécessaire aux conversions RAF20 hors ligne.
+!services/fire-viewer-backend/src/fire_viewer/data/
+!services/fire-viewer-backend/src/fire_viewer/data/proj/
+!services/fire-viewer-backend/src/fire_viewer/data/proj/fr_ign_RAF20.tif
+
 # Node / Vite
 **/node_modules/
 **/dist/
