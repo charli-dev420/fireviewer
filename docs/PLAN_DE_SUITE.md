@@ -9,9 +9,10 @@ Ce plan vise d'abord G0 puis un vertical slice G1 local et fictif. Il ne constit
 | ID | État | Preuve actuelle |
 | --- | --- | --- |
 | FV-001 | **VÉRIFIÉ** | dépôt public initialisé, provenance locale des ZIP ignorée par Git, documentation et licences publiées |
-| FV-002 | **VÉRIFIÉ** | UI : `npm ci`, contrôle TypeScript, build et parcours mocké bureau/mobile ; backend : migrations, qualité, compilation et 40 tests passants à 87,29 % de couverture |
+| FV-002 | **VÉRIFIÉ** | UI : `npm ci`, contrôle TypeScript, build et parcours mocké bureau/mobile ; backend : migrations, qualité, compilation et 69 tests passants à 88,70 % de couverture |
 | FV-003 | **VÉRIFIÉ** | ADR-001, schéma JSON `ViewerManifest` v2, fixtures fictifs, OpenAPI, CORS et tests backend/UI ; le raccordement réseau réel reste FV-006 |
 | FV-004 | **VÉRIFIÉ (contrat et contrôles SQLite)** | ADR-002, schéma spatial v1, fixtures fictifs ENU/glTF/Unity, zones, révision, snapshot et contrôles de transformation, axes, origine et hash RAF20 ; rendu Unity/PNG réel et migration PostgreSQL restent non vérifiés |
+| FV-005 | **VÉRIFIÉ (SQLite et contrats)** | seed `FR-83-00042` v1 entièrement fictif, idempotence sans écriture au second passage, manifeste/ETag hashés, matrice versionnée et masquage canonique ; 69 tests backend et 34 tests UI passent |
 
 **NON VÉRIFIÉ** : la page UI réelle conserve encore son adaptateur `IncidentData` historique. Le parseur `ViewerManifest` est vérifié, mais le raccordement avec `VITE_USE_MOCKS=false` reste FV-006.
 
@@ -58,7 +59,8 @@ Les phases 14 à 18 sont des prérequis : threat model, RBAC, minimisation des d
 
 ## Prochaine action sûre
 
-Réaliser **FV-005** : préparer le seed fictif `FR-83-00042` et la matrice
-états/visibilités à partir de `ViewerManifest` v2 et du contrat spatial v1, sans asset réel
-ni transfert du projet de Die. FV-008/FV-009 intégreront ensuite le GLB, son rendu Unity et
-l'archive PNG réelle dans ce contrat déjà contrôlé.
+Réaliser **FV-006** : connecter la page `/incident/FR-83-00042` au manifeste canonique
+avec `VITE_USE_MOCKS=false`, en conservant le mode mock explicite. Le parcours devra couvrir
+le seed `not_available`, le `404`, le timeout, le `304` navigateur et le fallback sans WebGL,
+sans remplir Sources, Historique ni Journal avec le fixture. FV-008/FV-009 intégreront ensuite
+un GLB, son rendu Unity et l'archive PNG réelle dans le contrat déjà contrôlé.

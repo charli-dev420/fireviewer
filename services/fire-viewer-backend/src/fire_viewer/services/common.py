@@ -22,9 +22,10 @@ from fire_viewer.db.models import (
     OutboxEvent,
     Source,
 )
-from fire_viewer.domain.enums import ActorType, IncidentStatus, PublicVisibility
+from fire_viewer.domain.enums import ActorType, IncidentStatus
 from fire_viewer.domain.geospatial import bbox_for_point
 from fire_viewer.domain.hashing import json_safe, sha256_hex
+from fire_viewer.domain.public_visibility import canonical_public_visibility
 
 
 def source_snapshot(source: Source) -> dict[str, Any]:
@@ -222,7 +223,7 @@ def create_incident_and_episode(
         bbox_max_lon=bbox.max_lon,
         bbox_min_lat=bbox.min_lat,
         bbox_max_lat=bbox.max_lat,
-        public_visibility=PublicVisibility.LIMITED,
+        public_visibility=canonical_public_visibility(initial_status),
         version=1,
     )
     session.add(incident)
@@ -254,7 +255,7 @@ def create_reactivation_episode(
 ) -> Episode:
     previous_episode.is_current = False
     previous_episode.version += 1
-    incident.public_visibility = PublicVisibility.LIMITED
+    incident.public_visibility = canonical_public_visibility(IncidentStatus.UNDER_REVIEW)
     incident.version += 1
     max_ordinal = session.execute(
         select(func.max(Episode.ordinal)).where(Episode.incident_id == incident.id)

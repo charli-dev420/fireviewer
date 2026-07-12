@@ -28,6 +28,24 @@ const STATUS_CODES = [
 const MODEL_STATES = ['available', 'not_available', 'withheld'] as const;
 const ASSET_LODS = ['mobile', 'desktop'] as const;
 
+/**
+ * Projection publique autorisée par le cycle de vie backend. `TOMBSTONED`
+ * n'apparaît pas ici : c'est une visibilité de série qui répond 410 avant
+ * qu'un ViewerManifest ne soit sérialisé.
+ */
+const MODEL_STATES_BY_STATUS: Readonly<
+  Record<(typeof STATUS_CODES)[number], readonly (typeof MODEL_STATES)[number][]>
+> = {
+  CANDIDATE: ['withheld'],
+  UNDER_REVIEW: ['withheld'],
+  ACTIVE_CONFIRMED: ['available', 'not_available'],
+  MONITORING: ['available', 'not_available'],
+  EXTINGUISHED: ['available', 'not_available'],
+  CLOSED: ['not_available'],
+  SUSPENDED: ['withheld'],
+  REJECTED: ['withheld'],
+};
+
 export type ViewerManifestStatusCode = (typeof STATUS_CODES)[number];
 export type ViewerManifestModelState = (typeof MODEL_STATES)[number];
 export type ViewerManifestAssetLod = (typeof ASSET_LODS)[number];
@@ -324,6 +342,16 @@ function validateModelStateInvariants(manifest: ViewerManifest): void {
   }
 }
 
+function validateLifecycleInvariants(manifest: ViewerManifest): void {
+  const allowedModelStates = MODEL_STATES_BY_STATUS[manifest.status.code];
+  if (!allowedModelStates.includes(manifest.model_state)) {
+    fail(
+      'status.code',
+      `"${manifest.status.code}" ne peut pas être associé à model_state "${manifest.model_state}".`,
+    );
+  }
+}
+
 /** Parse et valide strictement le JSON réseau du manifeste public. */
 export function parseViewerManifest(value: unknown): ViewerManifest {
   const record = strictRecord(value, 'manifest', [
@@ -360,6 +388,7 @@ export function parseViewerManifest(value: unknown): ViewerManifest {
     public_notice: string(record.public_notice, 'public_notice'),
   };
   validateModelStateInvariants(manifest);
+  validateLifecycleInvariants(manifest);
   return manifest;
 }
 

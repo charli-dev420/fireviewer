@@ -17,6 +17,11 @@ from fire_viewer.db.models import (
 )
 from fire_viewer.domain.enums import AssetState, IncidentStatus, PublicVisibility
 from fire_viewer.domain.errors import DomainError, NotFoundError
+from fire_viewer.domain.public_visibility import (
+    has_canonical_public_visibility,
+    permits_public_location,
+    permits_public_viewer_asset,
+)
 from fire_viewer.domain.schemas import (
     EpisodeSummary,
     IncidentPublicResponse,
@@ -60,11 +65,21 @@ def _current_episode(incident: IncidentSeries) -> Episode:
     return current
 
 
+def _require_canonical_public_visibility(incident: IncidentSeries, current: Episode) -> None:
+    """Reject corrupted lifecycle/visibility pairs before constructing any public DTO."""
+
+    if has_canonical_public_visibility(current.status, incident.public_visibility):
+        return
+    raise DomainError(
+        status_code=503,
+        code="incident_inconsistent",
+        title="Incident data unavailable",
+        detail="The incident lifecycle state and public visibility are inconsistent.",
+    )
+
+
 def _public_location(incident: IncidentSeries, current: Episode) -> PointGeometryInput | None:
-    if (
-        incident.public_visibility != PublicVisibility.PUBLIC
-        or current.status == IncidentStatus.SUSPENDED
-    ):
+    if not permits_public_location(current.status, incident.public_visibility):
         return None
     return PointGeometryInput(
         coordinates=(incident.reference_lon, incident.reference_lat),
@@ -75,6 +90,7 @@ def _public_location(incident: IncidentSeries, current: Episode) -> PointGeometr
 def get_incident_public(session: Session, fire_id: str) -> IncidentPublicResponse:
     incident = _load_incident(session, fire_id)
     current = _current_episode(incident)
+    _require_canonical_public_visibility(incident, current)
     return IncidentPublicResponse(
         fire_id=incident.fire_id,
         canonical_name=incident.canonical_name,
@@ -110,6 +126,7 @@ def get_viewer_manifest(
 ) -> ViewerManifest:
     incident = _load_incident(session, fire_id)
     current = _current_episode(incident)
+    _require_canonical_public_visibility(incident, current)
     location = _public_location(incident, current)
     withheld = location is None
     archived = False
@@ -153,9 +170,10 @@ def get_viewer_manifest(
 
     if withheld:
         model_state = "withheld"
-    elif archived:
+    elif not permits_public_viewer_asset(current.status, incident.public_visibility):
         # The immutable archive retains a PNG internally.  It intentionally does not leak a
         # historic GLB, a viewer frame, or an archive URL through the public v2 manifest.
+        # This also applies to every CLOSED episode before checking any stored asset.
         model_state = "not_available"
     elif revision_row is None or revision_row[1] is None or revision_row[2] is None:
         model_state = "not_available"

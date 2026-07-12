@@ -34,6 +34,24 @@ L'[ADR-001](adr/ADR-001-viewer-manifest-public-contract.md) fixe le contrat à :
 
 L'UI conserve un parseur strict séparé de son agrégat de démonstration. **NON VÉRIFIÉ** : l'appel de page réel reste différé à FV-006 ; aucune vue Sources, Historique ou Journal ne doit être alimentée par des données mockées lors de ce raccordement.
 
+### Projection publique canonique
+
+La visibilité n'est pas une préférence de rendu : elle suit la machine à états et échoue
+fermée lorsqu'une ligne persistée est incohérente. La matrice versionnée de démonstration
+est conservée sous `contracts/demo/v1/`.
+
+| Statut courant | Visibilité effective | Projection viewer |
+| --- | --- | --- |
+| `CANDIDATE`, `UNDER_REVIEW`, `REJECTED` | `LIMITED` | `withheld` : localisation, asset et repère masqués |
+| `SUSPENDED` | `SUSPENDED` | `withheld` : localisation, asset et repère masqués |
+| `ACTIVE_CONFIRMED`, `MONITORING`, `EXTINGUISHED` | `PUBLIC` | `available` seulement avec asset publié conforme, sinon `not_available` |
+| `CLOSED` | `PUBLIC` | `not_available` : aucun GLB ou repère public, même avec un snapshot PNG interne |
+| tombstone | `TOMBSTONED` | réponse `410` Problem Details, sans manifeste |
+
+Le jeu `FR-83-00042` est un identifiant de fixture, non une déclaration de feu ni de
+localisation opérationnelle. Son seed de référence est sans asset et sert à vérifier le
+fallback texte avant FV-006 et FV-008.
+
 ## Contrat spatial
 
 L'[ADR-002](adr/ADR-002-spatial-local-unity-contract.md) fixe un profil de terrain local

@@ -10,9 +10,10 @@ from fire_viewer.core.security import Actor
 from fire_viewer.core.time import utcnow
 from fire_viewer.db.models import Episode, IncidentSeries
 from fire_viewer.db.transactions import begin_write_transaction
-from fire_viewer.domain.enums import IncidentStatus, PublicVisibility
+from fire_viewer.domain.enums import IncidentStatus
 from fire_viewer.domain.errors import ConflictError, ForbiddenError, NotFoundError
 from fire_viewer.domain.hashing import sha256_hex
+from fire_viewer.domain.public_visibility import canonical_public_visibility
 from fire_viewer.domain.schemas import TransitionRequest, TransitionResponse
 from fire_viewer.domain.state_machine import get_transition_rule
 from fire_viewer.services.common import (
@@ -149,19 +150,17 @@ def transition_incident(
         episode.review_required = False
         episode.ended_at = now
 
+    incident.public_visibility = canonical_public_visibility(payload.target_status)
     if payload.target_status == IncidentStatus.SUSPENDED:
-        incident.public_visibility = PublicVisibility.SUSPENDED
         incident.public_note = payload.public_note or "Incident suspended pending review."
     elif payload.target_status in {
         IncidentStatus.CANDIDATE,
         IncidentStatus.UNDER_REVIEW,
         IncidentStatus.REJECTED,
     }:
-        incident.public_visibility = PublicVisibility.LIMITED
         if payload.public_note is not None:
             incident.public_note = payload.public_note
     else:
-        incident.public_visibility = PublicVisibility.PUBLIC
         if payload.public_note is not None or previous_status == IncidentStatus.SUSPENDED:
             incident.public_note = payload.public_note
     incident.version += 1
