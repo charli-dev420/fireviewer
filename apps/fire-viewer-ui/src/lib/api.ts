@@ -2,6 +2,10 @@ import { demoIncident } from '../fixtures/demoIncident';
 import type { IncidentData } from '../types';
 import { VIEWER_MANIFEST_FIRE_ID_RE } from './viewerManifest';
 
+/**
+ * Erreur du parcours de démonstration uniquement. Le client public réel est
+ * dans `manifestClient.ts` et ne connaît ni ce type ni le fixture.
+ */
 export class IncidentApiError extends Error {
   constructor(
     message: string,
@@ -16,26 +20,6 @@ export function isValidFireId(value: string): boolean {
   return VIEWER_MANIFEST_FIRE_ID_RE.test(value);
 }
 
-function validateIncidentData(value: unknown): IncidentData {
-  if (!value || typeof value !== 'object') {
-    throw new IncidentApiError('Réponse API invalide.');
-  }
-
-  const candidate = value as Partial<IncidentData>;
-  if (
-    candidate.schemaVersion !== '2.0' ||
-    typeof candidate.fireId !== 'string' ||
-    typeof candidate.episodeId !== 'string' ||
-    !candidate.asset ||
-    !candidate.frame ||
-    !candidate.status
-  ) {
-    throw new IncidentApiError('Le manifeste ne respecte pas le schéma attendu.');
-  }
-
-  return candidate as IncidentData;
-}
-
 function cloneDemo(fireId: string): IncidentData {
   return {
     ...structuredClone(demoIncident),
@@ -43,55 +27,40 @@ function cloneDemo(fireId: string): IncidentData {
   };
 }
 
-export async function loadIncident(
+function mockDelay(signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Le chargement fictif a été annulé.', 'AbortError'));
+      return;
+    }
+
+    const timeoutId = globalThis.setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, 280);
+    const onAbort = () => {
+      globalThis.clearTimeout(timeoutId);
+      reject(new DOMException('Le chargement fictif a été annulé.', 'AbortError'));
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+/**
+ * Charge le dashboard riche fictif. Cette fonction ne réalise aucune requête
+ * HTTP, quel que soit l'environnement ; elle ne peut donc jamais atteindre
+ * l'ancien endpoint `/incident/{fire_id}`.
+ */
+export async function loadMockIncident(
   fireId: string,
   externalSignal?: AbortSignal,
 ): Promise<IncidentData> {
   if (!isValidFireId(fireId)) {
     throw new IncidentApiError('Identifiant incident invalide.', 400);
   }
-
-  const useMocks = import.meta.env.VITE_USE_MOCKS !== 'false';
-  if (useMocks) {
-    await new Promise((resolve) => window.setTimeout(resolve, 280));
-    return cloneDemo(fireId);
-  }
-
-  const baseUrl = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
-  if (!baseUrl) {
-    throw new IncidentApiError('VITE_API_BASE_URL doit être défini lorsque les mocks sont désactivés.');
-  }
-
-  const timeoutController = new AbortController();
-  const timeoutId = window.setTimeout(() => timeoutController.abort(), 8_000);
-  const onAbort = () => timeoutController.abort();
-  externalSignal?.addEventListener('abort', onAbort, { once: true });
-
-  try {
-    const response = await fetch(`${baseUrl}/incident/${encodeURIComponent(fireId)}`, {
-      signal: timeoutController.signal,
-      headers: { Accept: 'application/json' },
-      credentials: 'omit',
-    });
-
-    if (!response.ok) {
-      throw new IncidentApiError(
-        response.status === 404
-          ? 'Incident introuvable.'
-          : `Erreur API (${response.status}).`,
-        response.status,
-      );
-    }
-
-    return validateIncidentData(await response.json());
-  } catch (error) {
-    if (error instanceof IncidentApiError) throw error;
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new IncidentApiError('Le chargement de l’incident a dépassé le délai autorisé.');
-    }
-    throw new IncidentApiError('Impossible de joindre le service incident.');
-  } finally {
-    window.clearTimeout(timeoutId);
-    externalSignal?.removeEventListener('abort', onAbort);
-  }
+  await mockDelay(externalSignal);
+  return cloneDemo(fireId);
 }
+
+/** Compatibilité transitoire : le nom historique reste exclusivement mock-only. */
+export const loadIncident = loadMockIncident;

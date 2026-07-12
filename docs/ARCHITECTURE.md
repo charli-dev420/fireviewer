@@ -6,12 +6,13 @@
 
 ```text
 observations -> API transactionnelle -> audit / matching / états
-                                      -> manifeste courant -> shell web
-                                                           -> Unity WebGL
-                                      -> asset GLB immuable
+                                      -> manifeste courant -> client web strict
+                                                           -> rendu DOM public minimal
+                                                           -> Unity WebGL (FV-009)
+                                      -> asset GLB immuable (FV-008)
 ```
 
-Le backend est responsable des identifiants, de l'audit, des règles de matching et de la publication de manifestes. L'UI affiche la situation avant toute initialisation 3D. Unity charge seulement un asset dont l'intégrité et le repère sont décrits par le manifeste.
+Le backend est responsable des identifiants, de l'audit, des règles de matching et de la publication de manifestes. L'UI affiche la situation avant toute initialisation 3D. FV-006 rend le manifeste public dans le DOM ; Unity ne sera autorisé à charger un asset dont l'intégrité et le repère sont décrits par le manifeste qu'après FV-008/FV-009.
 
 ## Identifiants stables
 
@@ -32,7 +33,41 @@ L'[ADR-001](adr/ADR-001-viewer-manifest-public-contract.md) fixe le contrat à :
 - CORS configurable, avec `If-None-Match` autorisé et `ETag` exposé pour les origines de développement documentées ;
 - trois états explicites : `available`, `not_available` et `withheld`. Le dernier masque localisation, asset et repère.
 
-L'UI conserve un parseur strict séparé de son agrégat de démonstration. **NON VÉRIFIÉ** : l'appel de page réel reste différé à FV-006 ; aucune vue Sources, Historique ou Journal ne doit être alimentée par des données mockées lors de ce raccordement.
+L'UI conserve un parseur strict séparé de son agrégat de démonstration ; la consommation
+réelle du manifeste est décrite ci-dessous. Les vues Sources, Historique et Journal ne
+doivent jamais être alimentées par des données mockées dans ce parcours.
+
+### Consommation web FV-006
+
+**VÉRIFIÉ dans FV-006** : `App` choisit une branche discriminée par
+`VITE_USE_MOCKS`. La valeur exacte `true` monte le dashboard `IncidentData` fictif ; la
+valeur exacte `false` exige une origine HTTP(S) sans préfixe API et monte la branche
+`ViewerManifest`. Toute autre configuration conduit à `N/A — mode de données non
+configuré`, sans requête et sans fixture.
+
+La branche API appelle exclusivement
+`GET {VITE_API_BASE_URL}/api/v1/incident/{fire_id}/manifest`. Elle parse chaque `200`,
+vérifie le `fire_id`, exige un `ETag`, puis adapte seulement le résumé public. Les requêtes
+utilisent `cache: "no-store"`, `credentials: "omit"` et `If-None-Match`. Le cache contient
+`{ manifest, etag, checkedAt }`, est séparé par origine, version de schéma et `fire_id`, et
+utilise `sessionStorage` avec repli mémoire. Un `304` n'est accepté que pour une entrée
+validée avec le même `ETag`; sinon le cache est purgé et un unique retry sans condition est
+fait. Le client revalide à l'ouverture, au retour de visibilité et toutes les cinq minutes
+tant que l'onglet est visible. Après un échec ultérieur, il rend la dernière valeur connue
+comme obsolète au lieu de revenir au mock.
+
+`ManifestWorkspace` est DOM-first : les métadonnées publiques de `available` sont visibles,
+`not_available` reste explicite, et `withheld` ne produit aucune donnée spatiale inférée.
+Sources, Historique et Journal sont des panneaux vides « non inclus dans le manifeste
+public ». `TerrainViewer`, marqueurs, périmètre, simulations, exports et mode opérateur du
+fixture ne sont pas montés dans la branche API. La vérification WebGL ne charge pas de GLB ;
+elle explique que GLB/Unity restent à FV-008/FV-009.
+
+**VÉRIFIÉ localement** : `npm run check`, 57 tests Vitest, le build Vite et les huit
+scénarios Playwright réels traversent cette séparation, y compris l'absence de requête
+GLB et de module mock en mode API. Le navigateur natif de l'environnement et un
+déploiement public restent **NON VÉRIFIÉS** ; ce résultat ne constitue pas une preuve de
+non-régression globale.
 
 ### Projection publique canonique
 
@@ -50,7 +85,7 @@ est conservée sous `contracts/demo/v1/`.
 
 Le jeu `FR-83-00042` est un identifiant de fixture, non une déclaration de feu ni de
 localisation opérationnelle. Son seed de référence est sans asset et sert à vérifier le
-fallback texte avant FV-006 et FV-008.
+fallback texte du manifeste public ; il ne déclenche aucun chargement 3D avant FV-008.
 
 ## Contrat spatial
 

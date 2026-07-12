@@ -10,11 +10,15 @@ Ce plan vise d'abord G0 puis un vertical slice G1 local et fictif. Il ne constit
 | --- | --- | --- |
 | FV-001 | **VÉRIFIÉ** | dépôt public initialisé, provenance locale des ZIP ignorée par Git, documentation et licences publiées |
 | FV-002 | **VÉRIFIÉ** | UI : `npm ci`, contrôle TypeScript, build et parcours mocké bureau/mobile ; backend : migrations, qualité, compilation et 69 tests passants à 88,70 % de couverture |
-| FV-003 | **VÉRIFIÉ** | ADR-001, schéma JSON `ViewerManifest` v2, fixtures fictifs, OpenAPI, CORS et tests backend/UI ; le raccordement réseau réel reste FV-006 |
+| FV-003 | **VÉRIFIÉ** | ADR-001, schéma JSON `ViewerManifest` v2, fixtures fictifs, OpenAPI, CORS et tests backend/UI ; le raccordement réseau réel est vérifié localement par FV-006 |
 | FV-004 | **VÉRIFIÉ (contrat et contrôles SQLite)** | ADR-002, schéma spatial v1, fixtures fictifs ENU/glTF/Unity, zones, révision, snapshot et contrôles de transformation, axes, origine et hash RAF20 ; rendu Unity/PNG réel et migration PostgreSQL restent non vérifiés |
 | FV-005 | **VÉRIFIÉ (SQLite et contrats)** | seed `FR-83-00042` v1 entièrement fictif, idempotence sans écriture au second passage, manifeste/ETag hashés, matrice versionnée et masquage canonique ; 69 tests backend et 34 tests UI passent |
+| FV-006 | **VÉRIFIÉ (SQLite, UI et Chromium Playwright)** | mode de données explicite, client `ViewerManifest` v2, cache ETag/`304`, surface API DOM-first et harnais E2E ; `check`, 57 tests, build et 8 scénarios Chromium passent avec CORS, seed réel, `200`/`304`, `404`, timeout et absence de GLB/mock API ; `npm ci`/check/tests/build sont rejoués dans un checkout Git neuf |
 
-**NON VÉRIFIÉ** : la page UI réelle conserve encore son adaptateur `IncidentData` historique. Le parseur `ViewerManifest` est vérifié, mais le raccordement avec `VITE_USE_MOCKS=false` reste FV-006.
+**VÉRIFIÉ dans FV-006** : `IncidentData` et le terrain SVG sont isolés dans le parcours
+mock ; le parcours API ne consomme que le résumé de `ViewerManifest`. Les tests Vitest et
+Playwright couvrent le raccordement `VITE_USE_MOCKS=false`, le cache, les erreurs, CORS et
+l'absence de GLB ou module mock dans le parcours API.
 
 ## Lot 0 - Baseline et décisions de contrat
 
@@ -30,7 +34,7 @@ Ce plan vise d'abord G0 puis un vertical slice G1 local et fictif. Il ne constit
 
 | ID | Action | Dépendances | Preuve d'acceptation |
 | --- | --- | --- | --- |
-| FV-006 | Connecter l'UI au manifeste réel et conserver le mode mock explicite | FV-003, FV-005 | parcours `/incident/FR-83-00042` en API réelle, erreur 404, timeout et WebGL indisponible testés |
+| FV-006 | Connecter l'UI au manifeste réel, avec modes `true`/`false`/N/A explicites, ETag/`304`, cache session/mémoire et rendu DOM public minimal | FV-003, FV-005 | `npm run check`, `npm run test`, build et Playwright : seed réel, CORS, `200`/`304`, `404`, timeout, WebGL indisponible, aucun GLB/Unity téléchargé |
 | FV-007 | Vérifier migrations, idempotence, matching `create/attach/review`, audit append-only et restauration SQLite | FV-002, FV-005 | tests transactionnels ; scénario de sauvegarde/corruption/restauration documenté |
 | FV-008 | Produire un seul asset GLB de démonstration avec manifeste immuable, SHA-256 et métadonnées ENU | FV-004, FV-005 | téléchargement, hash, taille, unité et repères contrôlés avant chargement |
 | FV-009 | Ajouter un pont minimal JavaScript/C# et un build Unity WebGL de démonstration, sans retirer le DOM texte | FV-004, FV-008 | contrat de messages borné, test navigateur et fallback sans WebGL |
@@ -59,8 +63,7 @@ Les phases 14 à 18 sont des prérequis : threat model, RBAC, minimisation des d
 
 ## Prochaine action sûre
 
-Réaliser **FV-006** : connecter la page `/incident/FR-83-00042` au manifeste canonique
-avec `VITE_USE_MOCKS=false`, en conservant le mode mock explicite. Le parcours devra couvrir
-le seed `not_available`, le `404`, le timeout, le `304` navigateur et le fallback sans WebGL,
-sans remplir Sources, Historique ni Journal avec le fixture. FV-008/FV-009 intégreront ensuite
-un GLB, son rendu Unity et l'archive PNG réelle dans le contrat déjà contrôlé.
+Réaliser **FV-007** : éprouver les migrations, l'idempotence, le matching
+`create/attach/review`, l'audit append-only et une restauration SQLite. FV-006 apporte des
+preuves locales de la consultation publique, mais FV-008/FV-009 restent exclusivement
+responsables du GLB, d'Unity/WebGL et de l'archive PNG réelle.

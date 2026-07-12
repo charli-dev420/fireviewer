@@ -32,7 +32,7 @@
 
 | Composant | Observé | Couverture roadmap |
 | --- | --- | --- |
-| `apps/fire-viewer-ui` | React 19, TypeScript, Vite, route incident, mode mock, DOM accessible et vue 3D de démonstration SVG | fondation de la phase 1 et une partie de la phase 9 |
+| `apps/fire-viewer-ui` | React 19, TypeScript, Vite, route incident, modes mock/API explicites, client `ViewerManifest`, DOM accessible et SVG de démonstration isolé | fondation de la phase 1 et préparation des phases 8-9 |
 | `services/fire-viewer-backend` | FastAPI, SQLAlchemy, Alembic, SQLite WAL, matching `create/attach/review`, audit, manifest et endpoints santé | fondation de la phase 2, éléments des phases 6 et 7 |
 | Projet Unity de Die externe | Unity 6.3, glTFast 6.15.1, Cesium, assets GLB et terrain Die | matière potentielle pour les phases 5 et 8, non intégrée |
 | Agents, pipeline IGN, workers, pont JS/C#, publication atomique, cache/hot-swap, infrastructure pilote | absents des deux ZIP | phases 3 à 20 à planifier et réaliser |
@@ -41,17 +41,58 @@
 
 ### Contrat HTTP UI/backend
 
-**VÉRIFIÉ dans le code** :
+**OBSERVÉ dans la baseline avant FV-006** : le dashboard historique chargeait un
+`IncidentData` camelCase riche depuis l'ancien chemin `/incident/{fire_id}`. Ce contrat ne
+correspondait ni au manifeste public minimal ni aux réponses backend disponibles.
 
-- L'UI appelle `GET {VITE_API_BASE_URL}/incident/{fire_id}` et exige une réponse `schemaVersion: "2.0"`, `fireId`, `episodeId`, `asset`, `frame` et `status`.
-- Le backend expose l'API sous `/api/v1`. `GET /api/v1/incident/{fire_id}` renvoie un `IncidentPublicResponse`, sans `asset` ni `frame`.
-- Le manifeste correspondant est disponible via `GET /api/v1/incident/{fire_id}/manifest`, au format Python `snake_case` (`schema_version`, `fire_id`, etc.).
+**OBSERVÉ dans le code backend** : le manifeste correspondant est disponible via
+`GET /api/v1/incident/{fire_id}/manifest`, au format `snake_case` (`schema_version`,
+`fire_id`, etc.). Le `IncidentPublicResponse` de `/api/v1/incident/{fire_id}` ne contient
+ni asset ni frame et n'est pas le contrat viewer.
 
 **VÉRIFIÉ après FV-003** : l'[ADR-001](adr/ADR-001-viewer-manifest-public-contract.md) fixe désormais le chemin canonique `/api/v1/incident/{fire_id}/manifest` et le schéma `ViewerManifest` v2 en `snake_case`. Le modèle Pydantic, le schéma JSON versionné, l'OpenAPI et les parseurs UI sont couverts par des tests de contrat sur données fictives.
 
 **VÉRIFIÉ après FV-005** : le dataset `FR-83-00042` est déclaratif, entièrement fictif et rejouable sans écrasement. Son manifeste `not_available`, son hash/`ETag` et la matrice des projections publiques sont versionnés. Les couples statut/visibilité non canoniques échouent fermés en `503`; les exemples et le parseur UI n'acceptent plus `UNDER_REVIEW + available` ni `REJECTED + not_available`.
 
-**NON VÉRIFIÉ** : les deux applications ne sont toujours pas connectées directement avec `VITE_USE_MOCKS=false`. Le raccordement réseau réel, le cache navigateur et les vues dégradées complètes restent dans FV-006 ; aucune compatibilité de démo connectée ne doit être affirmée avant ses tests.
+**VÉRIFIÉ dans FV-006** : le shell API remplace ce chemin legacy par
+`GET {VITE_API_BASE_URL}/api/v1/incident/{fire_id}/manifest`. `VITE_USE_MOCKS=true` conserve
+le seul dashboard fictif ; `false` avec une origine HTTP(S) pure active l'API ; toute autre
+configuration affiche `N/A` sans requête ni fixture. La réponse `200` passe par
+`parseViewerManifest()`, doit avoir le bon `fire_id` et un `ETag`, puis est réduite à un
+résumé public.
+
+Le cache de navigation est borné à `sessionStorage` ou, à défaut, à la mémoire du processus.
+La clé contient origine, schéma et `fire_id`. Une revalidation envoie `If-None-Match`; un
+`304` ne sert que si l'`ETag` et l'entrée validée concordent, sinon une seule requête sans
+condition suit la purge. L'ouverture, le retour de visibilité et cinq minutes d'onglet
+visible sont les déclencheurs normaux. Un échec conserve seulement le dernier manifeste
+marqué obsolète, sans fallback mock.
+
+La vue connectée est DOM-first : ni `TerrainViewer` SVG, ni marqueur, ni simulation, ni
+GLB/Unity ne sont montés. Sources, Historique et Journal indiquent qu'ils ne sont pas
+inclus dans le manifeste public. Les métadonnées d'un `available` sont informatives ; le
+chargement GLB/Unity et l'archive PNG restent FV-008/FV-009.
+
+**VÉRIFIÉ localement** : les tests couvrent le raccordement seed réel, le `304` navigateur,
+le timeout, les deux états WebGL et la recette Playwright. Aucun GLB ni module mock n'est
+demandé en mode API. Une compatibilité de déploiement connecté reste **NON VÉRIFIÉE** tant
+qu'aucune infrastructure de production et aucun navigateur supplémentaire ne sont testés.
+
+### Reproduction E2E de l'écart HTTP
+
+**VÉRIFIÉ localement** : `npm run test:e2e` s'appuie sur
+`apps/fire-viewer-ui/e2e/globalSetup.ts`. Il crée un dossier temporaire, prépare une SQLite
+avec `e2e/prepare_backend.py`, lance le seed, Uvicorn (`localhost:8000`) et Vite
+(`localhost:5173`) avec CORS local, puis les arrête. La migration ne lit pas l'URL implicite
+de `alembic.ini` : elle est injectée dans `alembic.config.Config` et le script refuse la
+base de développement par défaut. `npm run test:e2e:install` installe Chromium au préalable.
+Le polling est accéléré seulement dans le Vite de test ; la cadence normale reste cinq
+minutes.
+
+**VÉRIFIÉ dans l'arbre de travail FV-006** : les huit scénarios réussissent avec
+l'environnement Python backend préparé. **VÉRIFIÉ dans un checkout Git neuf** : `npm ci`,
+`npm run check`, les 57 tests et le build UI passent au commit FV-006. L'E2E nécessite
+l'environnement Python backend et reste donc prouvé dans l'arbre de travail contrôlé.
 
 ### Repère et échelle Unity
 
@@ -88,4 +129,7 @@ réduire le risque H3.
 
 ## Décision de cadrage recommandée
 
-**INFÉRÉ** : le prochain jalon doit être un vertical slice G0/G1 entièrement fictif et local : une route stable, un incident de démonstration, un manifeste hashé, un fallback texte, un appel API réel et un chargement 3D contrôlé. Démarrer par les agents IA, la publication cloud ou une bêta publique avant ce slice augmenterait les risques H1, H3, H4 et H5 sans réduire une incertitude de base.
+**INFÉRÉ** : après les preuves locales FV-006, le prochain jalon utile est FV-007
+(migrations, idempotence, audit et restauration SQLite). L'intégration de
+l'asset GLB puis d'Unity reste séquencée en FV-008/FV-009 ; la devancer augmenterait les
+risques H2, H3 et H5 sans réduire l'incertitude de la chaîne transactionnelle.
