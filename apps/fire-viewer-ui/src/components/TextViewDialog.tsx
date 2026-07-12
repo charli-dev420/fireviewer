@@ -66,7 +66,7 @@ export function TextViewDialog({
             <div><dt>Version courante affichée</dt><dd>v{activeVersion}</dd></div>
             <div><dt>Hash</dt><dd>sha256 {activeHash}</dd></div>
             <div><dt>Source</dt><dd>{incident.asset.source} · {incident.asset.sourceYear}</dd></div>
-            <div><dt>Repère</dt><dd>{incident.frame.localFrame} · 1 m = 1 unité</dd></div>
+            <div><dt>Repère</dt><dd>{incident.frame.localFrame} · 1 m = {1 / incident.frame.metersPerUnit} unités Unity</dd></div>
             <div><dt>Emprise</dt><dd>{incident.asset.footprint}</dd></div>
             <div><dt>Limite</dt><dd>Le relief est daté; il ne représente pas l’état temps réel du feu.</dd></div>
           </dl>

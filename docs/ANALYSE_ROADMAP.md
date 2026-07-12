@@ -55,7 +55,23 @@
 
 **VÉRIFIÉ** : la roadmap demande `1` mètre = `1` unité dans le manifeste et le GLB, avec une origine ENU. Le projet Unity de Die existant déclare une présentation `1` mètre = `100` unités Unity.
 
-**Impact** : copier le projet Unity ou charger ses assets dans le viewer sans contrat d'adaptation créerait un risque H3 de mauvais alignement des distances et marqueurs. Une ADR doit décider soit la normalisation à 1:1, soit une conversion explicite, testée et transportée par le manifeste.
+**VÉRIFIÉ après FV-004** : l'[ADR-002](adr/ADR-002-spatial-local-unity-contract.md)
+choisit une adaptation explicite plutôt qu'une normalisation implicite. Le GLB reste
+métrique (`1 mètre` par unité glTF) tandis que le monde Unity emploie `100` unités par
+mètre, soit `ViewerManifest.frame.meters_per_unit = 0.01`. L'origine est `EPSG:4979` dans
+l'ordre `[longitude, latitude, hauteur]`, le repère est ENU et le pont glTF vers Unity est
+versionné par le contrat spatial v1.
+
+**VÉRIFIÉ dans le périmètre documentaire** : le profil RAF20/NGF-IGN69 est limité à la
+France continentale rurale. Corse et outre-mer sont hors périmètre ; la Corse exigera un
+profil RAC23/NGF-IGN78 dédié. Les zones sont versionnées et réutilisables uniquement dans
+leur emprise ; l'archive PNG est attachée à un snapshot de révision de manifeste, pas à une
+zone active en général. Cesium est exclu de cette phase.
+
+**NON VÉRIFIÉ** : aucun GLB réel n'a encore été rendu ou importé dans Unity, et aucun PNG
+d'archive matériel n'a été produit. Les contrôles FV-004 couvrent les transformations,
+axes, origine et hash hors rendu ; les preuves d'intégration restent nécessaires pour
+réduire le risque H3.
 
 ## Risques prioritaires à conserver dans le backlog
 

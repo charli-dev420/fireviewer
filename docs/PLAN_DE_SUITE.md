@@ -11,6 +11,7 @@ Ce plan vise d'abord G0 puis un vertical slice G1 local et fictif. Il ne constit
 | FV-001 | **VÉRIFIÉ** | dépôt public initialisé, provenance locale des ZIP ignorée par Git, documentation et licences publiées |
 | FV-002 | **VÉRIFIÉ** | UI : `npm ci`, contrôle TypeScript, build et parcours mocké bureau/mobile ; backend : migrations, qualité, compilation et 40 tests passants à 87,29 % de couverture |
 | FV-003 | **VÉRIFIÉ** | ADR-001, schéma JSON `ViewerManifest` v2, fixtures fictifs, OpenAPI, CORS et tests backend/UI ; le raccordement réseau réel reste FV-006 |
+| FV-004 | **VÉRIFIÉ (contrat et contrôles SQLite)** | ADR-002, schéma spatial v1, fixtures fictifs ENU/glTF/Unity, zones, révision, snapshot et contrôles de transformation, axes, origine et hash RAF20 ; rendu Unity/PNG réel et migration PostgreSQL restent non vérifiés |
 
 **NON VÉRIFIÉ** : la page UI réelle conserve encore son adaptateur `IncidentData` historique. Le parseur `ViewerManifest` est vérifié, mais le raccordement avec `VITE_USE_MOCKS=false` reste FV-006.
 
@@ -21,7 +22,7 @@ Ce plan vise d'abord G0 puis un vertical slice G1 local et fictif. Il ne constit
 | FV-001 | Initialiser le dépôt Git Fire Viewer et ajouter les exclusions pour `.venv`, `node_modules`, bases SQLite, builds Unity et secrets | aucune | statut Git propre, `.gitignore` revu, provenance des ZIP conservée |
 | FV-002 | Exécuter les contrôles natifs reçus : backend (`make test`, `make quality` ou équivalents Windows) et UI (`npm ci`, `npm run check`, `npm run build`) | FV-001, accès aux dépendances | logs de commandes et artefacts de build ; aucun test annoncé sans exécution |
 | FV-003 | Choisir et enregistrer le contrat public `ViewerManifest` : URL, version, casing JSON, ETag, erreurs 404/409, CORS | FV-002 | ADR + schéma JSON + test de contrat UI/API rouge puis vert |
-| FV-004 | Décider le contrat de coordonnées Unity : ENU, datum vertical, origine, `metersPerUnit`, stratégie 1:1 ou conversion explicite de Die | inventaire Unity externe | ADR + fixture WGS84/ENU/Unity + tests de précision et de changement d'origine |
+| FV-004 | Fixer le profil local : France continentale rurale, NGF-IGN69 + RAF20 hors ligne, `EPSG:4979`, ENU, GLB métrique et Unity 100 u/m (`meters_per_unit=0.01`) | inventaire Unity externe | ADR-002 + schéma/fixtures spatiaux ; contrôles exécutés de transformation, axes, origine et hash RAF20 ; rendu GLB/Unity et PNG réel restent des intégrations séparées |
 | FV-005 | Créer un jeu de données entièrement fictif `FR-83-00042` et la matrice des états/visibilités | FV-003 | seed rejouable, manifeste hashé, transitions et masquage des données sensibles testés |
 
 ## Lot 1 - Vertical slice G1 local
@@ -51,10 +52,13 @@ Les phases 14 à 18 sont des prérequis : threat model, RBAC, minimisation des d
 
 - publier un feu, une position sensible ou une preuve réelle ;
 - présenter le prototype comme un service d'urgence, un outil de prévision ou un système de confirmation automatique ;
-- brancher Unity au backend avant d'avoir fixé le contrat JSON et les unités ;
+- brancher Unity au backend avant d'avoir exécuté les tests de précision, d'import et de changement d'origine du contrat spatial ;
 - lancer plusieurs workers sur la même base SQLite locale ;
 - effacer les ZIP reçus ou le projet Unity de Die externe.
 
 ## Prochaine action sûre
 
-Réaliser **FV-004** : fixer dans une ADR le contrat spatial Unity (WGS84, ENU, datum vertical, origine et `metersPerUnit`), puis le prouver avec une fixture de précision. FV-005 peut préparer en parallèle le seed fictif `FR-83-00042` à partir du contrat ViewerManifest v2, sans asset réel ni transfert du projet de Die.
+Réaliser **FV-005** : préparer le seed fictif `FR-83-00042` et la matrice
+états/visibilités à partir de `ViewerManifest` v2 et du contrat spatial v1, sans asset réel
+ni transfert du projet de Die. FV-008/FV-009 intégreront ensuite le GLB, son rendu Unity et
+l'archive PNG réelle dans ce contrat déjà contrôlé.

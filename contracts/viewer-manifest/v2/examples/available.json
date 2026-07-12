@@ -9,7 +9,7 @@
   },
   "location": {
     "type": "Point",
-    "coordinates": [0.0, 0.0],
+    "coordinates": [2.0, 46.0],
     "horizontal_uncertainty_m": 250.0,
     "altitude_m": null,
     "vertical_datum": null
@@ -23,10 +23,10 @@
     "lod": "desktop"
   },
   "frame": {
-    "origin_wgs84": [0.0, 0.0, 0.0],
+    "origin_wgs84": [2.0, 46.0, 454.203998565679],
     "local_frame": "ENU",
-    "meters_per_unit": 1.0,
-    "vertical_datum": "FIXTURE"
+    "meters_per_unit": 0.01,
+    "vertical_datum": "EPSG:4979"
   },
   "freshness": {
     "incident_at": "2026-07-12T08:24:00Z",

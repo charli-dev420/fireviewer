@@ -15,6 +15,8 @@ from fire_viewer.db.models import (
     ManifestRevision,
     ModelAsset,
     Source,
+    SpatialZone,
+    SpatialZoneRevision,
 )
 from fire_viewer.domain.enums import (
     AssetLod,
@@ -25,6 +27,7 @@ from fire_viewer.domain.enums import (
     SourceType,
 )
 from fire_viewer.domain.geospatial import bbox_for_point
+from fire_viewer.domain.spatial import derive_raf20_origin
 
 
 def main() -> None:
@@ -125,22 +128,39 @@ def main() -> None:
         asset_url = os.getenv("FV_DEMO_ASSET_URL")
         asset_sha256 = os.getenv("FV_DEMO_ASSET_SHA256")
         if asset_url and asset_sha256 and len(asset_sha256) == 64:
+            derived_origin = derive_raf20_origin(lon, lat, 412.7)
+            spatial_zone = SpatialZone(
+                zone_id="zone-demo-massif-des-maures",
+                label="Demo local rural zone",
+            )
+            session.add(spatial_zone)
+            session.flush()
+            spatial_zone_revision = SpatialZoneRevision(
+                spatial_zone_id=spatial_zone.id,
+                revision=1,
+                origin_lon=lon,
+                origin_lat=lat,
+                source_orthometric_height_m=derived_origin.source_orthometric_height_m,
+                geoid_undulation_m=derived_origin.geoid_undulation_m,
+                origin_ellipsoid_height_m=derived_origin.ellipsoid_height_m,
+                min_east_m=-2_500.0,
+                max_east_m=2_500.0,
+                min_north_m=-2_500.0,
+                max_north_m=2_500.0,
+                min_up_m=-500.0,
+                max_up_m=2_000.0,
+            )
+            session.add(spatial_zone_revision)
+            session.flush()
             asset = ModelAsset(
                 asset_id=new_asset_id(),
-                incident_id=incident.id,
-                episode_id=episodes[-1].id,
+                spatial_zone_revision_id=spatial_zone_revision.id,
                 version=4,
                 lod=AssetLod.MOBILE,
                 state=AssetState.PUBLISHED,
                 glb_url=asset_url,
                 sha256=asset_sha256,
                 size_bytes=int(os.getenv("FV_DEMO_ASSET_SIZE_BYTES", "19503562")),
-                origin_lon=lon,
-                origin_lat=lat,
-                origin_altitude_m=412.7,
-                local_frame="ENU",
-                meters_per_unit=1.0,
-                vertical_datum="documented-source-datum",
                 terrain_source_year=2024,
                 generated_at=datetime(2026, 7, 12, 8, 20, tzinfo=UTC),
                 published_at=datetime(2026, 7, 12, 8, 20, tzinfo=UTC),
@@ -152,6 +172,7 @@ def main() -> None:
                     incident_id=incident.id,
                     episode_id=episodes[-1].id,
                     asset_id=asset.id,
+                    spatial_zone_revision_id=spatial_zone_revision.id,
                     revision=1,
                     is_current=True,
                     reason="Demo seed",

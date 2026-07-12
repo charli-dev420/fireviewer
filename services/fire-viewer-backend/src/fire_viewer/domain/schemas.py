@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from typing import Annotated, Literal
 
@@ -9,6 +10,7 @@ from pydantic import (
     ConfigDict,
     Field,
     StringConstraints,
+    WithJsonSchema,
     field_validator,
     model_validator,
 )
@@ -26,6 +28,14 @@ from fire_viewer.domain.enums import (
 )
 
 StrictText = Annotated[str, StringConstraints(strip_whitespace=True)]
+ManifestLongitude = Annotated[float, Field(ge=-180.0, le=180.0, allow_inf_nan=False)]
+ManifestLatitude = Annotated[float, Field(ge=-90.0, le=90.0, allow_inf_nan=False)]
+ManifestEllipsoidHeight = Annotated[float, Field(allow_inf_nan=False)]
+ManifestMetersPerUnit = Annotated[
+    float,
+    Field(ge=0.01, le=0.01, allow_inf_nan=False),
+    WithJsonSchema({"const": 0.01, "type": "number"}),
+]
 
 
 class StrictModel(BaseModel):
@@ -164,10 +174,17 @@ class ManifestAsset(StrictModel):
 
 
 class ManifestFrame(StrictModel):
-    origin_wgs84: tuple[float, float, float]
+    origin_wgs84: tuple[ManifestLongitude, ManifestLatitude, ManifestEllipsoidHeight]
     local_frame: Literal["ENU"]
-    meters_per_unit: float
-    vertical_datum: str
+    meters_per_unit: ManifestMetersPerUnit
+    vertical_datum: Literal["EPSG:4979"]
+
+    @field_validator("origin_wgs84")
+    @classmethod
+    def validate_origin_wgs84(cls, value: tuple[float, float, float]) -> tuple[float, float, float]:
+        if not all(math.isfinite(component) for component in value):
+            raise ValueError("origin_wgs84 values must be finite")
+        return value
 
 
 class ManifestFreshness(StrictModel):

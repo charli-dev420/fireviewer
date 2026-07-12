@@ -24,6 +24,7 @@ Fire Viewer associe une page stable à une série d'incident identifiée par `fi
 ```text
 apps/fire-viewer-ui/                 Interface React, TypeScript et Vite
 services/fire-viewer-backend/        API FastAPI, SQLAlchemy et Alembic
+contracts/                           Schémas JSON et fixtures de contrats publics et spatiaux
 docs/                                Architecture, roadmap, analyse et plan G0/G1
 assets/diagrams/                     Schémas maintenables du projet
 archives/received/                   ZIP d'origine conservés localement et ignorés par Git
@@ -34,6 +35,8 @@ archives/received/                   ZIP d'origine conservés localement et igno
 - [Architecture cible](docs/ARCHITECTURE.md)
 - [ADR-001 — Contrat public ViewerManifest v2](docs/adr/ADR-001-viewer-manifest-public-contract.md)
 - [Schéma ViewerManifest v2](contracts/viewer-manifest/v2/viewer-manifest.schema.json)
+- [ADR-002 — Contrat spatial local ENU et Unity](docs/adr/ADR-002-spatial-local-unity-contract.md)
+- [Contrat spatial local v1](contracts/spatial/v1/README.md)
 - [Analyse de la roadmap](docs/ANALYSE_ROADMAP.md)
 - [Plan de suite G0/G1](docs/PLAN_DE_SUITE.md)
 - [Roadmap source](docs/roadmap/roadmap_fire_viewer_incident_centrique_detaillee-1.pdf)
@@ -78,9 +81,21 @@ Le contrat public est défini par l'[ADR-001](docs/adr/ADR-001-viewer-manifest-p
 
 **NON VÉRIFIÉ** : la page UI n'est pas encore connectée à cette API avec `VITE_USE_MOCKS=false`. Ce raccordement, le cache navigateur et les panneaux dégradés complets relèvent de FV-006.
 
-## Décision restante avant une démo connectée
+## Contrat spatial local v1
 
-Le contrat spatial doit encore être fixé : la roadmap attend `1 mètre = 1 unité`, alors que le projet Unity de Die existant utilise une présentation `1 mètre = 100 unités`. Aucun couplage Unity ou chargement de terrain ne doit être déclaré fonctionnel avant l'ADR spatiale et ses tests de précision métrique.
+**VÉRIFIÉ dans les artefacts FV-004** : l'[ADR-002](docs/adr/ADR-002-spatial-local-unity-contract.md)
+et les [fixtures spatiaux](contracts/spatial/v1/fixtures/) fixent un profil rural local de
+France continentale : origine `EPSG:4979` en `[longitude, latitude, hauteur]`, source
+verticale `NGF-IGN69` convertie hors ligne par RAF20, ENU, GLB métrique et Unity à
+`100` unités par mètre (`ViewerManifest.frame.meters_per_unit = 0.01`).
+
+La Corse et les outre-mer sont hors périmètre de ce profil. Les zones sont réutilisables
+uniquement à l'intérieur de leur emprise versionnée ; un snapshot de révision de manifeste
+porte l'archive PNG et la provenance associée. Cesium ne fait pas partie de cette phase.
+
+**NON VÉRIFIÉ** : aucun GLB rendu par Unity ni archive PNG réelle n'est encore livré. Les
+contrôles de transformation, axes, origine et hash sont exécutés dans FV-004 ; le rendu et
+l'archivage matériel resteront à intégrer avant toute affirmation d'alignement 3D.
 
 ## Sécurité et données
 

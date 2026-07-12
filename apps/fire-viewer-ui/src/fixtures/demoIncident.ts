@@ -45,7 +45,7 @@ export const demoIncident: IncidentData = {
   frame: {
     originWgs84: [6.0214, 43.2897, 412.7],
     localFrame: 'ENU',
-    metersPerUnit: 1,
+    metersPerUnit: 0.01,
     horizontalUncertaintyM: 220,
   },
   locationLabel: '43.2897 N · 6.0214 E',

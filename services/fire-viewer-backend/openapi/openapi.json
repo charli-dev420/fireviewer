@@ -1065,10 +1065,14 @@
           "origin_wgs84": {
             "prefixItems": [
               {
-                "type": "number"
+                "type": "number",
+                "maximum": 180.0,
+                "minimum": -180.0
               },
               {
-                "type": "number"
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": -90.0
               },
               {
                 "type": "number"
@@ -1086,10 +1090,12 @@
           },
           "meters_per_unit": {
             "type": "number",
+            "const": 0.01,
             "title": "Meters Per Unit"
           },
           "vertical_datum": {
             "type": "string",
+            "const": "EPSG:4979",
             "title": "Vertical Datum"
           }
         },
