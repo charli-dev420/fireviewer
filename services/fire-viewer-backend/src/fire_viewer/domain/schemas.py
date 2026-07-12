@@ -177,7 +177,7 @@ class ManifestFreshness(StrictModel):
 
 
 class ViewerManifest(StrictModel):
-    schema_version: Literal["2.0"] = "2.0"
+    schema_version: Literal["2.0"]
     fire_id: str
     episode_id: str
     status: ManifestStatus
@@ -187,6 +187,22 @@ class ViewerManifest(StrictModel):
     freshness: ManifestFreshness
     model_state: Literal["available", "not_available", "withheld"]
     public_notice: str
+
+    @model_validator(mode="after")
+    def validate_public_projection(self) -> ViewerManifest:
+        if self.model_state == "available" and (
+            self.location is None or self.asset is None or self.frame is None
+        ):
+            raise ValueError("available manifests require location, asset, and frame")
+        if self.model_state == "not_available" and (
+            self.location is None or self.asset is not None or self.frame is not None
+        ):
+            raise ValueError("not_available manifests require location without asset or frame")
+        if self.model_state == "withheld" and any(
+            value is not None for value in (self.location, self.asset, self.frame)
+        ):
+            raise ValueError("withheld manifests must not include location, asset, or frame")
+        return self
 
 
 class TransitionRequest(StrictModel):

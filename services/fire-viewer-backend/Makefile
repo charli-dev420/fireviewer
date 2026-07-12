@@ -1,4 +1,4 @@
-.PHONY: install migrate run test lint typecheck compile migration-check quality openapi seed backup
+.PHONY: install migrate run test lint typecheck compile migration-check quality openapi viewer-contract-schema seed backup
 
 install:
 	python -m pip install -e '.[dev]'
@@ -29,6 +29,9 @@ quality: lint typecheck test migration-check compile
 
 openapi:
 	python -m fire_viewer.scripts.export_openapi
+
+viewer-contract-schema:
+	python -m fire_viewer.scripts.export_viewer_manifest_contract
 
 seed:
 	python -m fire_viewer.scripts.seed_demo

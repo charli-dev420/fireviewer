@@ -126,7 +126,8 @@
         "tags": [
           "incidents"
         ],
-        "summary": "Get Manifest",
+        "summary": "Get the public viewer manifest",
+        "description": "Returns the public ViewerManifest in snake_case. A matching If-None-Match returns 304 without a body. This read endpoint never returns 409; conflicts are reserved for mutations.",
         "operationId": "get_manifest_api_v1_incident__fire_id__manifest_get",
         "parameters": [
           {
@@ -157,24 +158,244 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Current public ViewerManifest.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ViewerManifest"
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong entity tag calculated from the serialized ViewerManifest.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "Short public cache lifetime for this viewer representation.",
+                "schema": {
+                  "type": "string",
+                  "example": "public, max-age=30, must-revalidate"
+                }
+              },
+              "X-Trace-Id": {
+                "description": "Trace identifier to include when reporting an error.",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "304": {
-            "description": "Manifest unchanged."
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
+            "description": "Manifest unchanged; the response body is empty.",
+            "headers": {
+              "ETag": {
+                "description": "Strong entity tag calculated from the serialized ViewerManifest.",
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "Short public cache lifetime for this viewer representation.",
+                "schema": {
+                  "type": "string",
+                  "example": "public, max-age=30, must-revalidate"
+                }
+              },
+              "X-Trace-Id": {
+                "description": "Trace identifier to include when reporting an error.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The fire_id path parameter has an invalid format.",
+            "headers": {
+              "X-Trace-Id": {
+                "description": "Trace identifier to include when reporting an error.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "trace_id"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No incident exists for this fire_id.",
+            "headers": {
+              "X-Trace-Id": {
+                "description": "Trace identifier to include when reporting an error.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "trace_id"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "The incident has been tombstoned.",
+            "headers": {
+              "X-Trace-Id": {
+                "description": "Trace identifier to include when reporting an error.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "trace_id"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The incident data is temporarily unavailable.",
+            "headers": {
+              "X-Trace-Id": {
+                "description": "Trace identifier to include when reporting an error.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "trace_id"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -1435,8 +1656,7 @@
           "schema_version": {
             "type": "string",
             "const": "2.0",
-            "title": "Schema Version",
-            "default": "2.0"
+            "title": "Schema Version"
           },
           "fire_id": {
             "type": "string",
@@ -1499,6 +1719,7 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
+          "schema_version",
           "fire_id",
           "episode_id",
           "status",

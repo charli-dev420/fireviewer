@@ -1,7 +1,6 @@
-import { demoIncident } from '../data/demoIncident';
+import { demoIncident } from '../fixtures/demoIncident';
 import type { IncidentData } from '../types';
-
-const FIRE_ID_RE = /^[A-Z]{2}-\d{2}-\d{5}$/;
+import { VIEWER_MANIFEST_FIRE_ID_RE } from './viewerManifest';
 
 export class IncidentApiError extends Error {
   constructor(
@@ -14,7 +13,7 @@ export class IncidentApiError extends Error {
 }
 
 export function isValidFireId(value: string): boolean {
-  return FIRE_ID_RE.test(value);
+  return VIEWER_MANIFEST_FIRE_ID_RE.test(value);
 }
 
 function validateIncidentData(value: unknown): IncidentData {

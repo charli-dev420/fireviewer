@@ -152,6 +152,7 @@ def get_viewer_manifest(
         notice = f"{notice} {incident.public_note}"
 
     return ViewerManifest(
+        schema_version="2.0",
         fire_id=incident.fire_id,
         episode_id=current.episode_id,
         status=ManifestStatus(

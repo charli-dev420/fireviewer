@@ -9,10 +9,10 @@ Ce plan vise d'abord G0 puis un vertical slice G1 local et fictif. Il ne constit
 | ID | État | Preuve actuelle |
 | --- | --- | --- |
 | FV-001 | **VÉRIFIÉ** | dépôt public initialisé, provenance locale des ZIP ignorée par Git, documentation et licences publiées |
-| FV-002 | **VÉRIFIÉ** | UI : `npm ci`, contrôle TypeScript, build et parcours mocké bureau/mobile ; backend : migrations, qualité, compilation et 23 tests passants à 86,45 % de couverture |
-| FV-003 | **Prochaine action** | ADR, schéma JSON et test de contrat rouge puis vert entre l'UI et l'API réelle |
+| FV-002 | **VÉRIFIÉ** | UI : `npm ci`, contrôle TypeScript, build et parcours mocké bureau/mobile ; backend : migrations, qualité, compilation et 40 tests passants à 87,29 % de couverture |
+| FV-003 | **VÉRIFIÉ** | ADR-001, schéma JSON `ViewerManifest` v2, fixtures fictifs, OpenAPI, CORS et tests backend/UI ; le raccordement réseau réel reste FV-006 |
 
-**NON VÉRIFIÉ** : la route UI contre l'API réelle reste incompatible au vu des contrats actuellement lus dans le code ; ce n'est pas validé par le parcours mocké de FV-002.
+**NON VÉRIFIÉ** : la page UI réelle conserve encore son adaptateur `IncidentData` historique. Le parseur `ViewerManifest` est vérifié, mais le raccordement avec `VITE_USE_MOCKS=false` reste FV-006.
 
 ## Lot 0 - Baseline et décisions de contrat
 
@@ -57,4 +57,4 @@ Les phases 14 à 18 sont des prérequis : threat model, RBAC, minimisation des d
 
 ## Prochaine action sûre
 
-Réaliser **FV-003** : fixer dans une ADR le contrat public `ViewerManifest`, ajouter le schéma JSON et écrire le test de contrat qui échoue sur les formats actuels puis passe avec le contrat retenu. FV-004 peut démarrer en parallèle comme décision d'architecture, mais aucun transfert d'asset de Die ne doit être effectué avant sa preuve métrique.
+Réaliser **FV-004** : fixer dans une ADR le contrat spatial Unity (WGS84, ENU, datum vertical, origine et `metersPerUnit`), puis le prouver avec une fixture de précision. FV-005 peut préparer en parallèle le seed fictif `FR-83-00042` à partir du contrat ViewerManifest v2, sans asset réel ni transfert du projet de Die.

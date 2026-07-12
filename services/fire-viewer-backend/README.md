@@ -150,14 +150,22 @@ make quality
 
 Résultat de référence de cette livraison :
 
-- 23 tests passants;
-- couverture branches incluse : 86,45 %;
+- 40 tests passants;
+- couverture branches incluse : 87,29 %;
 - Ruff : aucune erreur et format vérifié;
 - mypy strict : aucune erreur;
 - compilation Python : réussie;
 - migration `upgrade -> check -> downgrade` validée sur une base vierge.
 
 Le détail des commandes exécutées et le smoke test sont consignés dans [`QUALITY_REPORT.md`](QUALITY_REPORT.md).
+
+Le contrat public viewer v2 est documenté dans
+[`../../docs/adr/ADR-001-viewer-manifest-public-contract.md`](../../docs/adr/ADR-001-viewer-manifest-public-contract.md).
+Son schéma versionné est généré depuis `ViewerManifest` avec :
+
+```bash
+make viewer-contract-schema
+```
 
 ## Sauvegarde SQLite
 

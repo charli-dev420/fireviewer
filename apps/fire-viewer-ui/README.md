@@ -18,7 +18,7 @@ Frontend React + TypeScript prêt à intégrer pour une page incidente-centrique
 ## Démarrage
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -32,9 +32,23 @@ Build de production :
 
 ```bash
 npm run check
+npm run test
 npm run build
 npm run preview
 ```
+
+## Contrat `ViewerManifest`
+
+FV-003 ajoute un parseur strict du DTO réseau `ViewerManifest` dans
+`src/lib/viewerManifest.ts`. Il n'accepte que le contrat public `snake_case`
+version `2.0` et les trois états `available`, `not_available` et `withheld`.
+Les exemples fictifs partagés sont testés depuis
+`../../contracts/viewer-manifest/v2/examples/`.
+
+Le parseur fournit aussi un résumé minimal dont les collections **Sources**,
+**Historique** et **Journal** sont volontairement vides : le manifeste public
+ne contient pas ces données et ne doit jamais être complété avec le fixture de
+démonstration lorsque les mocks seront désactivés.
 
 ## Connexion à une API
 
@@ -45,18 +59,22 @@ VITE_USE_MOCKS=false
 VITE_API_BASE_URL=https://api.example.org
 ```
 
-L’adaptateur `src/lib/api.ts` attend actuellement un objet `IncidentData` complet sur :
+L’adaptateur existant `src/lib/api.ts` attend encore un objet `IncidentData`
+complet sur :
 
 ```text
 GET /incident/{fire_id}
 ```
 
-Pour une API séparant métadonnées et manifeste, adapter `loadIncident()` afin de fusionner :
+Le raccordement réel du manifeste est volontairement différé à FV-006. Le
+contrat public canonique à employer à ce moment-là est :
 
 ```text
-GET /incident/{fire_id}
-GET /incident/{fire_id}/manifest
+GET /api/v1/incident/{fire_id}/manifest
 ```
+
+Il faudra alors utiliser `parseViewerManifest()` et son résumé public, sans
+fabriquer les données Sources, Historique ou Journal attendues par la démo.
 
 Les URLs fournies au viewer doivent déjà être validées côté serveur. Le frontend ne transmet pas d’URL arbitraire à un moteur 3D.
 
@@ -65,8 +83,9 @@ Les URLs fournies au viewer doivent déjà être validées côté serveur. Le fr
 ```text
 src/
 ├── App.tsx                     orchestration, route, états, mode dégradé
-├── data/demoIncident.ts        jeu de données fictif
+├── fixtures/demoIncident.ts    jeu de données fictif versionné
 ├── lib/api.ts                  validation de fire_id et adaptateur API
+├── lib/viewerManifest.ts       parseur strict du contrat réseau public
 ├── lib/format.ts               formats français et fuseau Europe/Paris
 ├── types.ts                    contrats TypeScript
 ├── components/
