@@ -4,7 +4,7 @@ import visibilityMatrix from '../../../../contracts/demo/v1/visibility-matrix.js
 import availableFixture from '../../../../contracts/viewer-manifest/v2/examples/available.json';
 import notAvailableFixture from '../../../../contracts/viewer-manifest/v2/examples/not_available.json';
 import withheldFixture from '../../../../contracts/viewer-manifest/v2/examples/withheld.json';
-import { isValidFireId } from './api';
+import { isViewerManifestFireId } from './manifestClient';
 import {
   ViewerManifestParseError,
   parseViewerManifest,
@@ -52,12 +52,12 @@ describe('parseViewerManifest', () => {
     const threeCharacterPrefix = clonedFixture(availableFixture);
     threeCharacterPrefix.fire_id = 'FR-ABC-00042';
     expect(parseViewerManifest(threeCharacterPrefix).fire_id).toBe('FR-ABC-00042');
-    expect(isValidFireId('FR-ABC-00042')).toBe(true);
+    expect(isViewerManifestFireId('FR-ABC-00042')).toBe(true);
 
     const invalid = clonedFixture(availableFixture);
     invalid.fire_id = 'FR-8-00042';
     expect(() => parseViewerManifest(invalid)).toThrow('fire_id');
-    expect(isValidFireId('FR-8-00042')).toBe(false);
+    expect(isViewerManifestFireId('FR-8-00042')).toBe(false);
   });
 
   it('associe les exemples partagés aux cycles de vie canoniques', () => {

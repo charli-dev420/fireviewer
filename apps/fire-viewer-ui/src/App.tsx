@@ -1,25 +1,30 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppHeader } from './components/AppHeader';
-import { HistoryView } from './components/HistoryView';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from './components/Icons';
-import { JournalView } from './components/JournalView';
-import { PrimaryNav } from './components/PrimaryNav';
-import { SourcesView } from './components/SourcesView';
-import { StatusPill } from './components/StatusPill';
-import { TextViewDialog } from './components/TextViewDialog';
-import { Toast } from './components/Toast';
-import { ViewerWorkspace } from './components/ViewerWorkspace';
-import { defaultLayers } from './fixtures/demoIncident';
-import { IncidentApiError, isValidFireId, loadIncident } from './lib/api';
-import type { IncidentData, LayerVisibility, ViewId, ViewerState } from './types';
+import {
+  getManifestStatusLabel,
+  ManifestEmptyPanel,
+  ManifestWorkspace,
+} from './components/ManifestWorkspace';
+import { getDataMode, isAbortError, loadViewerManifest } from './lib/manifestClient';
+import { VIEWER_MANIFEST_FIRE_ID_RE } from './lib/viewerManifest';
+import type { ViewId } from './types';
 
+/**
+ * Le dashboard riche est un artefact de démonstration distinct du manifeste
+ * public. Cette condition est pliée par Vite lors d'un build de production :
+ * un build API (ou non configuré) ne référence donc même pas le module mock.
+ * Vitest utilise MODE=test afin de pouvoir vérifier isolément le parcours mock
+ * sans modifier le contrat de configuration de la production.
+ */
+const MockApp = (
+  import.meta.env.VITE_USE_MOCKS === 'true' || import.meta.env.MODE === 'test'
+)
+  ? lazy(() => import('./MockApp'))
+  : null;
 const DEFAULT_FIRE_ID = 'FR-83-00042';
 const validViews: ViewId[] = ['viewer', 'sources', 'history', 'journal'];
-
-interface ToastState {
-  message: string;
-  tone: 'success' | 'info' | 'warning';
-}
+const LIVE_REFRESH_INTERVAL_MS = 300_000;
+const E2E_REFRESH_INTERVAL_MS = 100;
 
 function resolveRoute(): { fireId: string; view: ViewId } {
   const url = new URL(window.location.href);
@@ -42,295 +47,326 @@ function resolveRoute(): { fireId: string; view: ViewId } {
   };
 }
 
-export default function App() {
+function isValidFireId(value: string): boolean {
+  return VIEWER_MANIFEST_FIRE_ID_RE.test(value);
+}
+
+export interface AppProps {
+  /** Injectable uniquement par les tests ; la production reste à cinq minutes. */
+  refreshIntervalMs?: number;
+}
+
+type ManifestLoadResult = Awaited<ReturnType<typeof loadViewerManifest>>;
+
+type LiveManifestState =
+  | { kind: 'loading' }
+  | {
+      kind: 'ready';
+      result: ManifestLoadResult;
+      stale: boolean;
+      refreshing: boolean;
+      refreshError: unknown | null;
+    }
+  | { kind: 'error'; error: unknown };
+
+interface SafeError {
+  title: string;
+  description: string;
+  traceId: string | null;
+}
+
+const liveTabs: Array<{ id: ViewId; label: string; icon: 'layers' | 'table' | 'history' | 'file-text' }> = [
+  { id: 'viewer', label: 'Manifeste', icon: 'layers' },
+  { id: 'sources', label: 'Sources', icon: 'table' },
+  { id: 'history', label: 'Historique', icon: 'history' },
+  { id: 'journal', label: 'Journal', icon: 'file-text' },
+];
+
+function errorProperty(error: unknown, key: 'status' | 'kind' | 'traceId'): unknown {
+  if (!error || typeof error !== 'object') return undefined;
+  return (error as Record<string, unknown>)[key];
+}
+
+function toSafeError(error: unknown): SafeError {
+  const status = errorProperty(error, 'status');
+  const kind = errorProperty(error, 'kind');
+  const traceId = errorProperty(error, 'traceId');
+  const safeTraceId = typeof traceId === 'string' && traceId.length > 0 ? traceId : null;
+
+  if (status === 404) {
+    return { title: 'Incident introuvable', description: 'Aucun manifeste public ne correspond à cet identifiant.', traceId: safeTraceId };
+  }
+  if (status === 410) {
+    return { title: 'Incident retiré', description: 'Cet incident n’est plus publié par le service.', traceId: safeTraceId };
+  }
+  if (status === 503) {
+    return { title: 'Service temporairement indisponible', description: 'Le manifeste ne peut pas être revalidé pour le moment.', traceId: safeTraceId };
+  }
+  if (kind === 'timeout') {
+    return { title: 'Délai d’attente dépassé', description: 'Le service n’a pas répondu dans le délai autorisé.', traceId: safeTraceId };
+  }
+  if (kind === 'network') {
+    return { title: 'Service inaccessible', description: 'La connexion au service de manifeste est indisponible.', traceId: safeTraceId };
+  }
+  if (kind === 'parse') {
+    return { title: 'Réponse non conforme', description: 'Le manifeste reçu ne respecte pas le contrat public attendu.', traceId: safeTraceId };
+  }
+  if (kind === 'configuration' || status === 400) {
+    return { title: 'Configuration ou identifiant invalide', description: 'La page ne peut pas demander ce manifeste public.', traceId: safeTraceId };
+  }
+  return {
+    title: 'Impossible de charger le manifeste',
+    description: 'Une erreur non détaillée a interrompu la consultation publique.',
+    traceId: safeTraceId,
+  };
+}
+
+function updateRouteView(view: ViewId): void {
+  const url = new URL(window.location.href);
+  if (view === 'viewer') url.searchParams.delete('view');
+  else url.searchParams.set('view', view);
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  window.requestAnimationFrame(() => {
+    document.getElementById(`panel-${view}`)?.focus({ preventScroll: true });
+  });
+}
+
+function ManifestNavigation({
+  activeView,
+  stale,
+  onChange,
+}: {
+  activeView: ViewId;
+  stale: boolean;
+  onChange: (view: ViewId) => void;
+}) {
+  return (
+    <nav className="manifest-nav" aria-label="Vues du manifeste">
+      <div className="manifest-nav__inner" role="tablist" aria-label="Contenu public de l’incident">
+        <div className="manifest-nav__tabs">
+          {liveTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeView === tab.id}
+              aria-controls={`panel-${tab.id}`}
+              id={`tab-${tab.id}`}
+              tabIndex={activeView === tab.id ? 0 : -1}
+              className={`manifest-nav__tab ${activeView === tab.id ? 'is-active' : ''}`}
+              onClick={() => onChange(tab.id)}
+            >
+              <Icon name={tab.icon} size={17} />
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+        <span className={`manifest-nav__state ${stale ? 'is-stale' : ''}`} aria-live="polite">
+          {stale ? 'Dernier manifeste connu' : 'Manifeste revalidé'}
+        </span>
+      </div>
+    </nav>
+  );
+}
+
+function ConfigurationScreen() {
+  return (
+    <main className="error-screen" aria-labelledby="configuration-title">
+      <div className="error-screen__card">
+        <span className="error-screen__icon"><Icon name="warning" size={34} /></span>
+        <div className="eyebrow">Configuration requise</div>
+        <h1 id="configuration-title">N/A — mode de données non configuré</h1>
+        <p>
+          Définissez explicitement <code>VITE_USE_MOCKS=true</code> pour la démonstration ou
+          <code> VITE_USE_MOCKS=false</code> avec une origine API HTTP(S) valide.
+        </p>
+      </div>
+    </main>
+  );
+}
+
+function ManifestLoadingScreen() {
+  return (
+    <div className="loading-screen" role="status" aria-live="polite">
+      <span className="loading-screen__logo"><Icon name="flame" size={40} /></span>
+      <div>
+        <strong>Fire-Viewer</strong>
+        <span>Chargement du manifeste public…</span>
+      </div>
+      <i />
+    </div>
+  );
+}
+
+function ManifestErrorScreen({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  const safeError = toSafeError(error);
+  return (
+    <main className="error-screen" aria-labelledby="manifest-error-title">
+      <div className="error-screen__card">
+        <span className="error-screen__icon"><Icon name="warning" size={34} /></span>
+        <div className="eyebrow">Chargement interrompu</div>
+        <h1 id="manifest-error-title">{safeError.title}</h1>
+        <p>{safeError.description}</p>
+        {safeError.traceId ? <p>Code de suivi : <code>{safeError.traceId}</code></p> : null}
+        <button type="button" className="button button--primary" onClick={onRetry}>
+          <Icon name="refresh" size={17} />
+          Réessayer
+        </button>
+      </div>
+    </main>
+  );
+}
+
+function resolveRefreshInterval(explicitInterval?: number): number {
+  if (typeof explicitInterval === 'number' && Number.isFinite(explicitInterval) && explicitInterval > 0) {
+    return explicitInterval;
+  }
+  if (import.meta.env.DEV && import.meta.env.VITE_E2E_TEST_MODE === 'true') {
+    return E2E_REFRESH_INTERVAL_MS;
+  }
+  return LIVE_REFRESH_INTERVAL_MS;
+}
+
+function LiveManifestApp({ refreshIntervalMs }: AppProps) {
   const route = useRef(resolveRoute()).current;
-  const [incident, setIncident] = useState<IncidentData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<IncidentApiError | null>(null);
+  const refreshInterval = resolveRefreshInterval(refreshIntervalMs);
   const [activeView, setActiveView] = useState<ViewId>(route.view);
-  const [viewerState, setViewerState] = useState<ViewerState>('INITIALIZING');
-  const [layers, setLayers] = useState<LayerVisibility>({ ...defaultLayers });
-  const [offline, setOffline] = useState(false);
-  const [operatorMode, setOperatorMode] = useState(false);
-  const [textViewOpen, setTextViewOpen] = useState(false);
-  const [activeVersion, setActiveVersion] = useState(4);
-  const [activeHash, setActiveHash] = useState('9ad3d8f2c41e');
-  const [updateProgress, setUpdateProgress] = useState<number | null>(null);
-  const [toast, setToast] = useState<ToastState | null>(null);
-  const updateTimerRef = useRef<number | null>(null);
+  const [state, setState] = useState<LiveManifestState>({ kind: 'loading' });
+  const latestSuccessRef = useRef<ManifestLoadResult | null>(null);
+  const requestRef = useRef(0);
+  const controllerRef = useRef<AbortController | null>(null);
 
-  const notify = useCallback((message: string, tone: ToastState['tone'] = 'info') => {
-    setToast({ message, tone });
-  }, []);
-
-  const dismissToast = useCallback(() => setToast(null), []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function bootstrap() {
-      setLoading(true);
-      setError(null);
-      setViewerState('INITIALIZING');
-
-      if (!isValidFireId(route.fireId)) {
-        setError(new IncidentApiError('Identifiant incident invalide. Utilisez le format FR-83-00042.', 400));
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const data = await loadIncident(route.fireId, controller.signal);
-        if (controller.signal.aborted) return;
-        setIncident(data);
-        setActiveVersion(data.asset.version);
-        setActiveHash(data.asset.hash);
-        setViewerState('METADATA_READY');
-        document.title = `Fire-Viewer — ${data.fireId}`;
-
-        window.setTimeout(() => {
-          if (!controller.signal.aborted) setViewerState('MODEL_LOADING');
-        }, 300);
-        window.setTimeout(() => {
-          if (!controller.signal.aborted) setViewerState('READY');
-        }, 1_250);
-      } catch (loadError) {
-        if (controller.signal.aborted) return;
-        setError(
-          loadError instanceof IncidentApiError
-            ? loadError
-            : new IncidentApiError('Erreur inattendue lors du chargement.'),
-        );
-        setViewerState('ERROR');
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
+  const refresh = useCallback(async () => {
+    if (!isValidFireId(route.fireId)) {
+      setState({ kind: 'error', error: { status: 400, kind: 'configuration' } });
+      return;
     }
 
-    void bootstrap();
-    return () => controller.abort();
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    const requestId = requestRef.current + 1;
+    requestRef.current = requestId;
+    const previousResult = latestSuccessRef.current;
+
+    if (previousResult) {
+      setState((current) => ({
+        kind: 'ready',
+        result: previousResult,
+        // Un cache déjà obsolète ne redevient actuel qu'après 200/304 valide.
+        stale: current.kind === 'ready' ? current.stale : false,
+        refreshing: true,
+        refreshError: current.kind === 'ready' ? current.refreshError : null,
+      }));
+    } else {
+      setState({ kind: 'loading' });
+    }
+
+    try {
+      const result = await loadViewerManifest(route.fireId, { signal: controller.signal });
+      if (controller.signal.aborted || requestRef.current !== requestId) return;
+      latestSuccessRef.current = result;
+      document.title = `Fire-Viewer — ${result.summary.fireId}`;
+      setState({ kind: 'ready', result, stale: false, refreshing: false, refreshError: null });
+    } catch (error) {
+      if (controller.signal.aborted || isAbortError(error) || requestRef.current !== requestId) return;
+      if (previousResult) {
+        setState({ kind: 'ready', result: previousResult, stale: true, refreshing: false, refreshError: error });
+      } else {
+        setState({ kind: 'error', error });
+      }
+    }
   }, [route.fireId]);
 
   useEffect(() => {
-    return () => {
-      if (updateTimerRef.current !== null) window.clearInterval(updateTimerRef.current);
+    void refresh();
+    return () => controllerRef.current?.abort();
+  }, [refresh]);
+
+  useEffect(() => {
+    const revalidateWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refresh();
     };
+    const interval = window.setInterval(revalidateWhenVisible, refreshInterval);
+    document.addEventListener('visibilitychange', revalidateWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', revalidateWhenVisible);
+    };
+  }, [refresh, refreshInterval]);
+
+  const changeView = useCallback((view: ViewId) => {
+    setActiveView(view);
+    updateRouteView(view);
   }, []);
 
-  const changeView = (view: ViewId) => {
-    setActiveView(view);
-    const url = new URL(window.location.href);
-    if (view === 'viewer') url.searchParams.delete('view');
-    else url.searchParams.set('view', view);
-    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
-    window.requestAnimationFrame(() => {
-      document.getElementById(`panel-${view}`)?.focus({ preventScroll: true });
-    });
-  };
+  if (state.kind === 'loading') return <ManifestLoadingScreen />;
+  if (state.kind === 'error') return <ManifestErrorScreen error={state.error} onRetry={() => void refresh()} />;
 
-  const changeLayer = (key: keyof LayerVisibility, value: boolean) => {
-    setLayers((current) => ({ ...current, [key]: value }));
-  };
-
-  const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      notify('Lien canonique copié.', 'success');
-    } catch {
-      notify('La copie automatique est indisponible; utilisez la barre d’adresse.', 'warning');
-    }
-  };
-
-  const toggleOffline = () => {
-    setOffline((current) => {
-      const next = !current;
-      notify(
-        next
-          ? 'Mode hors ligne simulé : la fraîcheur est maintenant explicitement signalée.'
-          : 'Réseau rétabli : le manifeste peut être revalidé.',
-        next ? 'warning' : 'success',
-      );
-      return next;
-    });
-  };
-
-  const toggleDegraded = () => {
-    setViewerState((current) => {
-      const next: ViewerState = current === 'DEGRADED' ? 'READY' : 'DEGRADED';
-      notify(
-        next === 'DEGRADED'
-          ? 'Panne 3D simulée : la vue texte et les métadonnées restent actives.'
-          : 'Rendu 3D réactivé.',
-        next === 'DEGRADED' ? 'warning' : 'success',
-      );
-      return next;
-    });
-  };
-
-  const simulateUpdate = () => {
-    if (offline) {
-      notify('La mise à jour ne peut pas démarrer en mode hors ligne.', 'warning');
-      return;
-    }
-    if (updateTimerRef.current !== null || viewerState === 'MODEL_LOADING') return;
-
-    setUpdateProgress(4);
-    setViewerState('MODEL_LOADING');
-    let progress = 4;
-    updateTimerRef.current = window.setInterval(() => {
-      progress = Math.min(100, progress + Math.max(4, Math.round((100 - progress) / 7)));
-      setUpdateProgress(progress);
-      if (progress >= 100) {
-        if (updateTimerRef.current !== null) window.clearInterval(updateTimerRef.current);
-        updateTimerRef.current = null;
-        window.setTimeout(() => {
-          setActiveVersion(5);
-          setActiveHash('c51f7b19e43d');
-          setUpdateProgress(null);
-          setViewerState('READY');
-          notify('Version v5 activée après validation; les marqueurs sont restés ancrés géographiquement.', 'success');
-        }, 420);
-      }
-    }, 180);
-  };
-
-  const resetApp = () => {
-    if (updateTimerRef.current !== null) window.clearInterval(updateTimerRef.current);
-    updateTimerRef.current = null;
-    setLayers({ ...defaultLayers });
-    setOffline(false);
-    setOperatorMode(false);
-    setTextViewOpen(false);
-    setActiveVersion(incident?.asset.version ?? 4);
-    setActiveHash(incident?.asset.hash ?? '9ad3d8f2c41e');
-    setUpdateProgress(null);
-    setViewerState('READY');
-    changeView('viewer');
-    notify('Interface réinitialisée.', 'success');
-  };
-
-  if (loading) {
-    return (
-      <div className="loading-screen" role="status" aria-live="polite">
-        <span className="loading-screen__logo"><Icon name="flame" size={40} /></span>
-        <div>
-          <strong>Fire-Viewer</strong>
-          <span>Validation de l’identifiant et chargement des métadonnées…</span>
-        </div>
-        <i />
-      </div>
-    );
-  }
-
-  if (error || !incident) {
-    return (
-      <main className="error-screen">
-        <div className="error-screen__card">
-          <span className="error-screen__icon"><Icon name="warning" size={34} /></span>
-          <div className="eyebrow">Chargement interrompu</div>
-          <h1>{error?.status === 404 ? 'Incident introuvable' : 'Impossible d’ouvrir cette page'}</h1>
-          <p>{error?.message ?? 'Aucune donnée disponible.'}</p>
-          <a className="button button--primary" href={`/incident/${DEFAULT_FIRE_ID}`}>
-            Ouvrir l’incident de démonstration
-          </a>
-        </div>
-      </main>
-    );
-  }
-
+  const { summary } = state.result;
+  const safeRefreshError = state.refreshError ? toSafeError(state.refreshError) : null;
   return (
-    <div className="app-shell">
+    <div className="app-shell manifest-app-shell">
       <a className="skip-link" href="#main-content">Aller au contenu principal</a>
-      <AppHeader
-        incident={incident}
-        viewerState={viewerState}
-        offline={offline}
-        operatorMode={operatorMode}
-        onToggleOffline={toggleOffline}
-        onToggleOperatorMode={() => {
-          setOperatorMode((current) => !current);
-          notify(operatorMode ? 'Vue publique activée.' : 'Vue opérateur de démonstration activée.', 'info');
-        }}
-        onToggleDegraded={toggleDegraded}
-        onSimulateUpdate={simulateUpdate}
-        onReset={resetApp}
-      />
-      <PrimaryNav
-        activeView={activeView}
-        onChange={changeView}
-        viewerState={viewerState}
-        offline={offline}
-        observationCount={operatorMode ? incident.observations.length : 3}
-      />
-
-      <div className="mobile-status-strip" aria-label="Statut de l’incident">
-        <StatusPill code={incident.status.code} label={incident.status.label} compact />
-        <span>position ± {incident.frame.horizontalUncertaintyM} m</span>
-      </div>
-
-      {offline ? (
-        <div className="offline-banner" role="status">
-          <Icon name="offline" size={19} />
-          <div>
-            <strong>Mode hors ligne — dernière synchronisation conservée</strong>
-            <span>Le statut n’est pas présenté comme actuel tant que le manifeste n’a pas été revalidé.</span>
+      <header className="manifest-app-header">
+        <div className="manifest-app-header__inner">
+          <div className="manifest-brand" aria-label="Fire-Viewer manifeste public">
+            <Icon name="flame" size={28} />
+            <span>FIRE-VIEWER</span>
+          </div>
+          <div className="manifest-heading">
+            <h1>{summary.fireId}</h1>
+            <span>{getManifestStatusLabel(summary.statusCode)} · manifeste public</span>
+            <span>Épisode {summary.episodeId}</span>
           </div>
         </div>
-      ) : null}
-
-      <div className="safety-strip">
-        <Icon name="shield" size={17} />
-        <span>
-          Démonstration fictive. Terrain daté, périmètre estimé, aucune prévision de propagation. En urgence : 18 ou 112.
-        </span>
+      </header>
+      <ManifestNavigation activeView={activeView} stale={state.stale} onChange={changeView} />
+      <div className="manifest-safety-strip">
+        <Icon name="shield" size={18} />
+        <span>{summary.publicNotice}</span>
       </div>
-
-      <main id="main-content" className="main-content">
+      {safeRefreshError ? (
+        <div className="manifest-refresh-error" role="status">
+          <Icon name="warning" size={18} />
+          <span>
+            {safeRefreshError.title}. Les données affichées sont le dernier manifeste validé.
+            {safeRefreshError.traceId ? ` Code de suivi : ${safeRefreshError.traceId}.` : ''}
+          </span>
+        </div>
+      ) : null}
+      <main id="main-content" className="manifest-main-content">
         {activeView === 'viewer' ? (
-          <ViewerWorkspace
-            incident={incident}
-            layers={layers}
-            viewerState={viewerState}
-            activeVersion={activeVersion}
-            activeHash={activeHash}
-            offline={offline}
-            updateProgress={updateProgress}
-            onLayerChange={changeLayer}
-            onNavigate={changeView}
-            onCopyLink={copyLink}
-            onOpenTextView={() => setTextViewOpen(true)}
-            onNotify={notify}
+          <ManifestWorkspace
+            summary={summary}
+            checkedAt={state.result.checkedAt}
+            stale={state.stale}
+            refreshing={state.refreshing}
+            onRefresh={() => void refresh()}
           />
         ) : null}
-        {activeView === 'sources' ? (
-          <SourcesView incident={incident} operatorMode={operatorMode} onNotify={notify} />
-        ) : null}
-        {activeView === 'history' ? (
-          <HistoryView incident={incident} operatorMode={operatorMode} onNotify={notify} />
-        ) : null}
-        {activeView === 'journal' ? (
-          <JournalView incident={incident} operatorMode={operatorMode} onNotify={notify} />
-        ) : null}
+        {activeView === 'sources' ? <ManifestEmptyPanel view="sources" /> : null}
+        {activeView === 'history' ? <ManifestEmptyPanel view="history" /> : null}
+        {activeView === 'journal' ? <ManifestEmptyPanel view="journal" /> : null}
       </main>
-
-      <footer className="app-footer">
-        <span>FIRE-VIEWER · shell accessible et moteur-agnostique</span>
-        <span>Incident fictif {incident.fireId} · manifeste 2.0 · modèle v{activeVersion}</span>
+      <footer className="manifest-app-footer">
+        <span>FIRE-VIEWER · manifeste public minimal</span>
+        <span>Schéma {summary.schemaVersion} · aucune vue 3D chargée</span>
       </footer>
-
-      <TextViewDialog
-        open={textViewOpen}
-        incident={incident}
-        activeVersion={activeVersion}
-        activeHash={activeHash}
-        offline={offline}
-        onClose={() => setTextViewOpen(false)}
-      />
-      <Toast
-        message={toast?.message ?? null}
-        tone={toast?.tone}
-        onDismiss={dismissToast}
-      />
     </div>
   );
+}
+
+export default function App({ refreshIntervalMs }: AppProps) {
+  const dataMode = getDataMode();
+  if (dataMode === 'unconfigured') return <ConfigurationScreen />;
+  if (dataMode === 'mock') {
+    if (!MockApp) return <ConfigurationScreen />;
+    return (
+      <Suspense fallback={<ManifestLoadingScreen />}>
+        <MockApp />
+      </Suspense>
+    );
+  }
+  return <LiveManifestApp refreshIntervalMs={refreshIntervalMs} />;
 }
