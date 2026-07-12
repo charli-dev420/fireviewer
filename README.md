@@ -72,4 +72,9 @@ Ne placez dans ce dépôt ni position opérationnelle sensible, ni preuve brute,
 
 ## Licence
 
-Le backend fourni contient une licence AGPL-3.0-or-later. L'UI fournie ne contient pas de licence explicite. Le dépôt racine ne revendique donc pas encore une licence unifiée : lire [LICENSES.md](LICENSES.md) avant toute redistribution ou contribution.
+Le projet est libre, open source et gratuit :
+
+- le code source du dépôt est sous [GNU AGPL-3.0-or-later](LICENSE) ;
+- la documentation, la roadmap et les diagrammes sont sous [CC BY 4.0](LICENSE-DOCS.md).
+
+Ces licences n'annulent pas les licences propres aux dépendances tierces ni les conditions de réutilisation des données géographiques. Elles n'offrent aucune garantie de disponibilité opérationnelle ou d'usage d'urgence. Les détails de périmètre sont dans [LICENSES.md](LICENSES.md).

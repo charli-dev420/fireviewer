@@ -13,6 +13,10 @@ Le backlog initial est dans [docs/PLAN_DE_SUITE.md](docs/PLAN_DE_SUITE.md). Les 
 3. le vertical slice fictif `FR-83-00042` ;
 4. les fallbacks texte, WebGL indisponible et erreurs réseau.
 
+## Licence des contributions
+
+Tout code soumis à ce dépôt est proposé sous **AGPL-3.0-or-later**. Toute documentation, roadmap, illustration ou diagramme soumis est proposé sous **CC BY 4.0**. En ouvrant une contribution, vous confirmez disposer des droits nécessaires pour accorder cette licence et conserver les attributions requises.
+
 ## Avant une pull request
 
 - Décrivez le comportement et la preuve de test, pas seulement les fichiers modifiés.
