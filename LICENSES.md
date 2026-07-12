@@ -1,22 +1,20 @@
-# Statut des licences
+# Licences et réutilisation
 
-Ce document décrit uniquement les fichiers observés dans les livrables reçus. Il ne remplace pas une décision du titulaire des droits.
+## Décision enregistrée le 12 juillet 2026
 
-## Éléments vérifiés
+Le titulaire du projet a confirmé que Fire Viewer est libre, open source et gratuit.
 
-- **VÉRIFIÉ** : `services/fire-viewer-backend/LICENSE` contient le texte de la GNU Affero General Public License v3. Le fichier `pyproject.toml` déclare `AGPL-3.0-or-later`.
-- **OBSERVÉ** : `apps/fire-viewer-ui` ne contient pas de fichier `LICENSE` et son `package.json` ne déclare pas de licence.
-- **OBSERVÉ** : la roadmap mentionne AGPL-3.0 pour le code si Ultralytics est intégré et CC BY 4.0 pour la documentation. Cette mention d'architecture ne suffit pas, à elle seule, à attribuer une licence au dépôt racine ou à tous les fichiers fournis.
+- **Code source** : [GNU AGPL-3.0-or-later](LICENSE).
+- **Documentation, roadmap et diagrammes** : [Creative Commons Attribution 4.0 International](LICENSE-DOCS.md).
 
-## Conséquence actuelle
+**VÉRIFIÉ** : le backend fourni déclarait déjà `AGPL-3.0-or-later` et embarquait le texte de l'AGPL v3. Le fichier racine `LICENSE` est une copie identique de ce texte. L'UI et les composants communs sont désormais couverts explicitement par la licence racine.
 
-Le dépôt rend les sources visibles pour la collaboration, mais il ne revendique pas une licence racine unifiée. Les contributeurs ne doivent pas supposer qu'ils peuvent redistribuer ou relicencier l'interface, la roadmap ou les futurs assets sans décision explicite du titulaire des droits.
+## Portée
 
-## Décision à enregistrer avant les contributions externes
+La licence de code s'applique aux sources Fire Viewer dans ce dépôt. La licence documentaire s'applique notamment au README, aux fichiers Markdown, au PDF de roadmap et aux diagrammes produits pour Fire Viewer.
 
-Le ticket de gouvernance doit choisir et ajouter :
+Les dépendances tierces, données IGN, textures, modèles externes et contenus apportés par des contributeurs conservent leurs propres licences, attributions et contraintes de provenance. Une contribution ne doit être ajoutée que si son auteur peut accorder les droits correspondants.
 
-1. une licence racine pour le code de l'interface et les composants communs ;
-2. une licence de documentation ;
-3. une politique de provenance pour les données IGN, GLB, textures, captures, jeux de tests et contributions externes ;
-4. un fichier `NOTICE` si les composants distribués l'exigent.
+## Contribution
+
+En contribuant du code, vous acceptez de le proposer sous AGPL-3.0-or-later. En contribuant de la documentation ou un diagramme, vous acceptez CC BY 4.0. Consultez [CONTRIBUTING.md](CONTRIBUTING.md) avant toute contribution.
