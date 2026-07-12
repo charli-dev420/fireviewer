@@ -39,9 +39,16 @@ archives/received/                   ZIP d'origine conservés localement et igno
 - [Sécurité](SECURITY.md)
 - [Statut des licences](LICENSES.md)
 
-## Démarrage local prévu
+## Baseline vérifiée — 12 juillet 2026
 
-Les commandes ci-dessous sont **OBSERVÉES** dans les projets reçus mais **NON VÉRIFIÉES** dans ce dépôt racine. Elles seront validées par le ticket `FV-002` avant d'être présentées comme un parcours supporté.
+- **VÉRIFIÉ** : l'interface s'installe avec `npm ci`, passe `npm run check` et produit son build Vite avec `npm run build`. La route mockée `/incident/FR-83-00042` a été contrôlée en vues bureau et mobile, y compris la vue Sources.
+- **VÉRIFIÉ** : le backend a été validé sous CPython 3.13.2 : migrations Alembic, Ruff, formatage Ruff, mypy, compilation Python et 23 tests automatisés sont passés. La couverture mesurée est de 86,45 % (seuil du projet : 80 %).
+- **VÉRIFIÉ** : le verrou npm a été corrigé pour référencer le registre public npm, afin que `npm ci` ne dépende plus d'une URL interne indisponible hors de l'environnement de préparation.
+- **NON VÉRIFIÉ** : l'intégration UI/API réelle avec `VITE_USE_MOCKS=false`, le démarrage HTTP du backend et Docker ne font pas partie de cette baseline. Ils relèvent du ticket `FV-003`, puis de `FV-006`.
+
+## Démarrage local
+
+Les commandes ci-dessous correspondent aux scripts déclarés par les deux projets. La baseline ci-dessus a été exécutée sous PowerShell ; adaptez uniquement le choix de l'environnement Python à votre machine.
 
 ```powershell
 # Interface
@@ -52,11 +59,10 @@ npm run build
 
 # Backend
 Set-Location ../../services/fire-viewer-backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -e '.[dev]'
-alembic upgrade head
-make test
+uv venv --python 3.13 .venv
+uv pip install --python .venv\Scripts\python.exe -e '.[dev]'
+.\.venv\Scripts\alembic.exe upgrade head
+.\.venv\Scripts\python.exe -m pytest
 ```
 
 ## Deux décisions à prendre avant une démo connectée
