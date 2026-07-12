@@ -1,0 +1,17 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      FV_ENVIRONMENT: development
+      FV_DATABASE_URL: sqlite:////app/data/fire_viewer.db
+      FV_AUTH_MODE: disabled
+      FV_CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000"]'
+      FV_TRUSTED_HOSTS: '["localhost","127.0.0.1","api"]'
+    volumes:
+      - fire_viewer_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  fire_viewer_data:

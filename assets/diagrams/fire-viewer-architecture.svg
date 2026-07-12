@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title description">
+  <title id="title">Architecture Fire Viewer</title>
+  <desc id="description">Les observations passent par une API transactionnelle, qui publie un manifeste vers le shell web et un asset GLB immuable vers le viewer Unity WebGL. Les informations textuelles restent accessibles sans 3D.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1728"/>
+      <stop offset="1" stop-color="#122c3a"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8dd7f7"/>
+    </marker>
+  </defs>
+  <rect width="1280" height="720" fill="url(#background)" rx="32"/>
+  <text x="72" y="83" fill="#ffffff" font-family="Arial, sans-serif" font-size="42" font-weight="700">Fire Viewer - architecture incidente-centrique</text>
+  <text x="72" y="121" fill="#b8d5e4" font-family="Arial, sans-serif" font-size="20">Une page stable, un manifeste versionné, une visualisation 3D non bloquante.</text>
+
+  <g>
+    <rect x="72" y="220" width="220" height="150" rx="20" fill="#163a56" stroke="#77d0f5" stroke-width="2"/>
+    <text x="102" y="270" fill="#ffffff" font-family="Arial, sans-serif" font-size="24" font-weight="700">Observations</text>
+    <text x="102" y="304" fill="#c3dfeb" font-family="Arial, sans-serif" font-size="17">Sources texte et vision</text>
+    <text x="102" y="332" fill="#c3dfeb" font-family="Arial, sans-serif" font-size="17">Provenance + incertitude</text>
+
+    <rect x="405" y="180" width="280" height="230" rx="20" fill="#1e4550" stroke="#6fe0c4" stroke-width="2"/>
+    <text x="438" y="234" fill="#ffffff" font-family="Arial, sans-serif" font-size="25" font-weight="700">API transactionnelle</text>
+    <text x="438" y="270" fill="#c8eee3" font-family="Arial, sans-serif" font-size="17">matching create / attach / review</text>
+    <text x="438" y="300" fill="#c8eee3" font-family="Arial, sans-serif" font-size="17">audit et machine à états</text>
+    <text x="438" y="330" fill="#c8eee3" font-family="Arial, sans-serif" font-size="17">manifeste courant + ETag</text>
+    <text x="438" y="365" fill="#ffcb86" font-family="Arial, sans-serif" font-size="16">Jamais de confirmation IA seule</text>
+
+    <rect x="807" y="180" width="320" height="230" rx="20" fill="#483d65" stroke="#bb9cff" stroke-width="2"/>
+    <text x="840" y="234" fill="#ffffff" font-family="Arial, sans-serif" font-size="25" font-weight="700">Shell web accessible</text>
+    <text x="840" y="270" fill="#e2d7ff" font-family="Arial, sans-serif" font-size="17">route /incident/{fire_id}</text>
+    <text x="840" y="300" fill="#e2d7ff" font-family="Arial, sans-serif" font-size="17">statut, fraîcheur, sources, journal</text>
+    <text x="840" y="330" fill="#e2d7ff" font-family="Arial, sans-serif" font-size="17">mode texte et erreur explicite</text>
+    <text x="840" y="365" fill="#ffcb86" font-family="Arial, sans-serif" font-size="16">Disponible même sans WebGL</text>
+
+    <rect x="807" y="495" width="320" height="132" rx="20" fill="#593c3c" stroke="#ff9d8f" stroke-width="2"/>
+    <text x="840" y="545" fill="#ffffff" font-family="Arial, sans-serif" font-size="25" font-weight="700">Viewer Unity WebGL</text>
+    <text x="840" y="580" fill="#ffe0db" font-family="Arial, sans-serif" font-size="17">charge et place le GLB géoréférencé</text>
+
+    <rect x="405" y="495" width="280" height="132" rx="20" fill="#5a4b2f" stroke="#f3c969" stroke-width="2"/>
+    <text x="438" y="545" fill="#ffffff" font-family="Arial, sans-serif" font-size="25" font-weight="700">Asset immuable</text>
+    <text x="438" y="580" fill="#fff0c9" font-family="Arial, sans-serif" font-size="17">GLB + hash + ENU + version</text>
+  </g>
+
+  <path d="M 292 295 H 390" stroke="#8dd7f7" stroke-width="4" fill="none" marker-end="url(#arrow)"/>
+  <path d="M 685 295 H 792" stroke="#8dd7f7" stroke-width="4" fill="none" marker-end="url(#arrow)"/>
+  <path d="M 545 410 V 480" stroke="#f3c969" stroke-width="4" fill="none" marker-end="url(#arrow)"/>
+  <path d="M 967 410 V 480" stroke="#bb9cff" stroke-width="4" fill="none" marker-end="url(#arrow)"/>
+  <path d="M 685 560 H 792" stroke="#f3c969" stroke-width="4" fill="none" marker-end="url(#arrow)"/>
+
+  <rect x="72" y="666" width="1055" height="1" fill="#38596a"/>
+  <text x="72" y="697" fill="#a8c5d3" font-family="Arial, sans-serif" font-size="16">G0/G1 : données fictives, contrats testés, audit, intégrité asset et fallback texte avant toute démonstration connectée.</text>
+</svg>
