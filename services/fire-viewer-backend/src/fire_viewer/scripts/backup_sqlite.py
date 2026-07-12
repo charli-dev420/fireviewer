@@ -43,7 +43,7 @@ def create_backup(source_path: Path, destination_path: Path) -> None:
             result = destination.execute("PRAGMA integrity_check").fetchone()
             if not result or result[0] != "ok":
                 raise RuntimeError(f"Backup integrity check failed: {result}")
-        with temporary_path.open("rb") as handle:
+        with temporary_path.open("r+b") as handle:
             os.fsync(handle.fileno())
         os.replace(temporary_path, destination_path)
     finally:

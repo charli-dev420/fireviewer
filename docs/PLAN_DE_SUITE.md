@@ -4,6 +4,16 @@
 
 Ce plan vise d'abord G0 puis un vertical slice G1 local et fictif. Il ne constitue ni un plan de mise en production, ni une autorisation d'usage opérationnel. Chaque ticket doit avoir un propriétaire, un test exécuté et un artefact de preuve.
 
+## Suivi d'exécution
+
+| ID | État | Preuve actuelle |
+| --- | --- | --- |
+| FV-001 | **VÉRIFIÉ** | dépôt public initialisé, provenance locale des ZIP ignorée par Git, documentation et licences publiées |
+| FV-002 | **VÉRIFIÉ** | UI : `npm ci`, contrôle TypeScript, build et parcours mocké bureau/mobile ; backend : migrations, qualité, compilation et 23 tests passants à 86,45 % de couverture |
+| FV-003 | **Prochaine action** | ADR, schéma JSON et test de contrat rouge puis vert entre l'UI et l'API réelle |
+
+**NON VÉRIFIÉ** : la route UI contre l'API réelle reste incompatible au vu des contrats actuellement lus dans le code ; ce n'est pas validé par le parcours mocké de FV-002.
+
 ## Lot 0 - Baseline et décisions de contrat
 
 | ID | Action | Dépendances | Preuve d'acceptation |
@@ -47,4 +57,4 @@ Les phases 14 à 18 sont des prérequis : threat model, RBAC, minimisation des d
 
 ## Prochaine action sûre
 
-Exécuter FV-001 à FV-003. Elles réduisent les deux inconnues matérielles déjà observées : l'intégration HTTP non compatible et l'absence de baseline reproductible. FV-004 doit démarrer en parallèle comme décision d'architecture, mais aucun transfert d'asset de Die ne doit être effectué avant sa preuve métrique.
+Réaliser **FV-003** : fixer dans une ADR le contrat public `ViewerManifest`, ajouter le schéma JSON et écrire le test de contrat qui échoue sur les formats actuels puis passe avec le contrat retenu. FV-004 peut démarrer en parallèle comme décision d'architecture, mais aucun transfert d'asset de Die ne doit être effectué avant sa preuve métrique.
