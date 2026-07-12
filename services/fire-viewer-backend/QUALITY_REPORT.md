@@ -57,6 +57,25 @@ Exécutée sous CPython 3.13.2 le 12 juillet 2026, sur le dépôt organisé :
 
 **NON VÉRIFIÉ** : Docker, wheel Python et intégration UI/API réelle avec `VITE_USE_MOCKS=false` ne font pas partie de cette actualisation.
 
+## Actualisation FV-004/FV-005
+
+Exécutée sous CPython 3.13.2 le 12 juillet 2026, après intégration des contrats spatiaux,
+du seed fictif et de la matrice de visibilité :
+
+- Ruff lint et format : 61 fichiers conformes ;
+- mypy strict : 49 fichiers source contrôlés, aucune erreur ;
+- pytest : 69 tests réussis, couverture avec branches de 88,70 % ;
+- migrations SQLite `upgrade -> check -> downgrade` et compilation Python réussies ;
+- CLI `fire-viewer-seed` validé deux fois sur une SQLite temporaire vierge : seconde
+  exécution sans écriture, manifeste v2 conforme, SHA-256/ETag `6e27665245b74ad963ee6df22b1a5b45e2804c15b3714f967a35c2008a10d184`
+  et réponse conditionnelle `304` vérifiés ;
+- matrice canonique statut/visibilité, `503 incident_inconsistent`, masquage, archive
+  `CLOSED` et tombstone `410` couverts par les tests backend.
+- scan Gitleaks ciblé sur les 27 fichiers modifiés ou ajoutés : aucune fuite détectée.
+
+**NON VÉRIFIÉ** : instance PostgreSQL réelle, Docker, GLB réel, rendu Unity/PNG et
+raccordement UI/API avec `VITE_USE_MOCKS=false`.
+
 ## Limite de validation de cette livraison
 
 Le moteur Docker n'était pas disponible dans l'environnement d'exécution ; l'image n'a donc pas été construite ici. Le Dockerfile reste couvert par la même commande de démarrage et les mêmes migrations que le profil local, mais sa construction doit être ajoutée au pipeline CI du dépôt cible.

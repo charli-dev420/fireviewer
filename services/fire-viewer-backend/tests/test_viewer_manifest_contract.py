@@ -162,7 +162,7 @@ def test_canonical_manifest_returns_available_state_with_published_asset(
         sequence=42,
         lon=0.0,
         lat=0.0,
-        status=IncidentStatus.UNDER_REVIEW,
+        status=IncidentStatus.MONITORING,
     )
     _seed_published_asset(session, incident, episode)
 
@@ -171,7 +171,7 @@ def test_canonical_manifest_returns_available_state_with_published_asset(
     assert response.status_code == 200
     payload = response.json()
     assert payload["schema_version"] == "2.0"
-    assert payload["status"]["code"] == "UNDER_REVIEW"
+    assert payload["status"]["code"] == "MONITORING"
     assert payload["model_state"] == "available"
     assert payload["asset"] is not None
     assert payload["frame"] is not None
@@ -189,14 +189,14 @@ def test_canonical_manifest_returns_not_available_without_published_asset(
         sequence=43,
         lon=0.0,
         lat=0.0,
-        status=IncidentStatus.REJECTED,
+        status=IncidentStatus.MONITORING,
     )
 
     response = client.get(_manifest_path(incident.fire_id))
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["status"]["code"] == "REJECTED"
+    assert payload["status"]["code"] == "MONITORING"
     assert payload["model_state"] == "not_available"
     assert payload["location"] is not None
     assert payload["asset"] is None

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import visibilityMatrix from '../../../../contracts/demo/v1/visibility-matrix.json';
 import availableFixture from '../../../../contracts/viewer-manifest/v2/examples/available.json';
 import notAvailableFixture from '../../../../contracts/viewer-manifest/v2/examples/not_available.json';
 import withheldFixture from '../../../../contracts/viewer-manifest/v2/examples/withheld.json';
@@ -15,6 +16,12 @@ const fixtures = [
   ['not_available', notAvailableFixture],
   ['withheld', withheldFixture],
 ] as const;
+
+const fixtureForModelState = {
+  available: availableFixture,
+  not_available: notAvailableFixture,
+  withheld: withheldFixture,
+} as const;
 
 function clonedFixture(value: unknown): Record<string, unknown> {
   return structuredClone(value) as Record<string, unknown>;
@@ -53,9 +60,10 @@ describe('parseViewerManifest', () => {
     expect(isValidFireId('FR-8-00042')).toBe(false);
   });
 
-  it('accepte explicitement les statuts backend UNDER_REVIEW et REJECTED', () => {
-    expect(parseViewerManifest(availableFixture).status.code).toBe('UNDER_REVIEW');
-    expect(parseViewerManifest(notAvailableFixture).status.code).toBe('REJECTED');
+  it('associe les exemples partagés aux cycles de vie canoniques', () => {
+    expect(parseViewerManifest(availableFixture).status.code).toBe('MONITORING');
+    expect(parseViewerManifest(notAvailableFixture).status.code).toBe('MONITORING');
+    expect(parseViewerManifest(withheldFixture).status.code).toBe('UNDER_REVIEW');
   });
 
   it('accepte le profil spatial Unity canonique du manifeste disponible', () => {
@@ -92,6 +100,60 @@ describe('parseViewerManifest', () => {
 
     expect(() => parseViewerManifest(invalid)).toThrow('"available"');
   });
+
+  it.each([
+    ['CANDIDATE', 'withheld', withheldFixture],
+    ['UNDER_REVIEW', 'withheld', withheldFixture],
+    ['REJECTED', 'withheld', withheldFixture],
+    ['SUSPENDED', 'withheld', withheldFixture],
+    ['ACTIVE_CONFIRMED', 'available', availableFixture],
+    ['ACTIVE_CONFIRMED', 'not_available', notAvailableFixture],
+    ['MONITORING', 'available', availableFixture],
+    ['MONITORING', 'not_available', notAvailableFixture],
+    ['EXTINGUISHED', 'available', availableFixture],
+    ['EXTINGUISHED', 'not_available', notAvailableFixture],
+    ['CLOSED', 'not_available', notAvailableFixture],
+  ] as const)(
+    'accepte la paire de cycle de vie canonique %s / %s',
+    (statusCode, _modelState, fixture) => {
+      const manifest = clonedFixture(fixture);
+      (manifest.status as Record<string, unknown>).code = statusCode;
+
+      expect(parseViewerManifest(manifest).status.code).toBe(statusCode);
+    },
+  );
+
+  it('applique la matrice versionnée de démonstration aux manifests réseau', () => {
+    for (const scenario of visibilityMatrix.scenarios) {
+      const fixture = fixtureForModelState[
+        scenario.model_state as keyof typeof fixtureForModelState
+      ];
+      const manifest = clonedFixture(fixture);
+      (manifest.status as Record<string, unknown>).code = scenario.status;
+
+      expect(parseViewerManifest(manifest).model_state).toBe(scenario.model_state);
+    }
+
+    expect(visibilityMatrix.tombstone.http_status).toBe(410);
+  });
+
+  it.each([
+    ['UNDER_REVIEW', 'available', availableFixture],
+    ['REJECTED', 'not_available', notAvailableFixture],
+    ['CLOSED', 'available', availableFixture],
+    ['MONITORING', 'withheld', withheldFixture],
+  ] as const)(
+    'rejette la paire de cycle de vie invalide %s / %s',
+    (statusCode, modelState, fixture) => {
+      const manifest = clonedFixture(fixture);
+      (manifest.status as Record<string, unknown>).code = statusCode;
+      manifest.model_state = modelState;
+
+      expect(() => parseViewerManifest(manifest)).toThrow(
+        `"${statusCode}" ne peut pas être associé à model_state "${modelState}"`,
+      );
+    },
+  );
 
   it.each([1, 100])('rejette une échelle Unity non canonique (%s)', (metersPerUnit) => {
     const invalid = clonedFixture(availableFixture);

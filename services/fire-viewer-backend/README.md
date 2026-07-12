@@ -69,7 +69,7 @@ curl -i \
     "received_at": "2026-07-12T08:19:04Z",
     "geometry": {
       "type": "Point",
-      "coordinates": [6.0214, 43.2897],
+      "coordinates": [2.0, 46.0],
       "horizontal_uncertainty_m": 620
     },
     "evidence": {
@@ -78,8 +78,8 @@ curl -i \
     },
     "context": {
       "territory_code": "83",
-      "toponyms": ["Massif des Maures"],
-      "canonical_name": "Massif des Maures - secteur Nord"
+      "toponyms": ["Zone de démonstration fictive"],
+      "canonical_name": "Zone de démonstration fictive - secteur Alpha"
     }
   }'
 ```
@@ -150,8 +150,8 @@ make quality
 
 Résultat de référence de cette livraison :
 
-- 40 tests passants;
-- couverture branches incluse : 87,29 %;
+- 69 tests passants;
+- couverture branches incluse : 88,70 %;
 - Ruff : aucune erreur et format vérifié;
 - mypy strict : aucune erreur;
 - compilation Python : réussie;
@@ -185,14 +185,19 @@ Après migration :
 fire-viewer-seed
 ```
 
-Le seed crée `FR-83-00042` avec trois épisodes. Aucun faux GLB n'est publié. Pour brancher un asset de test immuable :
+Le seed crée le seul dataset versionné `FR-83-00042`, entièrement fictif, avec les
+épisodes fixes `E01`, `E02` et `E03`. `E03` est l'épisode courant en `MONITORING`.
+Il ne publie ni GLB, ni `ModelAsset`, ni révision de manifeste : la réponse viewer
+attendue est donc honnêtement `not_available`.
 
-```bash
-export FV_DEMO_ASSET_URL='https://assets.example/incidents/FR-83-00042/E03/v4_hash.glb'
-export FV_DEMO_ASSET_SHA256='<64 caractères hexadécimaux>'
-export FV_DEMO_ASSET_SIZE_BYTES='19503562'
-fire-viewer-seed
-```
+Le script calcule et affiche le hash du manifeste courant (la même valeur que l'`ETag`
+fort de l'endpoint). Un deuxième lancement vérifie que les données existantes correspondent
+au dataset déclaré et ne les modifie pas. S'il rencontre un `FR-83-00042` différent, il
+échoue sans l'écraser : utilisez une base de démonstration vierge plutôt qu'un reset
+automatique.
+
+Les métadonnées `.invalid` utilisées dans les tests de contrat ne correspondent à aucun
+fichier ni téléchargement. Un asset GLB de démonstration vérifiable est reporté à FV-008.
 
 ## Limites assumées
 

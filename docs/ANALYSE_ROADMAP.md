@@ -49,6 +49,8 @@
 
 **VÉRIFIÉ après FV-003** : l'[ADR-001](adr/ADR-001-viewer-manifest-public-contract.md) fixe désormais le chemin canonique `/api/v1/incident/{fire_id}/manifest` et le schéma `ViewerManifest` v2 en `snake_case`. Le modèle Pydantic, le schéma JSON versionné, l'OpenAPI et les parseurs UI sont couverts par des tests de contrat sur données fictives.
 
+**VÉRIFIÉ après FV-005** : le dataset `FR-83-00042` est déclaratif, entièrement fictif et rejouable sans écrasement. Son manifeste `not_available`, son hash/`ETag` et la matrice des projections publiques sont versionnés. Les couples statut/visibilité non canoniques échouent fermés en `503`; les exemples et le parseur UI n'acceptent plus `UNDER_REVIEW + available` ni `REJECTED + not_available`.
+
 **NON VÉRIFIÉ** : les deux applications ne sont toujours pas connectées directement avec `VITE_USE_MOCKS=false`. Le raccordement réseau réel, le cache navigateur et les vues dégradées complètes restent dans FV-006 ; aucune compatibilité de démo connectée ne doit être affirmée avant ses tests.
 
 ### Repère et échelle Unity

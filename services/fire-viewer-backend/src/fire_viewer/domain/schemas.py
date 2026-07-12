@@ -26,6 +26,11 @@ from fire_viewer.domain.enums import (
     SourceType,
     VerificationState,
 )
+from fire_viewer.domain.public_visibility import (
+    PUBLIC_LOCATION_STATUSES,
+    VIEWER_ASSET_STATUSES,
+    WITHHELD_MANIFEST_STATUSES,
+)
 
 StrictText = Annotated[str, StringConstraints(strip_whitespace=True)]
 ManifestLongitude = Annotated[float, Field(ge=-180.0, le=180.0, allow_inf_nan=False)]
@@ -211,14 +216,20 @@ class ViewerManifest(StrictModel):
             self.location is None or self.asset is None or self.frame is None
         ):
             raise ValueError("available manifests require location, asset, and frame")
+        if self.model_state == "available" and self.status.code not in VIEWER_ASSET_STATUSES:
+            raise ValueError("available manifests require an active public lifecycle status")
         if self.model_state == "not_available" and (
             self.location is None or self.asset is not None or self.frame is not None
         ):
             raise ValueError("not_available manifests require location without asset or frame")
+        if self.model_state == "not_available" and self.status.code not in PUBLIC_LOCATION_STATUSES:
+            raise ValueError("not_available manifests require a public lifecycle status")
         if self.model_state == "withheld" and any(
             value is not None for value in (self.location, self.asset, self.frame)
         ):
             raise ValueError("withheld manifests must not include location, asset, or frame")
+        if self.model_state == "withheld" and self.status.code not in WITHHELD_MANIFEST_STATUSES:
+            raise ValueError("withheld manifests require a non-public lifecycle status")
         return self
 
 

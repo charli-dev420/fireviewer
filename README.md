@@ -37,19 +37,21 @@ archives/received/                   ZIP d'origine conservés localement et igno
 - [Schéma ViewerManifest v2](contracts/viewer-manifest/v2/viewer-manifest.schema.json)
 - [ADR-002 — Contrat spatial local ENU et Unity](docs/adr/ADR-002-spatial-local-unity-contract.md)
 - [Contrat spatial local v1](contracts/spatial/v1/README.md)
+- [Dataset fictif et matrice publique v1](contracts/demo/v1/README.md)
 - [Analyse de la roadmap](docs/ANALYSE_ROADMAP.md)
 - [Plan de suite G0/G1](docs/PLAN_DE_SUITE.md)
+- [Registre problèmes et validations](docs/REGISTRE_PROBLEMES_VALIDATIONS.md)
 - [Roadmap source](docs/roadmap/roadmap_fire_viewer_incident_centrique_detaillee-1.pdf)
 - [Contribution](CONTRIBUTING.md)
 - [Sécurité](SECURITY.md)
 - [Statut des licences](LICENSES.md)
 
-## Baseline vérifiée — 12 juillet 2026
+## Contrôles vérifiés — 12 juillet 2026
 
-- **VÉRIFIÉ** : l'interface s'installe avec `npm ci`, passe `npm run check`, 10 tests Vitest de contrat et produit son build Vite avec `npm run build`. La route mockée `/incident/FR-83-00042` a été contrôlée en vues bureau et mobile, y compris la vue Sources.
-- **VÉRIFIÉ** : le backend a été validé sous CPython 3.13.2 : migrations Alembic, Ruff, formatage Ruff, mypy, compilation Python et 40 tests automatisés sont passés. La couverture mesurée est de 87,29 % (seuil du projet : 80 %).
+- **VÉRIFIÉ** : l'interface s'installe avec `npm ci`, passe `npm run check`, 34 tests Vitest de contrat et produit son build Vite avec `npm run build`.
+- **VÉRIFIÉ** : le backend a été validé sous CPython 3.13.2 : migrations Alembic, Ruff, formatage Ruff, mypy, compilation Python et 69 tests automatisés sont passés. La couverture mesurée est de 88,70 % (seuil du projet : 80 %).
 - **VÉRIFIÉ** : le verrou npm a été corrigé pour référencer le registre public npm, afin que `npm ci` ne dépende plus d'une URL interne indisponible hors de l'environnement de préparation.
-- **NON VÉRIFIÉ** : l'intégration UI/API réelle avec `VITE_USE_MOCKS=false`, le démarrage HTTP du backend et Docker ne font pas partie de cette baseline. Le contrat est fixé par FV-003 ; le raccordement reste dans FV-006.
+- **NON VÉRIFIÉ** : l'intégration UI/API réelle avec `VITE_USE_MOCKS=false`, le démarrage HTTP du backend, Docker et un contrôle visuel navigateur ne font pas partie de ces contrôles. Le raccordement reste FV-006.
 
 ## Démarrage local
 
@@ -80,6 +82,20 @@ Le contrat public est défini par l'[ADR-001](docs/adr/ADR-001-viewer-manifest-p
 - les sources, l'historique et le journal ne font pas partie de ce contrat public minimal.
 
 **NON VÉRIFIÉ** : la page UI n'est pas encore connectée à cette API avec `VITE_USE_MOCKS=false`. Ce raccordement, le cache navigateur et les panneaux dégradés complets relèvent de FV-006.
+
+## Dataset fictif et matrice d'états v1
+
+**VÉRIFIÉ** : `fire-viewer-seed` prépare le dataset entièrement fictif
+`FR-83-00042`, avec `E01` et `E02` clos puis `E03` en surveillance. Il est
+idempotent : une seconde exécution vérifie le dataset existant sans l'écrire, tandis
+qu'une collision échoue sans écrasement. Le manifeste de référence, son SHA-256/`ETag`
+et la matrice de visibilité sont versionnés sous
+[`contracts/demo/v1/`](contracts/demo/v1/).
+
+Le seed ne publie aucun asset : `E03` retourne donc `not_available`. Les états de
+revue et de suspension masquent strictement position, asset et repère ; une incohérence
+persistée statut/visibilité répond `503` sans projection publique. Les tests emploient
+seuls des métadonnées `.invalid` pour exercer `available`, sans GLB ni téléchargement.
 
 ## Contrat spatial local v1
 
