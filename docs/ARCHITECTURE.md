@@ -22,15 +22,17 @@ Le backend est responsable des identifiants, de l'audit, des règles de matching
 | `asset_id` + version | Modèle terrain/3D immuable, hashé et publiable atomiquement |
 | `trace_id` | Corrélation d'une opération métier et de son audit |
 
-## Contrat de viewer à stabiliser
+## Contrat de viewer public v2
 
-**VÉRIFIÉ dans les sources reçues** :
+L'[ADR-001](adr/ADR-001-viewer-manifest-public-contract.md) fixe le contrat à :
 
-- l'UI attend un objet `IncidentData` en camelCase à l'URL `{VITE_API_BASE_URL}/incident/{fire_id}` ;
-- le backend expose `GET /api/v1/incident/{fire_id}` pour le résumé public ;
-- le backend expose `GET /api/v1/incident/{fire_id}/manifest` pour le manifeste, au format snake_case.
+- `GET /api/v1/incident/{fire_id}/manifest`, sous forme `ViewerManifest` v2 en `snake_case` ;
+- `schema_version: "2.0"` obligatoire, `fire_id` validé et `ETag` calculé sur la représentation complète ;
+- `200` ou `304` conditionnel pour un manifeste, `400`, `404`, `410` et `503` en Problem Details ; `409` reste réservé aux mutations ;
+- CORS configurable, avec `If-None-Match` autorisé et `ETag` exposé pour les origines de développement documentées ;
+- trois états explicites : `available`, `not_available` et `withheld`. Le dernier masque localisation, asset et repère.
 
-Le contrat public n'est donc pas encore stabilisé. Le ticket `FV-003` doit définir un unique endpoint viewer, sa version, son casing, les erreurs, CORS, ETag et le test de compatibilité qui les verrouille.
+L'UI conserve un parseur strict séparé de son agrégat de démonstration. **NON VÉRIFIÉ** : l'appel de page réel reste différé à FV-006 ; aucune vue Sources, Historique ou Journal ne doit être alimentée par des données mockées lors de ce raccordement.
 
 ## Contrat spatial
 

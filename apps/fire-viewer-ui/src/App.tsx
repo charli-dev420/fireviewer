@@ -9,7 +9,7 @@ import { StatusPill } from './components/StatusPill';
 import { TextViewDialog } from './components/TextViewDialog';
 import { Toast } from './components/Toast';
 import { ViewerWorkspace } from './components/ViewerWorkspace';
-import { defaultLayers } from './data/demoIncident';
+import { defaultLayers } from './fixtures/demoIncident';
 import { IncidentApiError, isValidFireId, loadIncident } from './lib/api';
 import type { IncidentData, LayerVisibility, ViewId, ViewerState } from './types';
 

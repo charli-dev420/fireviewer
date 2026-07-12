@@ -32,6 +32,8 @@ archives/received/                   ZIP d'origine conservés localement et igno
 ## Sources et documentation
 
 - [Architecture cible](docs/ARCHITECTURE.md)
+- [ADR-001 — Contrat public ViewerManifest v2](docs/adr/ADR-001-viewer-manifest-public-contract.md)
+- [Schéma ViewerManifest v2](contracts/viewer-manifest/v2/viewer-manifest.schema.json)
 - [Analyse de la roadmap](docs/ANALYSE_ROADMAP.md)
 - [Plan de suite G0/G1](docs/PLAN_DE_SUITE.md)
 - [Roadmap source](docs/roadmap/roadmap_fire_viewer_incident_centrique_detaillee-1.pdf)
@@ -41,10 +43,10 @@ archives/received/                   ZIP d'origine conservés localement et igno
 
 ## Baseline vérifiée — 12 juillet 2026
 
-- **VÉRIFIÉ** : l'interface s'installe avec `npm ci`, passe `npm run check` et produit son build Vite avec `npm run build`. La route mockée `/incident/FR-83-00042` a été contrôlée en vues bureau et mobile, y compris la vue Sources.
-- **VÉRIFIÉ** : le backend a été validé sous CPython 3.13.2 : migrations Alembic, Ruff, formatage Ruff, mypy, compilation Python et 23 tests automatisés sont passés. La couverture mesurée est de 86,45 % (seuil du projet : 80 %).
+- **VÉRIFIÉ** : l'interface s'installe avec `npm ci`, passe `npm run check`, 10 tests Vitest de contrat et produit son build Vite avec `npm run build`. La route mockée `/incident/FR-83-00042` a été contrôlée en vues bureau et mobile, y compris la vue Sources.
+- **VÉRIFIÉ** : le backend a été validé sous CPython 3.13.2 : migrations Alembic, Ruff, formatage Ruff, mypy, compilation Python et 40 tests automatisés sont passés. La couverture mesurée est de 87,29 % (seuil du projet : 80 %).
 - **VÉRIFIÉ** : le verrou npm a été corrigé pour référencer le registre public npm, afin que `npm ci` ne dépende plus d'une URL interne indisponible hors de l'environnement de préparation.
-- **NON VÉRIFIÉ** : l'intégration UI/API réelle avec `VITE_USE_MOCKS=false`, le démarrage HTTP du backend et Docker ne font pas partie de cette baseline. Ils relèvent du ticket `FV-003`, puis de `FV-006`.
+- **NON VÉRIFIÉ** : l'intégration UI/API réelle avec `VITE_USE_MOCKS=false`, le démarrage HTTP du backend et Docker ne font pas partie de cette baseline. Le contrat est fixé par FV-003 ; le raccordement reste dans FV-006.
 
 ## Démarrage local
 
@@ -65,12 +67,20 @@ uv pip install --python .venv\Scripts\python.exe -e '.[dev]'
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-## Deux décisions à prendre avant une démo connectée
+## Contrat viewer public v2
 
-1. **Contrat API** - l'UI attend aujourd'hui un manifeste camelCase à `/incident/{fire_id}`, tandis que le backend fournit son manifeste snake_case sous `/api/v1/incident/{fire_id}/manifest`.
-2. **Contrat spatial** - la roadmap attend `1 mètre = 1 unité`, alors que le projet Unity de Die existant utilise une présentation `1 mètre = 100 unités`.
+Le contrat public est défini par l'[ADR-001](docs/adr/ADR-001-viewer-manifest-public-contract.md) :
 
-Ces écarts sont documentés avec leurs preuves dans [l'analyse de roadmap](docs/ANALYSE_ROADMAP.md). Aucun couplage Unity ou appel API réel ne doit être déclaré fonctionnel avant tests de contrat et de précision métrique.
+- `GET /api/v1/incident/{fire_id}/manifest` est la ressource viewer canonique ;
+- `ViewerManifest` v2 utilise `snake_case`, un `schema_version` obligatoire et les états `available`, `not_available` et `withheld` ;
+- les réponses conditionnelles utilisent `ETag` et `If-None-Match` ; les erreurs viewer sont des Problem Details ;
+- les sources, l'historique et le journal ne font pas partie de ce contrat public minimal.
+
+**NON VÉRIFIÉ** : la page UI n'est pas encore connectée à cette API avec `VITE_USE_MOCKS=false`. Ce raccordement, le cache navigateur et les panneaux dégradés complets relèvent de FV-006.
+
+## Décision restante avant une démo connectée
+
+Le contrat spatial doit encore être fixé : la roadmap attend `1 mètre = 1 unité`, alors que le projet Unity de Die existant utilise une présentation `1 mètre = 100 unités`. Aucun couplage Unity ou chargement de terrain ne doit être déclaré fonctionnel avant l'ADR spatiale et ses tests de précision métrique.
 
 ## Sécurité et données
 

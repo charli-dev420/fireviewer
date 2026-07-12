@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -62,6 +63,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             allow_headers=[
                 "Authorization",
                 "Content-Type",
+                "If-None-Match",
                 "Idempotency-Key",
                 "X-Trace-Id",
             ],
@@ -79,6 +81,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health_router)
     app.include_router(api_router, prefix=settings.api_prefix)
     app.mount("/metrics", make_asgi_app())
+
+    default_openapi = app.openapi
+
+    def openapi() -> dict[str, Any]:
+        schema = default_openapi()
+        manifest_operation = (
+            schema.get("paths", {})
+            .get(f"{settings.api_prefix}/incident/{{fire_id}}/manifest", {})
+            .get("get")
+        )
+        if manifest_operation:
+            # FireIdDep converts the only path validation failure to the documented 400 response.
+            manifest_operation.get("responses", {}).pop("422", None)
+        return schema
+
+    # FastAPI exposes this generator as a method, but per-instance replacement is its
+    # supported extension point for removing the inapplicable automatic 422 response.
+    app.openapi = openapi  # type: ignore[method-assign]
 
     BUILD_INFO.info({"version": settings.app_version, "environment": settings.environment})
     return app

@@ -89,13 +89,13 @@ def test_confirm_transition_is_idempotent_and_manifest_supports_etag(
     assert audit.before_snapshot["episode"]["status"] == "CANDIDATE"
     assert audit.after_snapshot["episode"]["status"] == "ACTIVE_CONFIRMED"
     assert audit.before_hash and audit.after_hash
-    manifest = client.get(f"/api/v1/incidents/{fire_id}/manifest")
+    manifest = client.get(f"/api/v1/incident/{fire_id}/manifest")
     assert manifest.status_code == 200
     assert manifest.json()["status"]["code"] == "ACTIVE_CONFIRMED"
     assert manifest.json()["location"] is not None
     etag = manifest.headers["ETag"]
     unchanged = client.get(
-        f"/api/v1/incidents/{fire_id}/manifest",
+        f"/api/v1/incident/{fire_id}/manifest",
         headers={"If-None-Match": etag},
     )
     assert unchanged.status_code == 304
@@ -114,16 +114,16 @@ def test_suspension_masks_location_and_asset(client, payload_factory) -> None:
         },
     )
     assert response.status_code == 200
-    incident = client.get(f"/api/v1/incidents/{fire_id}").json()
+    incident = client.get(f"/api/v1/incident/{fire_id}").json()
     assert incident["location"] is None
-    manifest = client.get(f"/api/v1/incidents/{fire_id}/manifest").json()
+    manifest = client.get(f"/api/v1/incident/{fire_id}/manifest").json()
     assert manifest["location"] is None
     assert manifest["asset"] is None
     assert manifest["model_state"] == "withheld"
 
 
 def test_invalid_fire_id_returns_400(client) -> None:
-    response = client.get("/api/v1/incidents/../../etc/passwd")
+    response = client.get("/api/v1/incident/../../etc/passwd")
     assert response.status_code in {400, 404}
-    direct = client.get("/api/v1/incidents/INVALID")
+    direct = client.get("/api/v1/incident/INVALID")
     assert direct.status_code == 400

@@ -44,8 +44,21 @@ Un scénario complet a été exécuté sur une base temporaire :
 - archive ZIP extraite dans un environnement vierge, installation `.[dev]` réussie, puis `make quality` réussi
 - Dockerfile non-root et Compose fournis
 
+## Actualisation FV-003
+
+Exécutée sous CPython 3.13.2 le 12 juillet 2026, sur le dépôt organisé :
+
+- Ruff lint et format : 54 fichiers conformes ;
+- mypy strict : 45 fichiers source contrôlés, aucune erreur ;
+- pytest : 40 tests réussis, couverture avec branches de 87,29 % ;
+- migrations et compilation Python : réussies ;
+- OpenAPI et schéma JSON `ViewerManifest` v2 régénérés puis vérifiés contre le modèle Pydantic ;
+- contrat HTTP canonique, ETag/304, erreurs Problem Details, trois états de manifeste et préflight CORS `If-None-Match` couverts par les tests.
+
+**NON VÉRIFIÉ** : Docker, wheel Python et intégration UI/API réelle avec `VITE_USE_MOCKS=false` ne font pas partie de cette actualisation.
+
 ## Limite de validation de cette livraison
 
 Le moteur Docker n'était pas disponible dans l'environnement d'exécution ; l'image n'a donc pas été construite ici. Le Dockerfile reste couvert par la même commande de démarrage et les mêmes migrations que le profil local, mais sa construction doit être ajoutée au pipeline CI du dépôt cible.
 
-Ce rapport valide un socle de prototype G1 prêt à intégrer. Il ne constitue pas une certification pour un usage opérationnel de sécurité civile.
+Ce rapport documente un socle de prototype G0/G1 en cours de construction. Le gate G1 n'est pas déclaré atteint avant les preuves FV-006 à FV-010 ; il ne constitue pas une certification pour un usage opérationnel de sécurité civile.

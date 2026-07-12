@@ -47,7 +47,9 @@
 - Le backend expose l'API sous `/api/v1`. `GET /api/v1/incident/{fire_id}` renvoie un `IncidentPublicResponse`, sans `asset` ni `frame`.
 - Le manifeste correspondant est disponible via `GET /api/v1/incident/{fire_id}/manifest`, au format Python `snake_case` (`schema_version`, `fire_id`, etc.).
 
-**Conclusion VÉRIFIÉE** : les deux projets ne sont pas compatibles directement avec `VITE_USE_MOCKS=false`. Le premier ticket d'intégration doit fixer le chemin canonique et un unique schéma JSON public, puis le prouver par un test de contrat. Une option cohérente est d'adapter l'UI au endpoint `/api/v1/incident/{fire_id}/manifest` et de définir des alias JSON camelCase côté API, mais cette solution reste **INFÉRÉE** tant qu'une décision d'architecture n'est pas enregistrée.
+**VÉRIFIÉ après FV-003** : l'[ADR-001](adr/ADR-001-viewer-manifest-public-contract.md) fixe désormais le chemin canonique `/api/v1/incident/{fire_id}/manifest` et le schéma `ViewerManifest` v2 en `snake_case`. Le modèle Pydantic, le schéma JSON versionné, l'OpenAPI et les parseurs UI sont couverts par des tests de contrat sur données fictives.
+
+**NON VÉRIFIÉ** : les deux applications ne sont toujours pas connectées directement avec `VITE_USE_MOCKS=false`. Le raccordement réseau réel, le cache navigateur et les vues dégradées complètes restent dans FV-006 ; aucune compatibilité de démo connectée ne doit être affirmée avant ses tests.
 
 ### Repère et échelle Unity
 
