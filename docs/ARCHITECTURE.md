@@ -115,6 +115,24 @@ l'import d'un GLB réel dans Unity, la production matérielle du PNG et l'exécu
 migration sur une instance PostgreSQL restent nécessaires avant de déclarer un terrain 3D
 aligné en intégration.
 
+La source de vérité du vertical slice reste une seule SQLite en WAL avec un seul écrivain.
+`BEGIN IMMEDIATE` sérialise la création, le rattachement et la revue; une clé
+d'idempotence concurrente ne crée qu'un seul agrégat et son rejeu ne double ni audit ni
+outbox. Les égalités de score sont départagées par identifiants stables, et les liens
+persistés observation → incident → épisode sont complets, cohérents et non déplaçables par
+SQL direct.
+
+La migration `e7a4c9d8f2b1` impose ces liens sur SQLite. Les audits de création, revue,
+réactivation et rejet conservent des snapshots hashés, et les triggers refusent toute
+modification ou suppression du journal. Une sauvegarde/restauration locale vérifie
+intégrité, clés étrangères, révision, hashes et tous les triggers critiques. La restauration
+écrit uniquement une cible neuve après migration et validation d'un fichier temporaire; elle
+ne modifie pas la source ni une cible existante.
+
+Ce mécanisme reste volontairement sans coût récurrent : fichiers SQLite locaux et outils
+open source déjà présents. L'exécution réelle de l'image Docker et la reprise sur
+PostgreSQL/PostGIS restent hors des tests SQLite.
+
 ## Limites de sécurité
 
 - Les agents IA ne confirment jamais seuls un incident.

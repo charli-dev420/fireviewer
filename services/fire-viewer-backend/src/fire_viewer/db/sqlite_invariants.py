@@ -1,0 +1,32 @@
+"""SQLite triggers that form part of the persistent Fire Viewer contract."""
+
+SQLITE_CRITICAL_TRIGGERS = frozenset(
+    {
+        "audit_event_no_update",
+        "audit_event_no_delete",
+        "incident_series_rtree_insert",
+        "incident_series_rtree_update",
+        "incident_series_rtree_delete",
+        "spatial_zone_zone_id_immutable",
+        "spatial_zone_revision_no_update",
+        "spatial_zone_revision_no_delete",
+        "model_asset_zone_revision_immutable",
+        "model_asset_sha256_immutable",
+        "model_asset_validate_legacy_link_insert",
+        "model_asset_validate_legacy_link_update",
+        "model_asset_legacy_provenance_immutable",
+        "manifest_revision_validate_episode_insert",
+        "manifest_revision_validate_episode_update",
+        "manifest_revision_validate_spatial_link_insert",
+        "manifest_revision_validate_spatial_link_update",
+        "zone_archive_snapshot_requires_closed_episode",
+        "zone_archive_snapshot_validate_source_insert",
+        "zone_archive_snapshot_no_update",
+        "zone_archive_snapshot_no_delete",
+        "episode_incident_immutable",
+        "observation_validate_pairs_insert",
+        "observation_validate_pairs_update",
+        "observation_validate_episode_ownership_insert",
+        "observation_validate_episode_ownership_update",
+    }
+)

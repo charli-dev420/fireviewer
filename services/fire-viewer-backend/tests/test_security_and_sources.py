@@ -1,7 +1,9 @@
+import pytest
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import DBAPIError
 
 from fire_viewer.db.models import AuditEvent, Observation, Source
+from fire_viewer.domain.hashing import sha256_hex
 
 TRUSTED_SOURCE_TOKEN = "source-token-for-tests-0123456789abcdef"
 
@@ -103,20 +105,38 @@ def test_operator_can_register_authenticated_trusted_source_then_ingest(
     assert detection.json()["factors"] == {}
 
 
-def test_audit_table_is_append_only(client, session, payload_factory) -> None:
+def test_audit_table_is_append_only_and_snapshots_match_their_hashes(
+    client, session, payload_factory
+) -> None:
     response = client.post(
         "/api/v1/incident/detect",
         headers={"Idempotency-Key": "audit-append-test-0001"},
         json=payload_factory(content_char="3"),
     )
     assert response.status_code == 201
-    event_id = session.execute(select(AuditEvent.id).limit(1)).scalar_one()
-    try:
+    events = session.execute(select(AuditEvent)).scalars().all()
+    assert events
+    for event in events:
+        if event.before_snapshot is None:
+            assert event.before_hash is None
+        else:
+            assert event.before_hash == sha256_hex(event.before_snapshot)
+        if event.after_snapshot is None:
+            assert event.after_hash is None
+        else:
+            assert event.after_hash == sha256_hex(event.after_snapshot)
+
+    event_id = events[0].id
+    with pytest.raises(DBAPIError, match="append-only"):
         session.execute(
             text("UPDATE audit_event SET reason = 'tampered' WHERE id = :id"),
             {"id": event_id},
         )
         session.commit()
-        raise AssertionError("audit update unexpectedly succeeded")
-    except DBAPIError:
-        session.rollback()
+    session.rollback()
+
+    with pytest.raises(DBAPIError, match="append-only"):
+        session.execute(text("DELETE FROM audit_event WHERE id = :id"), {"id": event_id})
+        session.commit()
+    session.rollback()
+    assert session.scalar(select(func.count()).select_from(AuditEvent)) == len(events)

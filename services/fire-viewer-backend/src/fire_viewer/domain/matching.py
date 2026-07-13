@@ -152,8 +152,16 @@ def match_observation(
 ) -> MatchResult:
     scored = sorted(
         (score_candidate(observation, candidate, settings) for candidate in candidates),
-        key=lambda item: item.score,
-        reverse=True,
+        # Scores are deliberately rounded before they enter the public response.
+        # A stable secondary key makes an equal-score review proposal reproducible
+        # even when a caller did not preserve database ordering.
+        key=lambda item: (
+            -item.score,
+            item.candidate.fire_id,
+            item.candidate.episode_id,
+            item.candidate.incident_db_id,
+            item.candidate.episode_db_id,
+        ),
     )
     best = scored[0] if scored else None
     second = scored[1] if len(scored) > 1 else None

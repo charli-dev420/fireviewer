@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import argparse
-import os
-import sqlite3
-from contextlib import closing
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import unquote
-from uuid import uuid4
 
 from fire_viewer.core.config import get_settings
+from fire_viewer.services.sqlite_recovery import (
+    SQLiteValidationReport,
+    create_validated_backup,
+)
 
 
 def sqlite_path_from_url(url: str) -> Path:
@@ -23,31 +24,15 @@ def sqlite_path_from_url(url: str) -> Path:
     raise ValueError("fire-viewer-backup only supports SQLite database URLs")
 
 
-def create_backup(source_path: Path, destination_path: Path) -> None:
-    source_path = source_path.resolve()
-    destination_path = destination_path.resolve()
-    if not source_path.exists():
-        raise FileNotFoundError(source_path)
-    if source_path == destination_path:
-        raise ValueError("Backup destination must differ from the source database")
+def create_backup(source_path: Path, destination_path: Path) -> SQLiteValidationReport:
+    """Create a validated, consistent local SQLite snapshot.
 
-    destination_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path = destination_path.with_name(f".{destination_path.name}.{uuid4().hex}.part")
-    try:
-        with (
-            closing(sqlite3.connect(source_path)) as source,
-            closing(sqlite3.connect(temporary_path)) as destination,
-        ):
-            source.execute("PRAGMA wal_checkpoint(FULL)")
-            source.backup(destination)
-            result = destination.execute("PRAGMA integrity_check").fetchone()
-            if not result or result[0] != "ok":
-                raise RuntimeError(f"Backup integrity check failed: {result}")
-        with temporary_path.open("r+b") as handle:
-            os.fsync(handle.fileno())
-        os.replace(temporary_path, destination_path)
-    finally:
-        temporary_path.unlink(missing_ok=True)
+    The source is opened read-only by the shared recovery service.  SQLite's
+    backup API reads a coherent snapshot including WAL content without forcing a
+    checkpoint on the running application database.
+    """
+
+    return create_validated_backup(source_path, destination_path)
 
 
 def main() -> None:
@@ -58,8 +43,8 @@ def main() -> None:
     source = sqlite_path_from_url(settings.database_url)
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     output = args.output or Path("backups") / f"fire_viewer_{timestamp}.db"
-    create_backup(source, output)
-    print(output.resolve())
+    report = create_backup(source, output)
+    print(json.dumps({"operation": "backup", "validation": report.as_dict()}))
 
 
 if __name__ == "__main__":

@@ -48,7 +48,7 @@ def find_candidates(
                       AND r.max_lat >= :min_lat
                       AND r.min_lat <= :max_lat
                       AND i.public_visibility != :tombstoned
-                    ORDER BY i.updated_at DESC
+                    ORDER BY i.updated_at DESC, i.fire_id ASC, i.id ASC
                     LIMIT :fetch_limit
                     """
                 ),
@@ -92,7 +92,13 @@ def find_candidates(
                 IncidentSeries.bbox_min_lat <= bbox.max_lat,
                 IncidentSeries.public_visibility != PublicVisibility.TOMBSTONED,
             )
-            .order_by(IncidentSeries.updated_at.desc())
+            .order_by(
+                IncidentSeries.updated_at.desc(),
+                IncidentSeries.fire_id.asc(),
+                IncidentSeries.id.asc(),
+                Episode.ordinal.asc(),
+                Episode.id.asc(),
+            )
             .limit(fetch_limit)
         )
         candidates = [

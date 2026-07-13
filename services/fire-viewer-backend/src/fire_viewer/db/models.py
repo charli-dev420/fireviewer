@@ -254,6 +254,16 @@ class Observation(Base):
         CheckConstraint("latitude >= -90 AND latitude <= 90", name="ck_observation_lat"),
         CheckConstraint("horizontal_uncertainty_m > 0", name="ck_observation_uncertainty"),
         CheckConstraint("version >= 1", name="ck_observation_version"),
+        CheckConstraint(
+            "(attached_incident_id IS NULL AND attached_episode_id IS NULL) "
+            "OR (attached_incident_id IS NOT NULL AND attached_episode_id IS NOT NULL)",
+            name="ck_observation_attached_pair_complete",
+        ),
+        CheckConstraint(
+            "(proposed_incident_id IS NULL AND proposed_episode_id IS NULL) "
+            "OR (proposed_incident_id IS NOT NULL AND proposed_episode_id IS NOT NULL)",
+            name="ck_observation_proposed_pair_complete",
+        ),
         Index("ix_observation_episode_time", "attached_episode_id", "observed_at"),
     )
 

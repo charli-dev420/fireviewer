@@ -23,7 +23,8 @@ Premier incrément fonctionnel du backend décrit dans la roadmap Fire-Viewer. L
 - Manifeste viewer avec ETag, cache court, asset immuable et masquage lors d'une suspension.
 - OIDC/JWT configurable pour staging/production; le mode sans authentification est interdit hors développement/test.
 - Logs JSON avec `trace_id`, métriques Prometheus, headers de sécurité et limite de taille des corps HTTP.
-- Sauvegarde SQLite atomique avec `integrity_check` avant publication du fichier final.
+- Sauvegarde SQLite locale validée et restauration non destructive vers une nouvelle cible,
+  avec intégrité, clés étrangères, migrations, audit et triggers critiques contrôlés.
 - Dockerfile non-root et Compose local.
 
 ## Démarrage local
@@ -124,11 +125,11 @@ Les mutations sensibles exigent un bearer JWT en staging/production. Le claim de
 
 ### Idempotence et concurrence
 
-L'API prend le verrou d'écriture SQLite avec `BEGIN IMMEDIATE` avant l'allocation d'identité et le matching. La réponse complète est conservée pendant la durée de rétention. Une même clé avec un corps différent retourne `409`; après expiration, la clé peut être réutilisée sans collision avec l'outbox.
+L'API prend le verrou d'écriture SQLite avec `BEGIN IMMEDIATE` avant l'allocation d'identité et le matching. La réponse complète est conservée pendant la durée de rétention. Une même clé avec un corps différent retourne `409`; après expiration, la clé peut être réutilisée sans collision avec l'outbox. Deux appels concurrents avec la même clé produisent un seul agrégat, un seul événement outbox et un rejeu explicite.
 
 ### Matching conservateur
 
-Le RTree ne sert que de préfiltre. Le classement final utilise une distance géodésique, l'incertitude combinée, la compatibilité temporelle, la toponymie et la confiance enregistrée côté serveur. Les seuils portent un `policy_id`; ils doivent être recalibrés sur un corpus annoté avant tout usage opérationnel.
+Le RTree ne sert que de préfiltre. Le classement final utilise une distance géodésique, l'incertitude combinée, la compatibilité temporelle, la toponymie et la confiance enregistrée côté serveur. Les scores égaux sont départagés de façon déterministe par les identifiants stables. Les seuils portent un `policy_id`; ils doivent être recalibrés sur un corpus annoté avant tout usage opérationnel.
 
 ### État public
 
@@ -136,7 +137,7 @@ Une détection ne peut pas passer seule à `ACTIVE_CONFIRMED`. Les nouvelles sé
 
 ### Audit
 
-Les mutations importantes conservent des snapshots structurés avant/après, leurs hashes, l'acteur, la raison et le `trace_id`. Les snapshots sont minimisés et n'exposent pas les preuves brutes. Le journal est protégé par des triggers append-only.
+Les mutations importantes conservent des snapshots structurés avant/après, leurs hashes, l'acteur, la raison et le `trace_id`. Les snapshots sont minimisés et n'exposent pas les preuves brutes. Le journal est protégé par des triggers append-only contrôlés à la restauration; les tests prouvent le rejet de `UPDATE` et `DELETE`, ainsi que la vérification des hashes. Création, attachement revu, rejet et réactivation produisent des événements dédiés uniquement pour les agrégats réellement mutés.
 
 ### Authentification des sources
 
@@ -150,12 +151,13 @@ make quality
 
 Résultat de référence de cette livraison :
 
-- 69 tests passants;
-- couverture branches incluse : 88,70 %;
+- 87 tests passants;
+- couverture branches incluse : 88,06 %;
 - Ruff : aucune erreur et format vérifié;
 - mypy strict : aucune erreur;
 - compilation Python : réussie;
-- migration `upgrade -> check -> downgrade` validée sur une base vierge.
+- migration `upgrade -> upgrade idempotent -> check -> downgrade` validée sur une base vierge,
+  avec contrôle des triggers SQLite critiques et de l'index RTree.
 
 Le détail des commandes exécutées et le smoke test sont consignés dans [`QUALITY_REPORT.md`](QUALITY_REPORT.md).
 
@@ -170,12 +172,21 @@ make viewer-contract-schema
 ## Sauvegarde SQLite
 
 ```bash
-fire-viewer-backup
+fire-viewer-backup --output backups/manual.db
 # ou
 python -m fire_viewer.scripts.backup_sqlite --output backups/manual.db
 ```
 
-Le fichier final n'est remplacé qu'après backup complet et `PRAGMA integrity_check = ok`. La procédure de restauration se trouve dans `docs/RUNBOOK_BACKUP_RESTORE.md`.
+La source est lue sans checkpoint forcé, puis le backup est validé (intégrité, clés étrangères,
+révision, audit et triggers) avant publication. Pour une reprise, la cible doit être nouvelle :
+
+```bash
+fire-viewer-restore --source backups/manual.db --target data/fire_viewer_recovered.db
+```
+
+La restauration ne remplace jamais une cible existante et ne migre que son fichier `.part`
+privé avant validation finale. La procédure et les limites sont détaillées dans
+[`docs/RUNBOOK_BACKUP_RESTORE.md`](docs/RUNBOOK_BACKUP_RESTORE.md).
 
 ## Données de démonstration
 

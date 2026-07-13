@@ -2,14 +2,24 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
+from threading import Barrier
 
 from sqlalchemy import func, select
 
 from fire_viewer.core.ids import new_trace_id
-from fire_viewer.db.models import IdempotencyRecord, IncidentSeries, Observation, OutboxEvent
+from fire_viewer.db.models import (
+    AuditEvent,
+    IdempotencyRecord,
+    IncidentSeries,
+    Observation,
+    OutboxEvent,
+    Source,
+)
 from fire_viewer.domain.enums import IncidentStatus
+from fire_viewer.domain.geospatial import bbox_for_point
 from fire_viewer.domain.schemas import DetectionRequest
-from fire_viewer.services.detection import process_detection
+from fire_viewer.services.candidates import find_candidates
+from fire_viewer.services.detection import DetectionOutcome, process_detection
 
 
 def test_idempotency_replay_creates_one_observation_and_event(
@@ -32,6 +42,9 @@ def test_idempotency_replay_creates_one_observation_and_event(
     assert session.scalar(select(func.count()).select_from(Observation)) == 1
     assert session.scalar(select(func.count()).select_from(OutboxEvent)) == 1
     assert session.scalar(select(func.count()).select_from(IdempotencyRecord)) == 1
+    # The first request writes source, incident, episode and observation events.
+    # Replays must not append any further audit history.
+    assert session.scalar(select(func.count()).select_from(AuditEvent)) == 4
 
 
 def test_idempotency_key_reuse_with_different_body_is_rejected(client, payload_factory) -> None:
@@ -109,6 +122,61 @@ def test_concurrent_near_identical_detections_create_one_series(
         assert db_session.scalar(select(func.count()).select_from(Observation)) == 2
 
 
+def test_concurrent_same_idempotency_key_replays_after_sqlite_writer_serialization(
+    app, settings, payload_factory
+) -> None:
+    """SQLite's single writer must still produce one committed aggregate on a same-key retry."""
+
+    factory = app.state.session_factory
+    payload = payload_factory(source_id="same-key-concurrent-source", content_char="e")
+    barrier = Barrier(2)
+
+    def execute() -> DetectionOutcome:
+        with factory() as db_session:
+            barrier.wait()
+            return process_detection(
+                db_session,
+                payload=DetectionRequest.model_validate(payload),
+                idempotency_key="same-key-concurrent-0001",
+                source_token=None,
+                trace_id=new_trace_id(),
+                settings=settings,
+            )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        outcomes = list(executor.map(lambda _index: execute(), range(2)))
+
+    assert sum(outcome.replayed for outcome in outcomes) == 1
+    assert outcomes[0].response == outcomes[1].response
+    with factory() as db_session:
+        assert db_session.scalar(select(func.count()).select_from(IncidentSeries)) == 1
+        assert db_session.scalar(select(func.count()).select_from(Observation)) == 1
+        assert db_session.scalar(select(func.count()).select_from(OutboxEvent)) == 1
+        assert db_session.scalar(select(func.count()).select_from(IdempotencyRecord)) == 1
+        assert db_session.scalar(select(func.count()).select_from(AuditEvent)) == 4
+
+
+def test_failed_detection_rolls_back_discovered_source_before_request_error(
+    client, session, payload_factory
+) -> None:
+    """Dependency teardown explicitly rolls back writes left by a failed request."""
+
+    response = client.post(
+        "/api/v1/incident/detect",
+        headers={"Idempotency-Key": "rollback-uncommitted-source-0001"},
+        json=payload_factory(
+            source_id="rollback-source-001",
+            content_char="f",
+            observed_at=datetime.now(UTC) + timedelta(hours=1),
+        ),
+    )
+
+    assert response.status_code == 422
+    assert response.json()["type"].endswith("future_timestamp")
+    assert session.scalar(select(func.count()).select_from(Source)) == 0
+    assert session.scalar(select(func.count()).select_from(AuditEvent)) == 0
+
+
 def test_two_close_candidates_with_small_margin_force_review(
     client, session, payload_factory, seed_incident
 ) -> None:
@@ -134,6 +202,38 @@ def test_two_close_candidates_with_small_margin_force_review(
     observation = session.execute(select(Observation)).scalar_one()
     assert observation.attached_incident_id is None
     assert observation.proposed_incident_id is not None
+
+
+def test_sqlite_candidate_query_breaks_equal_updated_at_ties_by_fire_id(
+    session, seed_incident
+) -> None:
+    first, _first_episode = seed_incident(
+        fire_id="FR-83-00051",
+        sequence=51,
+        lon=6.0200,
+        lat=43.2897,
+        uncertainty_m=500,
+    )
+    second, _second_episode = seed_incident(
+        fire_id="FR-83-00050",
+        sequence=50,
+        lon=6.0220,
+        lat=43.2897,
+        uncertainty_m=500,
+    )
+    same_updated_at = datetime.now(UTC)
+    first.updated_at = same_updated_at
+    second.updated_at = same_updated_at
+    session.commit()
+
+    candidates, overflow = find_candidates(
+        session,
+        bbox=bbox_for_point(6.0210, 43.2897, 1_000),
+        limit=10,
+    )
+
+    assert overflow is False
+    assert [candidate.fire_id for candidate in candidates] == ["FR-83-00050", "FR-83-00051"]
 
 
 def test_closed_incident_match_creates_reactivation_episode(
@@ -162,6 +262,16 @@ def test_closed_incident_match_creates_reactivation_episode(
     assert response.json()["decision"] == "attach"
     assert response.json()["fire_id"] == "FR-83-00020"
     assert response.json()["episode_id"] == "E02"
+    audit_events = session.execute(
+        select(AuditEvent).where(AuditEvent.trace_id == response.json()["trace_id"])
+    ).scalars()
+    actions = {event.action for event in audit_events}
+    assert {
+        "episode.reactivation.previous_closed",
+        "incident.reactivation.updated",
+        "episode.reactivation.created",
+        "observation.processed",
+    }.issubset(actions)
 
 
 def test_pending_auto_attach_does_not_refresh_public_timeline_until_verified(
