@@ -41,6 +41,7 @@ archives/received/                   ZIP d'origine conservés localement et igno
 - [Analyse de la roadmap](docs/ANALYSE_ROADMAP.md)
 - [Plan de suite G0/G1](docs/PLAN_DE_SUITE.md)
 - [Registre problèmes et validations](docs/REGISTRE_PROBLEMES_VALIDATIONS.md)
+- [Runbook sauvegarde/restauration SQLite](services/fire-viewer-backend/docs/RUNBOOK_BACKUP_RESTORE.md)
 - [Roadmap source](docs/roadmap/roadmap_fire_viewer_incident_centrique_detaillee-1.pdf)
 - [Contribution](CONTRIBUTING.md)
 - [Sécurité](SECURITY.md)
@@ -50,10 +51,12 @@ archives/received/                   ZIP d'origine conservés localement et igno
 
 - **VÉRIFIÉ** : l'interface s'installe avec `npm ci`, passe `npm run check`, **57 tests Vitest** et produit son build Vite avec `npm run build`.
 - **VÉRIFIÉ** : ces quatre contrôles UI ont été rejoués dans un worktree Git neuf au commit FV-006, après un `npm ci` sans dépendance préexistante.
-- **VÉRIFIÉ** : le backend a été validé sous CPython 3.13.2 : migrations Alembic, Ruff, formatage Ruff, mypy, compilation Python et 69 tests automatisés sont passés. La couverture mesurée est de 88,70 % (seuil du projet : 80 %).
+- Le backend a été validé sous CPython 3.13.2 : migrations Alembic, Ruff, formatage Ruff, mypy, compilation Python et 87 tests automatisés sont passés. La couverture mesurée est de 88,06 % (seuil du projet : 80 %).
+- FV-007 couvre l'upgrade idempotent, les 26 triggers critiques, l'idempotence concurrente, le matching `create/attach/review`, l'audit append-only et une reprise non destructive. La restauration valide une copie temporaire avant de publier une cible neuve; elle ne modifie ni la source ni une cible existante.
 - **VÉRIFIÉ** : le verrou npm a été corrigé pour référencer le registre public npm, afin que `npm ci` ne dépende plus d'une URL interne indisponible hors de l'environnement de préparation.
 - **VÉRIFIÉ (localement)** : FV-006 parcourt l'UI API réelle sous Chromium Playwright : SQLite temporaire migrée et seedée, CORS, premier `200`, revalidation `304`, polling, `404`, timeout, fallback WebGL et absence de téléchargement GLB ou du module mock en mode API (8 scénarios).
 - **NON VÉRIFIÉ** : le déploiement public, ses en-têtes CDN, les origines CORS de production et le contrôle visuel par le navigateur natif de l'environnement restent hors de cette preuve locale.
+- À tester encore : image Docker effectivement construite, restauration exécutée dans le conteneur et instance PostgreSQL/PostGIS réelle. Ces points ne sont pas déduits des tests SQLite.
 
 ## Démarrage local
 

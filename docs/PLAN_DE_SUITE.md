@@ -4,6 +4,12 @@
 
 Ce plan vise d'abord G0 puis un vertical slice G1 local et fictif. Il ne constitue ni un plan de mise en production, ni une autorisation d'usage opérationnel. Chaque ticket doit avoir un propriétaire, un test exécuté et un artefact de preuve.
 
+Le vertical slice est pensé pour ne pas engager de frais : outils libres, dépôt public,
+SQLite local, fichiers de sauvegarde locaux et dépendances déjà déclarées. Une passe ne
+doit pas introduire de service cloud, d'API payante, de licence propriétaire ou de coût
+récurrent sans décision explicite. Cette contrainte ne vaut pas promesse de disponibilité
+opérationnelle.
+
 ## Suivi d'exécution
 
 | ID | État | Preuve actuelle |
@@ -14,6 +20,7 @@ Ce plan vise d'abord G0 puis un vertical slice G1 local et fictif. Il ne constit
 | FV-004 | **VÉRIFIÉ (contrat et contrôles SQLite)** | ADR-002, schéma spatial v1, fixtures fictifs ENU/glTF/Unity, zones, révision, snapshot et contrôles de transformation, axes, origine et hash RAF20 ; rendu Unity/PNG réel et migration PostgreSQL restent non vérifiés |
 | FV-005 | **VÉRIFIÉ (SQLite et contrats)** | seed `FR-83-00042` v1 entièrement fictif, idempotence sans écriture au second passage, manifeste/ETag hashés, matrice versionnée et masquage canonique ; 69 tests backend et 34 tests UI passent |
 | FV-006 | **VÉRIFIÉ (SQLite, UI et Chromium Playwright)** | mode de données explicite, client `ViewerManifest` v2, cache ETag/`304`, surface API DOM-first et harnais E2E ; `check`, 57 tests, build et 8 scénarios Chromium passent avec CORS, seed réel, `200`/`304`, `404`, timeout et absence de GLB/mock API ; `npm ci`/check/tests/build sont rejoués dans un checkout Git neuf |
+| FV-007 | SQLite local validé | migration `e7a4c9d8f2b1`, `upgrade` idempotent, 26 triggers critiques, idempotence concurrente, matching déterministe `create/attach/review`, audit append-only et sauvegarde/restauration non destructive ; 87 tests backend passent à 88,06 % de couverture. Docker réel et PostgreSQL restent hors de cette preuve. |
 
 **VÉRIFIÉ dans FV-006** : `IncidentData` et le terrain SVG sont isolés dans le parcours
 mock ; le parcours API ne consomme que le résumé de `ViewerManifest`. Les tests Vitest et
@@ -63,7 +70,8 @@ Les phases 14 à 18 sont des prérequis : threat model, RBAC, minimisation des d
 
 ## Prochaine action sûre
 
-Réaliser **FV-007** : éprouver les migrations, l'idempotence, le matching
-`create/attach/review`, l'audit append-only et une restauration SQLite. FV-006 apporte des
-preuves locales de la consultation publique, mais FV-008/FV-009 restent exclusivement
-responsables du GLB, d'Unity/WebGL et de l'archive PNG réelle.
+Réaliser FV-008 : produire un unique asset GLB de démonstration entièrement fictif,
+versionné, hashé et rattaché à une révision de zone déjà contractuelle. Cette passe doit
+rester locale et sans coût récurrent; elle ne branche ni Unity/WebGL ni un terrain réel.
+FV-009 reste exclusivement responsable du pont Unity/WebGL, tandis que FV-010 documentera
+l'exercice local complet de démarrage, arrêt, migration, restauration et incident fictif.

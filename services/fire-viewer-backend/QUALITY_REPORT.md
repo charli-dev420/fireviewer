@@ -76,6 +76,27 @@ du seed fictif et de la matrice de visibilité :
 **NON VÉRIFIÉ** : instance PostgreSQL réelle, Docker, GLB réel, rendu Unity/PNG et
 raccordement UI/API avec `VITE_USE_MOCKS=false`.
 
+Le 13 juillet 2026, sous CPython 3.13.2, FV-007 a renforcé la persistance et la reprise
+SQLite avec les résultats suivants :
+
+- Ruff lint et format : 65 fichiers conformes ;
+- mypy strict : 52 fichiers source contrôlés, aucune erreur ;
+- pytest : 87 tests réussis, couverture avec branches de 88,06 % ;
+- compilation Python réussie ;
+- migrations SQLite `upgrade -> upgrade idempotent -> check -> downgrade` réussies, avec
+  les 26 triggers critiques et l'index RTree contrôlés ;
+- `create/attach/review`, scores égaux, idempotence concurrente, conflits de rejeu,
+  rollback de requête échouée et audit append-only sont couverts ;
+- sauvegarde/restauration SQLite validées : source/WAL inchangés, hashes d'audit,
+  déclencheurs critiques, corruption, cible existante, nettoyage `.part` et migration
+  privée `c6d4f13a9b20 -> e7a4c9d8f2b1` ;
+- la résolution des migrations est couverte dans un layout Python non éditable compatible
+  avec le répertoire de travail Docker, sans construire l'image.
+
+Aucun service hébergé, coût récurrent ou dépendance propriétaire n'est introduit par cette
+passe. Il reste à tester : construction/exécution réelle de Docker, PostgreSQL/PostGIS,
+stockage distant, GLB réel et Unity/WebGL.
+
 ## Limite de validation de cette livraison
 
 Le moteur Docker n'était pas disponible dans l'environnement d'exécution ; l'image n'a donc pas été construite ici. Le Dockerfile reste couvert par la même commande de démarrage et les mêmes migrations que le profil local, mais sa construction doit être ajoutée au pipeline CI du dépôt cible.

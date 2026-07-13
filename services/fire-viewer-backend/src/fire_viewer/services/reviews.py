@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -24,6 +25,8 @@ from fire_viewer.services.common import (
     create_incident_and_episode,
     create_reactivation_episode,
     emit_outbox,
+    episode_snapshot,
+    incident_snapshot,
     observation_snapshot,
     record_operator_audit,
 )
@@ -87,6 +90,10 @@ def resolve_review(
     before = observation_snapshot(observation)
     incident: IncidentSeries | None = None
     episode: Episode | None = None
+    created_incident = False
+    reactivated_previous_episode: Episode | None = None
+    before_incident: dict[str, Any] | None = None
+    before_episode: dict[str, Any] | None = None
 
     if payload.action == ReviewResolutionAction.REJECT:
         observation.verification_state = VerificationState.REJECTED
@@ -102,6 +109,7 @@ def resolve_review(
             observed_at=as_utc(observation.observed_at),
             policy_id=settings.matching_policy_id,
         )
+        created_incident = True
         observation.attached_incident_id = incident.id
         observation.attached_episode_id = episode.id
         observation.proposed_incident_id = None
@@ -130,6 +138,9 @@ def resolve_review(
                 "The selected incident cannot accept observations in its current state.",
             )
         if current.status in {IncidentStatus.EXTINGUISHED, IncidentStatus.CLOSED}:
+            before_incident = incident_snapshot(incident)
+            before_episode = episode_snapshot(current)
+            reactivated_previous_episode = current
             episode = create_reactivation_episode(
                 session,
                 incident=incident,
@@ -140,6 +151,7 @@ def resolve_review(
         else:
             episode = current
             if as_utc(observation.observed_at) > as_utc(episode.last_observed_at):
+                before_episode = episode_snapshot(episode)
                 episode.last_observed_at = as_utc(observation.observed_at)
                 episode.version += 1
         observation.attached_incident_id = incident.id
@@ -153,6 +165,80 @@ def resolve_review(
     observation.version += 1
     session.flush()
     after = observation_snapshot(observation)
+    if created_incident and incident is not None and episode is not None:
+        record_operator_audit(
+            session,
+            actor=actor,
+            action="incident.created",
+            target_type="incident_series",
+            target_id=incident.fire_id,
+            reason=payload.reason,
+            trace_id=trace_id,
+            after=incident_snapshot(incident),
+            payload={"resolution": payload.action.value, "episode_id": episode.episode_id},
+        )
+        record_operator_audit(
+            session,
+            actor=actor,
+            action="episode.created",
+            target_type="episode",
+            target_id=f"{incident.fire_id}/{episode.episode_id}",
+            reason=payload.reason,
+            trace_id=trace_id,
+            after=episode_snapshot(episode),
+            payload={"resolution": payload.action.value, "fire_id": incident.fire_id},
+        )
+    elif reactivated_previous_episode is not None and incident is not None and episode is not None:
+        if before_episode is None or before_incident is None:
+            raise RuntimeError("reactivation audit snapshots are required")
+        record_operator_audit(
+            session,
+            actor=actor,
+            action="episode.reactivation.previous_closed",
+            target_type="episode",
+            target_id=f"{incident.fire_id}/{reactivated_previous_episode.episode_id}",
+            reason=payload.reason,
+            trace_id=trace_id,
+            before=before_episode,
+            after=episode_snapshot(reactivated_previous_episode),
+            payload={"resolution": payload.action.value, "next_episode_id": episode.episode_id},
+        )
+        record_operator_audit(
+            session,
+            actor=actor,
+            action="incident.reactivation.updated",
+            target_type="incident_series",
+            target_id=incident.fire_id,
+            reason=payload.reason,
+            trace_id=trace_id,
+            before=before_incident,
+            after=incident_snapshot(incident),
+            payload={"resolution": payload.action.value, "episode_id": episode.episode_id},
+        )
+        record_operator_audit(
+            session,
+            actor=actor,
+            action="episode.reactivation.created",
+            target_type="episode",
+            target_id=f"{incident.fire_id}/{episode.episode_id}",
+            reason=payload.reason,
+            trace_id=trace_id,
+            after=episode_snapshot(episode),
+            payload={"resolution": payload.action.value, "fire_id": incident.fire_id},
+        )
+    elif before_episode is not None and incident is not None and episode is not None:
+        record_operator_audit(
+            session,
+            actor=actor,
+            action="episode.timeline.advanced",
+            target_type="episode",
+            target_id=f"{incident.fire_id}/{episode.episode_id}",
+            reason=payload.reason,
+            trace_id=trace_id,
+            before=before_episode,
+            after=episode_snapshot(episode),
+            payload={"resolution": payload.action.value},
+        )
     record_operator_audit(
         session,
         actor=actor,

@@ -36,6 +36,7 @@ dev = [
 fire-viewer-seed = "fire_viewer.scripts.seed_demo:main"
 fire-viewer-export-openapi = "fire_viewer.scripts.export_openapi:main"
 fire-viewer-backup = "fire_viewer.scripts.backup_sqlite:main"
+fire-viewer-restore = "fire_viewer.scripts.restore_sqlite:main"
 fire-viewer-check-migrations = "fire_viewer.scripts.check_migrations:main"
 
 [tool.setuptools.packages.find]

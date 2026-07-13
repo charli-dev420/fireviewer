@@ -127,9 +127,19 @@ réduire le risque H3.
 | H5 - panne 3D | DOM texte et tests sans WebGL/réseau |
 | H6 - fuite de position | RBAC, minimisation, vues publique/opérateur séparées |
 
+La passe FV-007 a exécuté 87 tests backend avec 88,06 % de couverture. Elle traverse
+`upgrade -> upgrade idempotent -> check -> downgrade`, le matching déterministe
+`create/attach/review`, le rejet des liens observation/épisode incohérents, l'idempotence
+concurrente, l'audit append-only et une restauration SQLite validée. Une source historique
+`c6d4f13a9b20` est migrée seulement dans un candidat `.part`, puis publiée vers une cible
+neuve après contrôle de l'intégrité, des clés étrangères, des hashes et des triggers.
+
+Cette passe n'ajoute aucun coût récurrent : SQLite local, Alembic, Python et fichiers de
+sauvegarde locaux suffisent. Docker réellement exécuté, PostgreSQL/PostGIS, stockage distant
+et procédure d'exploitation d'urgence restent hors de cette preuve.
+
 ## Décision de cadrage recommandée
 
-**INFÉRÉ** : après les preuves locales FV-006, le prochain jalon utile est FV-007
-(migrations, idempotence, audit et restauration SQLite). L'intégration de
-l'asset GLB puis d'Unity reste séquencée en FV-008/FV-009 ; la devancer augmenterait les
-risques H2, H3 et H5 sans réduire l'incertitude de la chaîne transactionnelle.
+La suite conseillée est FV-008 : un seul asset GLB de démonstration, fictif, immuable et
+contrôlé par hash dans le contrat spatial déjà établi. Unity/WebGL reste à FV-009 ; le
+brancher plus tôt ne réduit pas l'incertitude de publication de l'asset.

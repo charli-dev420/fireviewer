@@ -284,6 +284,18 @@ def process_detection(
             after=incident_snapshot(attached_incident),
             payload={"episode_id": attached_episode.episode_id},
         )
+        record_audit(
+            session,
+            actor_type=ActorType.SYSTEM,
+            actor_id="incident-service",
+            action="episode.created",
+            target_type="episode",
+            target_id=f"{attached_incident.fire_id}/{attached_episode.episode_id}",
+            reason="A new incident series starts with its first reviewable episode.",
+            trace_id=trace_id,
+            after=episode_snapshot(attached_episode),
+            payload={"fire_id": attached_incident.fire_id},
+        )
     elif match.best is not None:
         proposed_incident = session.get(IncidentSeries, match.best.candidate.incident_db_id)
         proposed_episode = session.get(Episode, match.best.candidate.episode_db_id)
@@ -300,6 +312,7 @@ def process_detection(
                 .with_for_update()
             ).scalar_one()
             if current_episode.status in {IncidentStatus.EXTINGUISHED, IncidentStatus.CLOSED}:
+                before_incident = incident_snapshot(attached_incident)
                 before_episode = episode_snapshot(current_episode)
                 attached_episode = create_reactivation_episode(
                     session,
@@ -312,12 +325,37 @@ def process_detection(
                     session,
                     actor_type=ActorType.SYSTEM,
                     actor_id="incident-service",
+                    action="episode.reactivation.previous_closed",
+                    target_type="episode",
+                    target_id=f"{attached_incident.fire_id}/{current_episode.episode_id}",
+                    reason="A strong match arrived after the previous episode ended.",
+                    trace_id=trace_id,
+                    before=before_episode,
+                    after=episode_snapshot(current_episode),
+                    payload={"next_episode_id": attached_episode.episode_id},
+                )
+                record_audit(
+                    session,
+                    actor_type=ActorType.SYSTEM,
+                    actor_id="incident-service",
+                    action="incident.reactivation.updated",
+                    target_type="incident_series",
+                    target_id=attached_incident.fire_id,
+                    reason="A strong match re-opened the incident for review.",
+                    trace_id=trace_id,
+                    before=before_incident,
+                    after=incident_snapshot(attached_incident),
+                    payload={"episode_id": attached_episode.episode_id},
+                )
+                record_audit(
+                    session,
+                    actor_type=ActorType.SYSTEM,
+                    actor_id="incident-service",
                     action="episode.reactivation.created",
                     target_type="episode",
                     target_id=f"{attached_incident.fire_id}/{attached_episode.episode_id}",
                     reason="A strong match arrived after the previous episode ended.",
                     trace_id=trace_id,
-                    before=before_episode,
                     after=episode_snapshot(attached_episode),
                 )
             else:

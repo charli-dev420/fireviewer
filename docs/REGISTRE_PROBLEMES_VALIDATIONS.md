@@ -28,8 +28,32 @@ preuve. Les points non exécutés restent explicitement **NON VÉRIFIÉ**.
 | FV6-007 | **VÉRIFIÉ** | Une invocation manuelle `mypy .` a inclus le répertoire généré `build/` et signalé un module `fire_viewer` dupliqué, alors que ce chemin n'appartient pas au contrôle officiel. | Les contrôles backend suivent les cibles déclarées par le dépôt : `mypy` sans argument (`make typecheck`), plutôt qu'un parcours arbitraire du dossier de travail. | `mypy` : aucune erreur dans 49 fichiers source ; `pytest` : 69 tests, couverture 88,70 % ; Ruff, migration-check et compilation passent. |
 | FV6-008 | **VÉRIFIÉ** | Un scan large `gitleaks detect --no-git` a traversé l'environnement virtuel ignoré et remonté des littéraux de dépendances tierces ; une première exécution Git était parasitée par les avertissements CRLF. | Le scan final est ancré sur le diff Git avec `core.autocrlf=false` temporaire, puis complète les fichiers non suivis individuellement ; aucun contenu ignoré n'est traité comme changement du produit. | `gitleaks git --pre-commit` et le scan ciblé de tous les fichiers non suivis : aucune fuite détectée. |
 
+FV-007, le 13 juillet 2026 : les liens observation/incident/épisode pouvaient être
+incomplets ou traverser deux incidents par SQL direct. La migration `e7a4c9d8f2b1` ajoute
+les contraintes de paires, quatre contrôles de cohérence et l'immuabilité de
+`episode.incident_id`. Les tests couvrent attach réel, INSERT/UPDATE directs et déplacement
+d'épisode.
+
+FV-007 : le départage de scores égaux est devenu stable et une même clé idempotente a été
+testée avec deux écrivains SQLite. Les relectures create, attach et reject, leurs replays et
+le conflit `409` sont couverts sans audit ou outbox supplémentaire.
+
+FV-007 : le contrôle de backup refusait initialement un trigger audit affaibli par `WHEN 0`.
+Il compare maintenant la définition exacte des deux triggers append-only et leurs hashes.
+La restauration valide aussi les 26 triggers critiques communs avec le contrôle de migration.
+
+FV-007 : la reprise est une copie SQLite en lecture seule, migrée uniquement dans un fichier
+`.part`, puis publiée vers une cible neuve. Les tests couvrent source/WAL inchangés,
+corruption, hash altéré, garde relationnel ou spatial manquant, cible existante et migration
+`c6d4f13a9b20 -> e7a4c9d8f2b1`. Le layout Python non éditable est simulé; l'image Docker et
+PostgreSQL ne sont pas exécutés ici.
+
+FV-007 n'ajoute aucun service payant, cloud ou dépendance propriétaire : SQLite local,
+fichiers locaux, Python et Alembic suffisent à cette passe.
+
 ## Limites actives
 
 - **NON VÉRIFIÉ** : navigateur natif de l'environnement, déploiement public, CDN et origines CORS de production ; les contrôles FV-006 sont locaux sous Chromium Playwright.
 - **NON VÉRIFIÉ** : GLB réel, import/rendu Unity et production matérielle de l'archive PNG — FV-008/FV-009.
 - **NON VÉRIFIÉ** : migration exécutée contre une instance PostgreSQL réelle — hors contrôle SQLite actuel.
+- Image Docker et restauration exécutée dans le conteneur : non testées ici; le layout non éditable est couvert par simulation locale, pas par un build d'image.

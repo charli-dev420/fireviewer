@@ -23,7 +23,20 @@ def get_session(request: Request) -> Iterator[Session]:
     session = factory()
     try:
         yield session
+    except BaseException:
+        # Services own their successful commits.  A request that exits through an
+        # exception must never leave a partially flushed write transaction to be
+        # implicitly dealt with by Session.close().  In particular, a failed
+        # detection may have discovered a source before later request validation
+        # rejects the observation.
+        session.rollback()
+        raise
     finally:
+        # Read paths also open an implicit transaction on SQLite.  Close it
+        # explicitly so dependency teardown has one deterministic transaction
+        # boundary regardless of how the endpoint returned.
+        if session.in_transaction():
+            session.rollback()
         session.close()
 
 
