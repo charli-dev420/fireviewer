@@ -42,7 +42,7 @@ plus réaliste et plus économique :
 | --- | --- | --- |
 | FV-008 | paquet spatial réel Die–Pontaix, catalogue `1.1`, COG LiDAR, aperçus PNG et GLB découpés | une seule zone publique `DIE-PONTAIX-08@R1`; les deux couvertures LiDAR restent techniques |
 | FV-009 | bridge web Giro3D avec chargement local conditionnel | Unity conserve son rôle d'authoring ; il n'est pas chargé dans le navigateur public |
-| FV-010 | clôture reproductible G1 | release GitHub de binaires, verrou et provenance versionnés ; seul le clone neuf la valide |
+| FV-010 | clôture reproductible G1 | release GitHub de binaires, verrou et provenance versionnés ; clone neuf Windows validé |
 
 Le contrat G1 fixe le catalogue `1.1` à `DIE-PONTAIX-08@R1`, emprise
 `[876000, 6403000, 892000, 6413000]`, avec deux emprises techniques de
@@ -90,14 +90,14 @@ Gates de maturité.
 | Gate | Usage autorisé | État documentaire |
 | --- | --- | --- |
 | G0 | conception, contrats et fixtures | historique du dépôt |
-| G1 | démonstration technique locale et contrôlée | clôture en cours : release immuable, clone neuf, E2E de zone unique et preuves finales à vérifier |
+| G1 | démonstration technique locale et contrôlée | clôture validée : release binaire v4, tag source correctif, clone neuf et E2E de zone unique |
 | G2 | bêta supervisée | non engagé |
 | G3-candidat | évaluation avec professionnels | non engagé |
 | G3 | usage opérationnel | hors périmètre |
 
-Le périmètre G1 local est VÉRIFIÉ par les commandes consignées ci-dessous. Le
-statut de livraison ne devient pas VÉRIFIÉ par cette analyse : les conditions
-exactes sont dans [PLAN_DE_SUITE.md](PLAN_DE_SUITE.md) et la procédure dans
+Le périmètre G1 local est VÉRIFIÉ par les commandes consignées dans le
+[registre](REGISTRE_PROBLEMES_VALIDATIONS.md). Les conditions exactes restent
+dans [PLAN_DE_SUITE.md](PLAN_DE_SUITE.md) et la procédure dans
 [RUNBOOK_G1.md](RUNBOOK_G1.md).
 
 VÉRIFIÉ le 14 juillet 2026 avant la clôture G1 : FV-007 a exécuté 87/87 tests backend à 88,06 % de
@@ -127,8 +127,8 @@ Suite recommandée après le gate G1.
 1. Geler toute évolution de `DIE-PONTAIX-08@R1` sous le tag de release et
    publier toute évolution future sous une nouvelle révision, jamais en
    remplaçant la release existante.
-2. Exécuter le runbook depuis un clone neuf, récupérer la release puis conserver
-   dans le registre les résultats, hashes et captures.
+2. Conserver dans le registre les résultats, hashes et captures du clone neuf ;
+   toute évolution devra répéter cette recette depuis un nouveau tag source.
 3. Mesurer le runtime Giro3D sur bureau et mobile avant de modifier la
    géométrie, le relief ou les lisières.
 4. Introduire un registre de zones en base seulement lorsqu'il faudra publier

@@ -9,12 +9,13 @@ données d'incident avec leur provenance, leur fraîcheur et leur incertitude.
 
 G1 clôt une démonstration contrôlée, sans coût récurrent imposé : manifeste
 public, persistance SQLite et carte de zone restent séparés. Le paquet binaire
-spatial n'est volontairement pas stocké dans Git ; après publication, un
-checkout propre pourra le récupérer depuis la GitHub Release, le vérifier puis
-l'installer localement avant le build. La publication de la release et la recette depuis
-un clone neuf restent NON VÉRIFIÉES tant que leurs preuves ne sont pas ajoutées
-au registre. Il ne s'agit pas d'un service d'urgence, d'un outil de prévision,
-ni d'un système de confirmation automatique d'incendie.
+spatial n'est volontairement pas stocké dans Git. La release publique
+`spatial-die-pontaix-r1-v4` le distribue ; le tag source de clôture
+`spatial-die-pontaix-r1-v4-fix1` préserve les contrats hashés en LF et permet
+à un checkout Windows standard de le récupérer, le vérifier puis l'installer
+avant le build. Le tag v4 publié est conservé tel quel. Il ne s'agit pas d'un
+service d'urgence, d'un outil de prévision, ni d'un système de confirmation
+automatique d'incendie.
 
 OBSERVÉ dans l'arbre de travail : deux parcours publics sont séparés.
 
@@ -28,13 +29,13 @@ l'exercice décrits dans [le plan](docs/PLAN_DE_SUITE.md) et
 [le runbook](docs/RUNBOOK_G1.md). Cette page ne transforme pas les preuves
 historiques en contrôles nouvellement exécutés.
 
-VÉRIFIÉ le 14 juillet 2026 dans l'arbre de travail avant la clôture G1 : le
-backend a passé 87/87 tests avec 88,06 % de couverture, Ruff, mypy, migrations
+VÉRIFIÉ le 14 juillet 2026 dans un clone neuf avec `core.autocrlf=true` : le
+backend a passé 88/88 tests avec 88,06 % de couverture, Ruff, mypy, migrations
 et compilation. Une sauvegarde et une restauration SQLite fraîche ont également
-été exécutées. L'interface a passé `npm run check`, 65 tests Vitest, le build,
-8 scénarios E2E, 4 tests du paquet spatial et le contrôle cryptographique des
-146 fichiers de la carte. Ces résultats historiques ne valident pas encore le
-catalogue G1 à zone publique unique, la release ni le checkout propre.
+été exécutées. L'interface a passé `npm ci`, `fetch:spatial`, le check, 68 tests
+Vitest, 11 tests spatiaux, le build et 20 scénarios E2E bureau et émulation
+mobile. Les 144 fichiers de la carte, la provenance IGN et l'archive HTTPS ont
+été contrôlés. Les limites de runtime public restent dans le registre.
 
 En cas de feu ou de danger immédiat en France, contactez les secours au 18 ou
 au 112. N'utilisez jamais ce prototype pour guider une intervention ou vous
@@ -149,8 +150,10 @@ manifeste versionné est
 `contracts/spatial/releases/ign_sources.v1.json` et son SHA-256 est
 `cff6e9ffa71ce38397defe490bf54f6ba361cc9e5ed8621f22719e5e86d20fe5`.
 
-La release immuable attendue est le tag `spatial-die-pontaix-r1-v4`, avec
-`fireviewer-die-pontaix-r1-v4.tar.gz`, `SHA256SUMS` et l'attribution IGN.
+La release publique `spatial-die-pontaix-r1-v4` contient
+`fireviewer-die-pontaix-r1-v4.tar.gz`, `SHA256SUMS` et l'attribution IGN. Le
+tag source de clôture `spatial-die-pontaix-r1-v4-fix1` ne remplace ni ne modifie
+cette release : il corrige seulement la reproductibilité du checkout Windows.
 GitHub sert seulement à reconstituer le paquet au build : la carte ne charge
 jamais d'asset depuis GitHub au runtime. `npm run fetch:spatial` contrôle
 l'archive avant extraction et `npm run verify:spatial` recalcule les chemins,

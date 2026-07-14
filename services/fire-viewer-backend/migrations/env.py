@@ -1,3 +1,4 @@
+import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -14,6 +15,12 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def database_url() -> str:
+    """Resolve the Alembic target with the same FV_ override as the app."""
+
+    return os.environ.get("FV_DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+
+
 def include_object(
     _object: object,
     name: str | None,
@@ -26,7 +33,7 @@ def include_object(
 
 
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
+    url = database_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -42,7 +49,8 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    configuration = config.get_section(config.config_ini_section, {})
+    configuration = dict(config.get_section(config.config_ini_section, {}))
+    configuration["sqlalchemy.url"] = database_url()
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",

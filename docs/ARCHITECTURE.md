@@ -130,10 +130,11 @@ Le dépôt versionne le catalogue, le manifeste de paquet, le verrou de release
 la provenance `contracts/spatial/releases/ign_sources.v1.json`. Seuls les
 répertoires binaires installés sous
 `apps/fire-viewer-ui/public/maps/fireviewer-die-pontaix-r1-v4/` sont ignorés.
-La release GitHub immuable attendue `spatial-die-pontaix-r1-v4` doit fournir
-l'archive `fireviewer-die-pontaix-r1-v4.tar.gz`, `SHA256SUMS` et l'attribution
-IGN. Après publication, elle servira au clone et au build, jamais au runtime
-public : Giro3D ne charge que des
+La release GitHub publique `spatial-die-pontaix-r1-v4` fournit l'archive
+`fireviewer-die-pontaix-r1-v4.tar.gz`, `SHA256SUMS` et l'attribution IGN. Le
+tag source `spatial-die-pontaix-r1-v4-fix1` force les fins de ligne LF des
+contrats hashés sans déplacer le tag binaire v4. La release sert au clone et au
+build, jamais au runtime public : Giro3D ne charge que des
 chemins same-origin après installation locale du paquet.
 
 `npm run fetch:spatial` télécharge ou reçoit une archive locale, vérifie son
