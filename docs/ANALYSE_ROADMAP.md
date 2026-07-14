@@ -90,7 +90,7 @@ Gates de maturité.
 | Gate | Usage autorisé | État documentaire |
 | --- | --- | --- |
 | G0 | conception, contrats et fixtures | historique du dépôt |
-| G1 | démonstration technique locale et contrôlée | clôture validée : release binaire v4, tag source correctif, clone neuf et E2E de zone unique |
+| G1 | démonstration technique locale et contrôlée | recette de clôture vérifiée : release v4, tag source `spatial-die-pontaix-r1-v4-fix1`, clone neuf et E2E de zone unique ; verrouillage GitHub NON VÉRIFIÉ (`immutable: false`) |
 | G2 | bêta supervisée | non engagé |
 | G3-candidat | évaluation avec professionnels | non engagé |
 | G3 | usage opérationnel | hors périmètre |
