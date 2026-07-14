@@ -8,6 +8,16 @@ import {
 import { getDataMode, isAbortError, loadViewerManifest } from './lib/manifestClient';
 import { VIEWER_MANIFEST_FIRE_ID_RE } from './lib/viewerManifest';
 import SpatialMapApp from './components/SpatialMapApp';
+import { AdminAuthGate } from './components/admin/AdminAuthGate';
+import { AdminNewZonePage } from './components/admin/AdminNewZonePage';
+import { AdminPublicationsPage } from './components/admin/AdminPublicationsPage';
+import { AdminShell } from './components/admin/AdminShell';
+import { AdminZoneDetailPage } from './components/admin/AdminZoneDetailPage';
+import { AdminZoneRevisionPage } from './components/admin/AdminZoneRevisionPage';
+import { AdminZonePrivatePreviewPage } from './components/admin/AdminZonePrivatePreviewPage';
+import { AdminZonesPage } from './components/admin/AdminZonesPage';
+import { resolveAppRoute } from './routing';
+import type { AdminRoute } from './routing';
 import type { ViewId } from './types';
 
 /**
@@ -52,9 +62,6 @@ function isValidFireId(value: string): boolean {
   return VIEWER_MANIFEST_FIRE_ID_RE.test(value);
 }
 
-function isSpatialMapRoute(): boolean {
-  return /^\/zones\/die-pontaix\/?$/.test(window.location.pathname);
-}
 
 export interface AppProps {
   /** Injectable uniquement par les tests ; la production reste à cinq minutes. */
@@ -362,8 +369,57 @@ function LiveManifestApp({ refreshIntervalMs }: AppProps) {
   );
 }
 
+
+function PublicZonesPendingScreen() {
+  return (
+    <main className="error-screen" aria-labelledby="public-zones-pending-title">
+      <div className="error-screen__card">
+        <span className="error-screen__icon"><Icon name="shield" size={34} /></span>
+        <div className="eyebrow">Catalogue public en attente</div>
+        <h1 id="public-zones-pending-title">Catalogue public des zones non publié</h1>
+        <p>
+          Les zones publiques multi-zones seront exposées uniquement après publication administrateur explicite.
+          Aucun paquet local, release GitHub ou fichier présent sur disque n’est listé automatiquement.
+        </p>
+        <p>
+          La démonstration technique Die–Pontaix reste isolée sous <code>/demo/zones/die-pontaix</code> et ne
+          constitue pas le catalogue public MVP-6.
+        </p>
+      </div>
+    </main>
+  );
+}
+
+function AdminNotFoundPage() {
+  return (
+    <section aria-labelledby="admin-not-found-title">
+      <span className="eyebrow">Route administrateur</span>
+      <h2 id="admin-not-found-title">Page administrateur inconnue</h2>
+      <p>Cette route privée n’est pas encore prévue par le MVP administration des zones.</p>
+    </section>
+  );
+}
+
+function AdminApp({ route }: { route: AdminRoute }) {
+  let page;
+  if (route.kind === 'zones') page = <AdminZonesPage />;
+  else if (route.kind === 'new-zone') page = <AdminNewZonePage />;
+  else if (route.kind === 'zone-detail') page = <AdminZoneDetailPage zoneId={route.zoneId} />;
+  else if (route.kind === 'zone-revision') {
+    page = <AdminZoneRevisionPage zoneId={route.zoneId} revision={route.revision} />;
+  } else if (route.kind === 'zone-private-preview') {
+    page = <AdminZonePrivatePreviewPage zoneId={route.zoneId} revision={route.revision} />;
+  } else if (route.kind === 'publications') page = <AdminPublicationsPage />;
+  else page = <AdminNotFoundPage />;
+
+  return <AdminAuthGate>{() => <AdminShell>{page}</AdminShell>}</AdminAuthGate>;
+}
+
 export default function App({ refreshIntervalMs }: AppProps) {
-  if (isSpatialMapRoute()) return <SpatialMapApp />;
+  const route = resolveAppRoute();
+  if (route.kind === 'admin') return <AdminApp route={route.adminRoute} />;
+  if (route.kind === 'spatial-demo') return <SpatialMapApp />;
+  if (route.kind === 'public-zones-pending') return <PublicZonesPendingScreen />;
   const dataMode = getDataMode();
   if (dataMode === 'unconfigured') return <ConfigurationScreen />;
   if (dataMode === 'mock') {

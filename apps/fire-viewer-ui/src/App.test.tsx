@@ -56,8 +56,26 @@ function createResult(summary = createSummary()) {
   };
 }
 
+function createJwt(payload: Record<string, unknown>): string {
+  const encode = (value: Record<string, unknown>) => btoa(JSON.stringify(value))
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+  return `${encode({ alg: 'none', typ: 'JWT' })}.${encode(payload)}.`;
+}
+
+function storeAdminSession(payload: Record<string, unknown> = {}): void {
+  window.sessionStorage.setItem(
+    'fire-viewer:admin-session:v1',
+    JSON.stringify({
+      token: createJwt({ sub: 'admin-ui-test', roles: ['administrator'], exp: 4_102_444_800, ...payload }),
+    }),
+  );
+}
+
 describe('App en mode manifeste API', () => {
   beforeEach(() => {
+    window.sessionStorage.clear();
     window.history.replaceState({}, '', '/incident/FR-83-00042');
     manifestClient.getDataMode.mockReset().mockReturnValue('api');
     manifestClient.isAbortError.mockReset().mockReturnValue(false);
@@ -191,6 +209,7 @@ describe('App en mode manifeste API', () => {
     expect(screen.getAllByText('Aucun modèle public disponible')[0]).toBeVisible();
   });
 
+
   it.each([
     [404, 'Incident introuvable'],
     [410, 'Incident retiré'],
@@ -208,5 +227,98 @@ describe('App en mode manifeste API', () => {
     expect(await screen.findByRole('heading', { name: title })).toBeVisible();
     expect(screen.getByText('trace-status')).toBeVisible();
     expect(document.body.textContent).not.toContain('information interne à ne jamais afficher');
+  });
+});
+
+describe('Routage administrateur privé', () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+    manifestClient.getDataMode.mockReset().mockReturnValue('api');
+    manifestClient.isAbortError.mockReset().mockReturnValue(false);
+    manifestClient.loadViewerManifest.mockReset().mockResolvedValue(createResult());
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => window.setTimeout(callback, 0));
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+
+  it('garde /zones/die-pontaix hors catalogue public tant qu’aucune publication admin ne l’expose', () => {
+    window.history.replaceState({}, '', '/zones/die-pontaix');
+
+    render(<App />);
+
+    expect(screen.getByRole('heading', { name: 'Catalogue public des zones non publié' })).toBeVisible();
+    expect(screen.getByText('/demo/zones/die-pontaix')).toBeVisible();
+    expect(screen.queryByText('Préparation de la carte 3D')).not.toBeInTheDocument();
+    expect(manifestClient.getDataMode).not.toHaveBeenCalled();
+    expect(manifestClient.loadViewerManifest).not.toHaveBeenCalled();
+  });
+
+  it('bloque la branche admin tant qu’aucun bearer administrator n’est stocké', () => {
+    window.history.replaceState({}, '', '/admin/zones');
+
+    render(<App />);
+
+    expect(screen.getByRole('heading', { name: 'Connexion administrateur requise' })).toBeVisible();
+    expect(screen.getByLabelText('Bearer JWT administrateur')).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Fire-Viewer Admin' })).not.toBeInTheDocument();
+    expect(manifestClient.getDataMode).not.toHaveBeenCalled();
+    expect(manifestClient.loadViewerManifest).not.toHaveBeenCalled();
+  });
+
+  it('refuse un JWT sans rôle administrator sur l’écran de connexion', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, '', '/admin/zones');
+
+    render(<App />);
+
+    await user.type(
+      screen.getByLabelText('Bearer JWT administrateur'),
+      createJwt({ sub: 'viewer', roles: ['viewer'], exp: 4_102_444_800 }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Ouvrir l’administration' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Le jeton ne contient pas le rôle administrator.');
+    expect(screen.queryByRole('heading', { name: 'Fire-Viewer Admin' })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['/admin/zones', 'Administration des zones'],
+    ['/admin/zones/nouvelle', 'Nouvelle zone'],
+    ['/admin/zones/alpes-test', 'Zone alpes-test'],
+    ['/admin/zones/alpes-test/revisions/r2', 'Zone alpes-test — révision r2'],
+    ['/admin/zones/alpes-test/revisions/r2/preview', 'Prévisualisation privée — alpes-test révision r2'],
+    ['/admin/publications', 'Publications'],
+  ])('rend %s dans le shell admin sans charger les branches publiques', (path, heading) => {
+    storeAdminSession();
+    window.history.replaceState({}, '', path);
+
+    render(<App />);
+
+    expect(screen.getByRole('heading', { name: 'Fire-Viewer Admin' })).toBeVisible();
+    expect(screen.getByText('Session administrateur active')).toBeVisible();
+    expect(screen.getByRole('heading', { name: heading })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Zones' })).toHaveAttribute('href', '/admin/zones');
+    expect(screen.getByRole('link', { name: 'Nouvelle zone' })).toHaveAttribute('href', '/admin/zones/nouvelle');
+    expect(screen.getByRole('link', { name: 'Publications' })).toHaveAttribute('href', '/admin/publications');
+    expect(manifestClient.getDataMode).not.toHaveBeenCalled();
+    expect(manifestClient.loadViewerManifest).not.toHaveBeenCalled();
+    expect(screen.queryByText('Démonstration fictive')).not.toBeInTheDocument();
+    expect(screen.queryByText('La carte ne consulte ni Cesium')).not.toBeInTheDocument();
+  });
+
+  it('priorise /admin/* avant les routes publiques de zone', () => {
+    storeAdminSession();
+    window.history.replaceState({}, '', '/admin/zones/die-pontaix');
+
+    render(<App />);
+
+    expect(screen.getByRole('heading', { name: 'Zone die-pontaix' })).toBeVisible();
+    expect(manifestClient.loadViewerManifest).not.toHaveBeenCalled();
   });
 });

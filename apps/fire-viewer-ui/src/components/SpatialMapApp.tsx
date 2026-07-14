@@ -59,7 +59,7 @@ function MapFallback({ catalog, message }: { catalog: SpatialCatalog; message: s
     <main className="spatial-map-page" id="main-content">
       <section className="spatial-map-intro" aria-labelledby="spatial-map-title">
         <div>
-          <p className="section-kicker">Cartographie 3D locale</p>
+          <p className="section-kicker">Démonstration technique 3D locale</p>
           <h1 id="spatial-map-title">Zone Die–Pontaix</h1>
           <p>
             Le catalogue local reste disponible, mais cette vue ne peut pas initialiser le rendu 3D dans ce navigateur.
@@ -73,7 +73,7 @@ function MapFallback({ catalog, message }: { catalog: SpatialCatalog; message: s
           <h2 id="spatial-map-fallback-title">Rendu 3D indisponible</h2>
           <p>{message}</p>
           <p>
-            La carte ne consulte ni Cesium, ni fond cartographique externe, ni données d’incident. La zone publique
+            La carte ne consulte ni Cesium, ni fond cartographique externe, ni données d’incident. La zone de démonstration
             Die–Pontaix et ses deux couvertures techniques restent des fichiers statiques du même domaine.
           </p>
         </div>
@@ -135,11 +135,11 @@ function MapWorkspace({ catalog }: { catalog: SpatialCatalog }) {
     <main className="spatial-map-page" id="main-content">
       <section className="spatial-map-intro" aria-labelledby="spatial-map-title">
         <div>
-          <p className="section-kicker">Cartographie 3D locale</p>
+          <p className="section-kicker">Démonstration technique 3D locale</p>
           <h1 id="spatial-map-title">Zone Die–Pontaix</h1>
           <p>
             Relief LiDAR, bâtiments, routes, chemins, lisières végétales et arbres sont lus depuis le même domaine,
-            sans Cesium ni fond cartographique externe.
+            sans Cesium ni fond cartographique externe. Ce parcours /demo ne constitue pas le catalogue public multi-zones.
           </p>
         </div>
         <MapMetrics catalog={catalog} />
@@ -147,7 +147,7 @@ function MapWorkspace({ catalog }: { catalog: SpatialCatalog }) {
 
       <section className="spatial-map-viewer" aria-label="Vue cartographique 3D">
         <div className="spatial-map-toolbar">
-          <div className="spatial-map-zones" role="group" aria-label="Zone publique et recentrage de la carte">
+          <div className="spatial-map-zones" role="group" aria-label="Zone de démonstration et recentrage de la carte">
             <span className="spatial-map-zone-name">Zone Die–Pontaix</span>
             <button
               type="button"

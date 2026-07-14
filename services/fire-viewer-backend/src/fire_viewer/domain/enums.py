@@ -57,6 +57,32 @@ class AssetState(StrEnum):
     DELETED_TOMBSTONE = "DELETED_TOMBSTONE"
 
 
+class SpatialPackageState(StrEnum):
+    DRAFT = "DRAFT"
+    VERIFIED = "VERIFIED"
+    PREVIEWABLE = "PREVIEWABLE"
+    PUBLISHED = "PUBLISHED"
+    WITHDRAWN = "WITHDRAWN"
+    REVOKED = "REVOKED"
+    ARCHIVED = "ARCHIVED"
+
+
+class ZonePublicationState(StrEnum):
+    DRAFT = "DRAFT"
+    VERIFIED = "VERIFIED"
+    PREVIEWABLE = "PREVIEWABLE"
+    PUBLISHED = "PUBLISHED"
+    WITHDRAWN = "WITHDRAWN"
+    REVOKED = "REVOKED"
+    ARCHIVED = "ARCHIVED"
+
+
+class SpatialPackageFileKind(StrEnum):
+    COG = "COG"
+    PNG = "PNG"
+    GLB = "GLB"
+
+
 class AssetLod(StrEnum):
     MOBILE = "mobile"
     DESKTOP = "desktop"

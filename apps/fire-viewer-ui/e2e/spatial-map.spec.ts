@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const mapRoute = '/zones/die-pontaix';
+const mapRoute = '/demo/zones/die-pontaix';
 const mapOrigin = 'http://localhost:5173';
 
 function isMapAsset(url: string, suffix: string): boolean {
@@ -8,7 +8,7 @@ function isMapAsset(url: string, suffix: string): boolean {
   return parsed.origin === mapOrigin && parsed.pathname.endsWith(suffix);
 }
 
-test.describe('Carte spatiale publique Die–Pontaix', () => {
+test.describe('Démonstration technique spatiale Die–Pontaix', () => {
   test('affiche une zone unique, reste same-origin à distance et ne charge aucun GLB', async ({ page }) => {
     const requests: string[] = [];
     const glbRequests: string[] = [];

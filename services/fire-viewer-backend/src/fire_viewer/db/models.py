@@ -33,7 +33,10 @@ from fire_viewer.domain.enums import (
     PublicVisibility,
     SourceTrust,
     SourceType,
+    SpatialPackageFileKind,
+    SpatialPackageState,
     VerificationState,
+    ZonePublicationState,
 )
 
 
@@ -280,6 +283,7 @@ class SpatialZone(Base, TimestampMixin):
     revisions: Mapped[list[SpatialZoneRevision]] = relationship(
         back_populates="zone", order_by="SpatialZoneRevision.revision"
     )
+    publications: Mapped[list[ZonePublication]] = relationship(back_populates="zone")
 
 
 class SpatialZoneRevision(Base):
@@ -335,6 +339,12 @@ class SpatialZoneRevision(Base):
 
     zone: Mapped[SpatialZone] = relationship(back_populates="revisions")
     assets: Mapped[list[ModelAsset]] = relationship(back_populates="spatial_zone_revision")
+    spatial_packages: Mapped[list[SpatialPackage]] = relationship(
+        back_populates="spatial_zone_revision"
+    )
+    zone_publications: Mapped[list[ZonePublication]] = relationship(
+        back_populates="spatial_zone_revision"
+    )
     manifest_revisions: Mapped[list[ManifestRevision]] = relationship(
         back_populates="spatial_zone_revision"
     )
@@ -407,6 +417,190 @@ class SpatialZoneRevision(Base):
             name="ck_spatial_zone_up_bounds",
         ),
     )
+
+
+class SpatialPackage(Base):
+    """Immutable admin registry entry for a Unity-produced spatial package.
+
+    The package stores controlled object locations, hashes and verification
+    metadata only. COG/PNG/GLB binaries stay outside SQLite.
+    """
+
+    __tablename__ = "spatial_package"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    package_id: Mapped[str] = mapped_column(String(96), nullable=False, unique=True, index=True)
+    manifest_uri: Mapped[str] = mapped_column(String(2_048), nullable=False)
+    manifest_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    manifest_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    storage_uri: Mapped[str] = mapped_column(String(2_048), nullable=False)
+    state: Mapped[SpatialPackageState] = mapped_column(
+        enum_column(SpatialPackageState, name="spatial_package_state"),
+        nullable=False,
+        default=SpatialPackageState.DRAFT,
+    )
+    provenance: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    verification_report: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    created_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    spatial_zone_revision_id: Mapped[int | None] = mapped_column(
+        ForeignKey("spatial_zone_revision.id", ondelete="RESTRICT"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+    spatial_zone_revision: Mapped[SpatialZoneRevision | None] = relationship(
+        back_populates="spatial_packages"
+    )
+    files: Mapped[list[SpatialPackageFile]] = relationship(
+        back_populates="package", cascade="all, delete-orphan"
+    )
+    zone_publications: Mapped[list[ZonePublication]] = relationship(back_populates="package")
+
+    __table_args__ = (
+        CheckConstraint(
+            sha256_hex_check("manifest_sha256"),
+            name="ck_spatial_package_manifest_sha256",
+        ),
+        CheckConstraint("manifest_size_bytes > 0", name="ck_spatial_package_manifest_size"),
+        CheckConstraint("length(manifest_uri) > 0", name="ck_spatial_package_manifest_uri"),
+        CheckConstraint("length(storage_uri) > 0", name="ck_spatial_package_storage_uri"),
+        CheckConstraint(
+            "(state IN ('VERIFIED', 'PREVIEWABLE', 'PUBLISHED', 'WITHDRAWN', "
+            "'REVOKED', 'ARCHIVED') "
+            "AND verified_at IS NOT NULL) OR state = 'DRAFT'",
+            name="ck_spatial_package_verified_states_timestamp",
+        ),
+        CheckConstraint(
+            "spatial_zone_revision_id IS NULL OR state IN "
+            "('VERIFIED', 'PREVIEWABLE', 'PUBLISHED', 'WITHDRAWN', 'REVOKED', 'ARCHIVED')",
+            name="ck_spatial_package_revision_requires_validated_state",
+        ),
+    )
+
+
+class SpatialPackageFile(Base):
+    """Object-store reference for one file that belongs to an admin package."""
+
+    __tablename__ = "spatial_package_file"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    spatial_package_id: Mapped[int] = mapped_column(
+        ForeignKey("spatial_package.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kind: Mapped[SpatialPackageFileKind] = mapped_column(
+        enum_column(SpatialPackageFileKind, name="spatial_package_file_kind"), nullable=False
+    )
+    uri: Mapped[str] = mapped_column(String(2_048), nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    media_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    provenance: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+    package: Mapped[SpatialPackage] = relationship(back_populates="files")
+
+    __table_args__ = (
+        UniqueConstraint("spatial_package_id", "kind", "uri", name="uq_spatial_package_file"),
+        CheckConstraint(sha256_hex_check("sha256"), name="ck_spatial_package_file_sha256"),
+        CheckConstraint("size_bytes > 0", name="ck_spatial_package_file_size"),
+        CheckConstraint("length(uri) > 0", name="ck_spatial_package_file_uri"),
+        CheckConstraint(
+            "(kind = 'COG' AND media_type IN "
+            "('image/tiff', 'image/geotiff', 'application/octet-stream')) "
+            "OR (kind = 'PNG' AND media_type = 'image/png') "
+            "OR (kind = 'GLB' AND media_type IN ('model/gltf-binary', 'application/octet-stream'))",
+            name="ck_spatial_package_file_media_type",
+        ),
+    )
+
+
+class ZonePublication(Base):
+    """Administrative publication lifecycle for one explicit zone revision choice."""
+
+    __tablename__ = "zone_publication"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    publication_id: Mapped[str] = mapped_column(String(96), nullable=False, unique=True, index=True)
+    spatial_zone_id: Mapped[int] = mapped_column(
+        ForeignKey("spatial_zone.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    spatial_zone_revision_id: Mapped[int] = mapped_column(
+        ForeignKey("spatial_zone_revision.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    spatial_package_id: Mapped[int] = mapped_column(
+        ForeignKey("spatial_package.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    state: Mapped[ZonePublicationState] = mapped_column(
+        enum_column(ZonePublicationState, name="zone_publication_state"),
+        nullable=False,
+        default=ZonePublicationState.DRAFT,
+        index=True,
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    actor_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+    zone: Mapped[SpatialZone] = relationship(back_populates="publications")
+    spatial_zone_revision: Mapped[SpatialZoneRevision] = relationship(
+        back_populates="zone_publications"
+    )
+    package: Mapped[SpatialPackage] = relationship(back_populates="zone_publications")
+    events: Mapped[list[ZonePublicationEvent]] = relationship(
+        back_populates="publication", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        Index(
+            "uq_zone_publication_one_active",
+            "spatial_zone_id",
+            unique=True,
+            sqlite_where=text("is_active = 1"),
+            postgresql_where=text("is_active"),
+        ),
+        CheckConstraint(
+            "(is_active = 1 AND state = 'PUBLISHED') OR (is_active = 0 AND state != 'PUBLISHED')",
+            name="ck_zone_publication_active_state",
+        ),
+    )
+
+
+class ZonePublicationEvent(Base):
+    """Append-only audit event for publication state transitions."""
+
+    __tablename__ = "zone_publication_event"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_id: Mapped[str] = mapped_column(String(96), nullable=False, unique=True, index=True)
+    zone_publication_id: Mapped[int] = mapped_column(
+        ForeignKey("zone_publication.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    from_state: Mapped[ZonePublicationState | None] = mapped_column(
+        enum_column(ZonePublicationState, name="zone_publication_from_state")
+    )
+    to_state: Mapped[ZonePublicationState] = mapped_column(
+        enum_column(ZonePublicationState, name="zone_publication_to_state"), nullable=False
+    )
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    actor_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    event_metadata: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSON, nullable=False, default=dict
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+    publication: Mapped[ZonePublication] = relationship(back_populates="events")
 
 
 class ModelAsset(Base):

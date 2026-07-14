@@ -593,10 +593,735 @@
           }
         }
       }
+    },
+    "/api/v1/admin/zones": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Zones",
+        "operationId": "list_zones_api_v1_admin_zones_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminZoneListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Create Zone",
+        "operationId": "create_zone_api_v1_admin_zones_post",
+        "responses": {
+          "501": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEndpointStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/zones/{zone_id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Zone",
+        "operationId": "get_zone_api_v1_admin_zones__zone_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 64,
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "title": "Zone Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminZoneSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zones/{zone_id}/revisions": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Create Zone Revision",
+        "operationId": "create_zone_revision_api_v1_admin_zones__zone_id__revisions_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 64,
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "title": "Zone Id"
+            }
+          }
+        ],
+        "responses": {
+          "501": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEndpointStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zones/{zone_id}/revisions/{revision}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Zone Revision",
+        "operationId": "get_zone_revision_api_v1_admin_zones__zone_id__revisions__revision__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 64,
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "title": "Zone Id"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Revision"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminZoneRevisionSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zones/{zone_id}/revisions/{revision}/packages": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Submit Zone Package",
+        "operationId": "submit_zone_package_api_v1_admin_zones__zone_id__revisions__revision__packages_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 64,
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "title": "Zone Id"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Revision"
+            }
+          }
+        ],
+        "responses": {
+          "501": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEndpointStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zones/{zone_id}/revisions/{revision}/validations": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Validate Zone Revision",
+        "operationId": "validate_zone_revision_api_v1_admin_zones__zone_id__revisions__revision__validations_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 64,
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "title": "Zone Id"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Revision"
+            }
+          }
+        ],
+        "responses": {
+          "501": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEndpointStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/zones/{zone_id}/revisions/{revision}/preview": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Private Preview",
+        "operationId": "get_private_preview_api_v1_admin_zones__zone_id__revisions__revision__preview_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 64,
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "title": "Zone Id"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Revision"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPrivatePreviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Create Zone Preview",
+        "operationId": "create_zone_preview_api_v1_admin_zones__zone_id__revisions__revision__preview_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 64,
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "title": "Zone Id"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Revision"
+            }
+          }
+        ],
+        "responses": {
+          "501": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEndpointStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/publications": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Publications",
+        "operationId": "list_publications_api_v1_admin_publications_get",
+        "responses": {
+          "501": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEndpointStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Publish Revision",
+        "operationId": "publish_revision_api_v1_admin_publications_post",
+        "responses": {
+          "501": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEndpointStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
+      "AdminEndpointStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "not_implemented",
+            "title": "Status"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "detail"
+        ],
+        "title": "AdminEndpointStatus"
+      },
+      "AdminPrivatePreviewFile": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "media_type": {
+            "type": "string",
+            "title": "Media Type"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "sha256",
+          "size_bytes",
+          "media_type"
+        ],
+        "title": "AdminPrivatePreviewFile"
+      },
+      "AdminPrivatePreviewResponse": {
+        "properties": {
+          "zone_id": {
+            "type": "string",
+            "title": "Zone Id"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "preview_scope": {
+            "type": "string",
+            "const": "private-admin",
+            "title": "Preview Scope"
+          },
+          "package_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Id"
+          },
+          "package_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package State"
+          },
+          "verification_report": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Verification Report"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/AdminPrivatePreviewFile"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "zone_id",
+          "revision",
+          "preview_scope",
+          "package_id",
+          "package_state",
+          "verification_report"
+        ],
+        "title": "AdminPrivatePreviewResponse"
+      },
+      "AdminZoneListResponse": {
+        "properties": {
+          "zones": {
+            "items": {
+              "$ref": "#/components/schemas/AdminZoneSummary"
+            },
+            "type": "array",
+            "title": "Zones"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "zones"
+        ],
+        "title": "AdminZoneListResponse"
+      },
+      "AdminZoneRevisionSummary": {
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "origin_wgs84": {
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array",
+            "maxItems": 3,
+            "minItems": 3,
+            "title": "Origin Wgs84"
+          },
+          "local_frame": {
+            "type": "string",
+            "const": "ENU",
+            "title": "Local Frame"
+          },
+          "meters_per_unit": {
+            "type": "number",
+            "title": "Meters Per Unit"
+          },
+          "vertical_datum": {
+            "type": "string",
+            "title": "Vertical Datum"
+          },
+          "bounds_m": {
+            "additionalProperties": {
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array",
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "type": "object",
+            "title": "Bounds M"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "revision",
+          "origin_wgs84",
+          "local_frame",
+          "meters_per_unit",
+          "vertical_datum",
+          "bounds_m"
+        ],
+        "title": "AdminZoneRevisionSummary"
+      },
+      "AdminZoneSummary": {
+        "properties": {
+          "zone_id": {
+            "type": "string",
+            "title": "Zone Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "revisions": {
+            "items": {
+              "$ref": "#/components/schemas/AdminZoneRevisionSummary"
+            },
+            "type": "array",
+            "title": "Revisions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "zone_id",
+          "label"
+        ],
+        "title": "AdminZoneSummary"
+      },
       "AssetLod": {
         "type": "string",
         "enum": [
