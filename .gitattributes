@@ -1,0 +1,5 @@
+# These release contracts are verified by their exact SHA-256 bytes.
+# Keep their checkout representation stable when core.autocrlf is enabled.
+/apps/fire-viewer-ui/public/maps/fireviewer-die-pontaix-r1-v4/*.json text eol=lf
+/contracts/spatial/releases/*.json text eol=lf
+/contracts/spatial/releases/ATTRIBUTION-IGN.txt text eol=lf
