@@ -78,6 +78,7 @@ Sources et documentation.
 - [Provenance IGN versionnée](contracts/spatial/releases/ign_sources.v1.json)
 - [Dataset fictif et matrice publique v1](contracts/demo/v1/README.md)
 - [Analyse de la roadmap](docs/ANALYSE_ROADMAP.md)
+- [MVP — administration des zones, révisions et publications](docs/MVP_ADMINISTRATION_ZONES.md)
 - [Plan de suite et critères de clôture G1](docs/PLAN_DE_SUITE.md)
 - [Registre problèmes et validations](docs/REGISTRE_PROBLEMES_VALIDATIONS.md)
 - [Runbook G1](docs/RUNBOOK_G1.md)
