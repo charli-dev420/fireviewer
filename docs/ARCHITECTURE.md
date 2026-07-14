@@ -133,9 +133,14 @@ répertoires binaires installés sous
 La release GitHub publique `spatial-die-pontaix-r1-v4` fournit l'archive
 `fireviewer-die-pontaix-r1-v4.tar.gz`, `SHA256SUMS` et l'attribution IGN. Le
 tag source `spatial-die-pontaix-r1-v4-fix1` force les fins de ligne LF des
-contrats hashés sans déplacer le tag binaire v4. La release sert au clone et au
-build, jamais au runtime public : Giro3D ne charge que des
+contrats hashés sans modifier le tag associé à la release v4. La release sert
+au clone et au build, jamais au runtime public : Giro3D ne charge que des
 chemins same-origin après installation locale du paquet.
+
+La publication des trois assets et leur consommation par un clone neuf sont
+VÉRIFIÉES. Leur conservation est contrôlée par les hashes versionnés. Le
+verrouillage technique du tag et de la release GitHub reste NON VÉRIFIÉ : l'API
+publique indiquait `immutable: false` lors du contrôle.
 
 `npm run fetch:spatial` télécharge ou reçoit une archive locale, vérifie son
 hash, refuse les entrées hostiles et installe dans un répertoire temporaire.

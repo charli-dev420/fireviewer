@@ -11,6 +11,8 @@ une restauration non destructives.
 Ce document est une procédure, pas une preuve d'exécution. Le parcours complet
 a été exercé le 14 juillet 2026 depuis le tag source de clôture ; les résultats
 sont consignés dans [le registre](REGISTRE_PROBLEMES_VALIDATIONS.md).
+La correction est aussi intégrée dans `main` par la PR #10, au commit
+`6ae41d3fc6e5c9be9c9b3050902c593c6f0a196f`.
 
 Préconditions.
 
@@ -96,11 +98,14 @@ npm run pack:spatial
 Le script produit l'archive `fireviewer-die-pontaix-r1-v4.tar.gz` et
 `SHA256SUMS`. Contrôler ensuite que ces fichiers correspondent au verrou
 versionné avant publication. La release publique
-`spatial-die-pontaix-r1-v4` contient ces trois assets et n'est jamais déplacée.
+`spatial-die-pontaix-r1-v4` reste la référence logique de ces trois assets,
+contrôlée par le verrou et les hashes. Le verrouillage technique GitHub reste
+NON VÉRIFIÉ (`immutable: false`) : toute correction binaire doit publier une
+nouvelle release, sans remplacer ces assets.
 Le tag source `spatial-die-pontaix-r1-v4-fix1` est distinct : il corrige la
 reproductibilité du checkout sans reconstruire ni réimporter les 144 binaires.
-GitHub sert uniquement à préparer le paquet : la carte publique ne charge aucun
-asset depuis GitHub.
+GitHub sert uniquement à récupérer le paquet avant le build : la carte publique
+ne charge aucun asset depuis GitHub.
 
 Préparer et démarrer l'interface.
 
@@ -147,12 +152,20 @@ npm run test:e2e
 
 # Backend
 Set-Location ../../services/fire-viewer-backend
+# Si GNU Make est disponible :
 make quality
+# Sinon, depuis le même environnement virtuel :
+.\.venv\Scripts\ruff.exe check .
+.\.venv\Scripts\ruff.exe format --check .
+.\.venv\Scripts\mypy.exe
+.\.venv\Scripts\pytest.exe
+.\.venv\Scripts\python.exe -m fire_viewer.scripts.check_migrations
+.\.venv\Scripts\python.exe -m compileall -q src
 
 # Dépôt, depuis sa racine
 Set-Location ../..
 git diff --check
-gitleaks protect --staged --no-banner
+gitleaks git --no-banner --log-opts="--all"
 ```
 
 `npm run fetch:spatial` vérifie le hash de l'archive de release, refuse les
@@ -168,7 +181,7 @@ Sauvegarder la SQLite G1.
 Arrêter les écritures avant de lancer cette étape. Depuis le dossier backend :
 
 ```powershell
-fire-viewer-backup --output backups/fire_viewer_g1.db
+.\.venv\Scripts\fire-viewer-backup.exe --output backups/fire_viewer_g1.db
 Get-FileHash backups/fire_viewer_g1.db -Algorithm SHA256
 ```
 
@@ -178,7 +191,7 @@ recette. Ne pas utiliser le nom de votre seule copie comme sortie de backup.
 Restaurer vers une cible neuve.
 
 ```powershell
-fire-viewer-restore --source backups/fire_viewer_g1.db --target data/fire_viewer_g1_recovered.db
+.\.venv\Scripts\fire-viewer-restore.exe --source backups/fire_viewer_g1.db --target data/fire_viewer_g1_recovered.db
 ```
 
 La restauration doit refuser une cible déjà existante et ne doit pas modifier
