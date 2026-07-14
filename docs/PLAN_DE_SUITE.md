@@ -1,77 +1,132 @@
-# Plan de suite - Fire Viewer
+# Plan de suite — Fire Viewer
 
-## Règle de conduite
+État de référence.
 
-Ce plan vise d'abord G0 puis un vertical slice G1 local et fictif. Il ne constitue ni un plan de mise en production, ni une autorisation d'usage opérationnel. Chaque ticket doit avoir un propriétaire, un test exécuté et un artefact de preuve.
+Le projet vise un vertical slice G1 local, contrôlé et sans coût récurrent. Il
+utilise des outils libres, SQLite local, des fichiers statiques du même domaine
+et les dépendances versionnées dans le dépôt. Ce plan ne constitue ni une mise
+en production, ni une autorisation d'usage opérationnel.
 
-Le vertical slice est pensé pour ne pas engager de frais : outils libres, dépôt public,
-SQLite local, fichiers de sauvegarde locaux et dépendances déjà déclarées. Une passe ne
-doit pas introduire de service cloud, d'API payante, de licence propriétaire ou de coût
-récurrent sans décision explicite. Cette contrainte ne vaut pas promesse de disponibilité
-opérationnelle.
+Règle de bascule G1.
 
-## Suivi d'exécution
+La documentation ne suffit pas à déclarer G1 terminé. Le périmètre technique
+local devient VÉRIFIÉ lorsque les contrôles ci-dessous ont été exécutés dans le
+même arbre de travail et que leurs résultats sont consignés dans le registre.
+Le gate de livraison devient VÉRIFIÉ uniquement lorsque la même révision Git
+contient FV-006 à FV-010, le contrat du paquet spatial et son verrou de release,
+et que le runbook est rejoué depuis un checkout propre :
 
-| ID | État | Preuve actuelle |
-| --- | --- | --- |
-| FV-001 | **VÉRIFIÉ** | dépôt public initialisé, provenance locale des ZIP ignorée par Git, documentation et licences publiées |
-| FV-002 | **VÉRIFIÉ** | UI : `npm ci`, contrôle TypeScript, build et parcours mocké bureau/mobile ; backend : migrations, qualité, compilation et 69 tests passants à 88,70 % de couverture |
-| FV-003 | **VÉRIFIÉ** | ADR-001, schéma JSON `ViewerManifest` v2, fixtures fictifs, OpenAPI, CORS et tests backend/UI ; le raccordement réseau réel est vérifié localement par FV-006 |
-| FV-004 | **VÉRIFIÉ (contrat et contrôles SQLite)** | ADR-002, schéma spatial v1, fixtures fictifs ENU/glTF/Unity, zones, révision, snapshot et contrôles de transformation, axes, origine et hash RAF20 ; rendu Unity/PNG réel et migration PostgreSQL restent non vérifiés |
-| FV-005 | **VÉRIFIÉ (SQLite et contrats)** | seed `FR-83-00042` v1 entièrement fictif, idempotence sans écriture au second passage, manifeste/ETag hashés, matrice versionnée et masquage canonique ; 69 tests backend et 34 tests UI passent |
-| FV-006 | **VÉRIFIÉ (SQLite, UI et Chromium Playwright)** | mode de données explicite, client `ViewerManifest` v2, cache ETag/`304`, surface API DOM-first et harnais E2E ; `check`, 57 tests, build et 8 scénarios Chromium passent avec CORS, seed réel, `200`/`304`, `404`, timeout et absence de GLB/mock API ; `npm ci`/check/tests/build sont rejoués dans un checkout Git neuf |
-| FV-007 | SQLite local validé | migration `e7a4c9d8f2b1`, `upgrade` idempotent, 26 triggers critiques, idempotence concurrente, matching déterministe `create/attach/review`, audit append-only et sauvegarde/restauration non destructive ; 87 tests backend passent à 88,06 % de couverture. Docker réel et PostgreSQL restent hors de cette preuve. |
+- backend : migration vierge, second `upgrade`, seed exécuté deux fois,
+  `make quality`, sauvegarde et restauration SQLite vers une cible neuve ;
+- interface : `npm ci`, `npm run fetch:spatial`, `npm run check`,
+  `npm run test`, `npm run test:spatial`, `npm run verify:spatial`,
+  `npm run build` et la recette E2E déclarée ;
+- carte : une seule zone publique `DIE-PONTAIX-08@R1`, lecture du catalogue,
+  contrôle des hashes de paquet, route `/zones/die-pontaix` dans un navigateur
+  WebGL, recentrage et vue d'ensemble sans chargement de GLB détaillé ;
+- release : le tag immuable `spatial-die-pontaix-r1-v4`, l'archive,
+  `SHA256SUMS`, l'attribution IGN et le verrou versionné concordent ;
+- runbook : exercice sur un checkout propre, sans réutiliser une base ou un
+  build existant.
 
-**VÉRIFIÉ dans FV-006** : `IncidentData` et le terrain SVG sont isolés dans le parcours
-mock ; le parcours API ne consomme que le résumé de `ViewerManifest`. Les tests Vitest et
-Playwright couvrent le raccordement `VITE_USE_MOCKS=false`, le cache, les erreurs, CORS et
-l'absence de GLB ou module mock dans le parcours API.
+Un échec conserve le gate au statut BLOQUÉ, avec l'erreur et la voie de reprise
+dans le registre. Aucun résultat historique n'est réinterprété ici comme une
+exécution nouvelle.
 
-## Lot 0 - Baseline et décisions de contrat
+Suivi d'exécution.
 
-| ID | Action | Dépendances | Preuve d'acceptation |
+| ID | Objet | État documentaire actuel | Preuve attendue pour le gate |
 | --- | --- | --- | --- |
-| FV-001 | Initialiser le dépôt Git Fire Viewer et ajouter les exclusions pour `.venv`, `node_modules`, bases SQLite, builds Unity et secrets | aucune | statut Git propre, `.gitignore` revu, provenance des ZIP conservée |
-| FV-002 | Exécuter les contrôles natifs reçus : backend (`make test`, `make quality` ou équivalents Windows) et UI (`npm ci`, `npm run check`, `npm run build`) | FV-001, accès aux dépendances | logs de commandes et artefacts de build ; aucun test annoncé sans exécution |
-| FV-003 | Choisir et enregistrer le contrat public `ViewerManifest` : URL, version, casing JSON, ETag, erreurs 404/409, CORS | FV-002 | ADR + schéma JSON + test de contrat UI/API rouge puis vert |
-| FV-004 | Fixer le profil local : France continentale rurale, NGF-IGN69 + RAF20 hors ligne, `EPSG:4979`, ENU, GLB métrique et Unity 100 u/m (`meters_per_unit=0.01`) | inventaire Unity externe | ADR-002 + schéma/fixtures spatiaux ; contrôles exécutés de transformation, axes, origine et hash RAF20 ; rendu GLB/Unity et PNG réel restent des intégrations séparées |
-| FV-005 | Créer un jeu de données entièrement fictif `FR-83-00042` et la matrice des états/visibilités | FV-003 | seed rejouable, manifeste hashé, transitions et masquage des données sensibles testés |
+| FV-001 | dépôt, licences et exclusions | historique versionné | état Git et documentation contrôlés |
+| FV-002 | contrôles de baseline | historique versionné | commandes officielles rejouées |
+| FV-003 | contrat public `ViewerManifest` v2 | historique versionné | schéma, OpenAPI et parseurs cohérents |
+| FV-004 | contrat spatial ENU, glTF et Unity | historique versionné | transformations et révisions de zone contrôlées |
+| FV-005 | seed fictif et matrice de visibilité | historique versionné | second seed sans écriture et projections sûres |
+| FV-006 | UI connectée au manifeste public | historique versionné | cache, ETag/304, CORS local et parcours API |
+| FV-007 | intégrité SQLite | VÉRIFIÉ le 14 juillet 2026 | 87/87 tests, 88,06 % de couverture, Ruff, mypy, migrations, compilation et restauration SQLite fraîche |
+| FV-008 | paquet spatial réel Die–Pontaix | NON VÉRIFIÉ : clôture G1 | catalogue `1.1`, zone unique, 144 binaires invariants, provenance et release contrôlées |
+| FV-009 | bridge web Giro3D | NON VÉRIFIÉ : clôture G1 | vue d'ensemble, recentrage, chargement conditionnel et fallback DOM |
+| FV-010 | runbook G1 | OBSERVÉ : procédure présente | release immuable et exercice complet dans un checkout propre |
 
-## Lot 1 - Vertical slice G1 local
+FV-008 — paquet spatial réel, versionné et same-origin.
 
-| ID | Action | Dépendances | Preuve d'acceptation |
-| --- | --- | --- | --- |
-| FV-006 | Connecter l'UI au manifeste réel, avec modes `true`/`false`/N/A explicites, ETag/`304`, cache session/mémoire et rendu DOM public minimal | FV-003, FV-005 | `npm run check`, `npm run test`, build et Playwright : seed réel, CORS, `200`/`304`, `404`, timeout, WebGL indisponible, aucun GLB/Unity téléchargé |
-| FV-007 | Vérifier migrations, idempotence, matching `create/attach/review`, audit append-only et restauration SQLite | FV-002, FV-005 | tests transactionnels ; scénario de sauvegarde/corruption/restauration documenté |
-| FV-008 | Produire un seul asset GLB de démonstration avec manifeste immuable, SHA-256 et métadonnées ENU | FV-004, FV-005 | téléchargement, hash, taille, unité et repères contrôlés avant chargement |
-| FV-009 | Ajouter un pont minimal JavaScript/C# et un build Unity WebGL de démonstration, sans retirer le DOM texte | FV-004, FV-008 | contrat de messages borné, test navigateur et fallback sans WebGL |
-| FV-010 | Écrire le runbook local de démarrage, arrêt, migration, seed, rollback et incident fictif | FV-006 à FV-009 | exercice reproductible par une seconde personne ou dans un environnement propre |
+Cette passe remplace le scénario historique d'un GLB fictif unique. Le
+catalogue `1.1` déclare une seule zone publique `DIE-PONTAIX-08@R1`, emprise
+Lambert-93 `[876000, 6403000, 892000, 6413000]`. Deux emprises techniques de
+couverture, `[876000, 6403000, 884000, 6411000]` et
+`[884000, 6405000, 892000, 6413000]`, décrivent les secteurs LiDAR disponibles
+sans devenir des zones visibles. Les huit tuiles COG, huit aperçus couleur PNG
+et 128 GLB détaillés du bâti, des routes, chemins, lisières et arbres restent
+bit à bit inchangés.
 
-Le gate G1 ne pourra être déclaré atteint que lorsque FV-006 à FV-010 auront des preuves exécutées. À cet instant, le produit reste une démonstration contrôlée, non opérationnelle.
+Le dépôt suit sous
+`apps/fire-viewer-ui/public/maps/fireviewer-die-pontaix-r1-v4/` le catalogue et
+le manifeste seulement ; les répertoires binaires `terrain/` et `vectors/` sont
+ignorés. Le verrou de release et le manifeste IGN sont suivis sous
+`contracts/spatial/releases/`. Après publication, la GitHub Release
+`spatial-die-pontaix-r1-v4` devra distribuer l'archive
+`fireviewer-die-pontaix-r1-v4.tar.gz`, `SHA256SUMS` et l'attribution IGN.
+`npm run fetch:spatial` vérifie l'archive avant extraction, refuse les chemins
+hostiles et n'installe les binaires qu'après contrôle. `npm run build` dépend
+de `npm run verify:spatial` ; un build sans paquet vérifié échoue.
 
-## Lot 2 - Capacités préparatoires après G1
+Le paquet est un contenu de zone, pas un manifeste d'incident. Il ne doit pas
+ajouter implicitement une position, un feu ou un asset au contrat
+`ViewerManifest` v2. Tout rattachement incident → révision de zone reste une
+passe distincte, revue et archivée par PNG immuable.
 
-1. Phases 3 et 4 : agents vision et texte. Les limiter à des observations structurées ; préparer corpus négatifs, jeux ambigus, calibration et quarantaine.
-2. Phases 5 et 6 : pipeline IGN/PDAL/GDAL/TIN, provenance, versioning d'asset, rollback et réactivation. Ne pas choisir Poisson comme reconstruction par défaut du MNT.
-3. Phases 7, 10 et 11 : profils d'environnement, stockage objet, worker idempotent, upload temporaire puis publication atomique, traces et métriques.
-4. Phases 8, 9, 12 et 13 : contrat Unity complet, UI accessible, hot-swap du même `fire_id`, cache contrôlé et fallback hors ligne.
+FV-009 — bridge web Giro3D.
 
-## Lot 3 - Conditions avant bêta supervisée (G2)
+Unity reste l'outil d'authoring et d'export spatial. Le runtime public choisi
+est Giro3D dans l'interface web, sans build Unity WebGL ni pont JavaScript/C#.
+Le bridge doit :
 
-Les phases 14 à 18 sont des prérequis : threat model, RBAC, minimisation des données, kill switch, test de charge mesuré, matrice mobile, recette E2E, documentation et exercices de restauration. Une bêta n'est planifiable qu'après des preuves de ces contrôles sur données fictives et un go/no-go documenté.
+- lire un catalogue strict et refuser les chemins sortant du paquet ;
+- conserver le pont glTF local `(E, U, -N)` vers la scène Giro3D
+  `(E, N, U)` ;
+- afficher le relief et l'aperçu couleur à toute distance ;
+- charger les GLB détaillés seulement autour de la caméra, puis les libérer
+  hors de la distance configurée ;
+- présenter `Zone Die–Pontaix` comme unique choix public et proposer
+  `Recentrer la zone` pour revenir à l'emprise complète ;
+- rester indépendant de `ViewerManifest` et de toute donnée d'incident ;
+- conserver un résumé DOM explicite lorsque WebGL est indisponible, sans
+  prétendre fournir le rendu 3D.
 
-## Ce qui ne doit pas être fait maintenant
+Ce choix maintient le coût d'exécution au niveau d'un site statique et évite de
+maintenir deux viewers publics. Il ne modifie pas le contrat spatial Unity :
+Unity reste à 100 unités par mètre, alors que les COG et GLB restent métriques.
 
-- publier un feu, une position sensible ou une preuve réelle ;
-- présenter le prototype comme un service d'urgence, un outil de prévision ou un système de confirmation automatique ;
-- brancher Unity au backend avant d'avoir exécuté les tests de précision, d'import et de changement d'origine du contrat spatial ;
-- lancer plusieurs workers sur la même base SQLite locale ;
-- effacer les ZIP reçus ou le projet Unity de Die externe.
+FV-010 — runbook G1.
 
-## Prochaine action sûre
+Le runbook de démarrage, arrêt, migration, seed, récupération du paquet,
+carte, sauvegarde, restauration et rollback est
+[docs/RUNBOOK_G1.md](RUNBOOK_G1.md). Il est délibérément exécutable sans
+service cloud de runtime, Cesium, API cartographique externe ni dépendance
+propriétaire. GitHub Releases sert uniquement à la récupération du paquet au
+build, jamais aux requêtes de la carte publique.
 
-Réaliser FV-008 : produire un unique asset GLB de démonstration entièrement fictif,
-versionné, hashé et rattaché à une révision de zone déjà contractuelle. Cette passe doit
-rester locale et sans coût récurrent; elle ne branche ni Unity/WebGL ni un terrain réel.
-FV-009 reste exclusivement responsable du pont Unity/WebGL, tandis que FV-010 documentera
-l'exercice local complet de démarrage, arrêt, migration, restauration et incident fictif.
+Suite après G1.
+
+1. Pour une nouvelle carte, créer une nouvelle release et un nouveau catalogue ;
+   ne jamais remplacer `DIE-PONTAIX-08@R1` ni son archive.
+2. Ajouter un registre de zones en base lorsqu'il faudra publier des zones
+   supplémentaires dynamiquement ; G1 reste statique et sans lien incident →
+   carte.
+3. Mesurer le chargement, la mémoire WebGL et la bande passante avant toute
+   compression destructrice ou tout déploiement.
+4. Ajouter une publication explicite de révision spatiale vers un incident,
+   avec revue humaine et archive PNG immuable, sans enrichir le manifeste public
+   par défaut.
+5. Préparer G2 : threat model, RBAC, minimisation des données, tests E2E
+   mesurés, restauration, cache et monitoring.
+
+Ce qui reste hors périmètre.
+
+- carte nationale, Cesium ou fond cartographique externe ;
+- incident réel, position opérationnelle sensible, preuve brute ou donnée de
+  secours ;
+- promesse de disponibilité, de prévision ou de confirmation automatique ;
+- plusieurs writers Uvicorn sur la même SQLite ;
+- déploiement public et coûts de diffusion : NON VÉRIFIÉ tant qu'une mesure
+  d'hébergement et de trafic n'a pas été réalisée.

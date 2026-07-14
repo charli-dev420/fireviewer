@@ -5,16 +5,25 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run verify:spatial && tsc --noEmit && vite build",
     "check": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test",
+    "test:spatial": "node --test tools/spatial-package-verifier.test.mjs tools/spatial-release.test.mjs",
+    "verify:spatial": "node tools/verify-spatial-package.mjs",
+    "pack:spatial": "node tools/pack-spatial-release.mjs",
+    "fetch:spatial": "node tools/fetch-spatial-release.mjs",
+    "test:e2e": "npm run verify:spatial && playwright test",
+    "test:e2e:spatial": "npm run verify:spatial && playwright test e2e/spatial-map.spec.ts",
     "test:e2e:install": "playwright install chromium",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
+    "@giro3d/giro3d": "2.0.3",
+    "ol": "10.8.0",
+    "proj4": "2.19.0",
     "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "react-dom": "19.2.7",
+    "three": "0.180.0"
   },
   "devDependencies": {
     "@playwright/test": "1.61.1",
@@ -23,6 +32,7 @@
     "@testing-library/user-event": "14.6.1",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@types/three": "0.180.0",
     "@vitejs/plugin-react": "6.0.3",
     "jsdom": "29.1.1",
     "typescript": "7.0.2",

@@ -1,145 +1,144 @@
 # Analyse de la roadmap Fire Viewer
 
-## Périmètre et preuves
+Cadre de lecture.
 
-- **VÉRIFIÉ** : `docs/roadmap/roadmap_fire_viewer_incident_centrique_detaillee-1.pdf` contient 65 pages, est non chiffré et son SHA-256 est `80F5B4A6101630E3BED88D04852A0260D42717FA75870762579A2901EB4016F0`.
-- **VÉRIFIÉ** : le texte des 65 pages a été extrait et des pages représentatives ont été rendues visuellement. La structure, les tableaux et les maquettes examinés sont lisibles, sans texte coupé ni chevauchement visible.
-- **OBSERVÉ** : le document est la version 1.0 du 12 juillet 2026. Il définit une architecture incidente-centrique, pas une carte nationale ni un système de conduite des secours.
-- **NON VÉRIFIÉ** : les références externes, coûts d'hébergement, licences tierces et exigences réglementaires citées par le PDF n'ont pas été revalidés ici.
+La roadmap source reste une architecture incident-centrique : elle n'autorise ni
+une carte nationale, ni la conduite des secours, ni la confirmation publique
+sur une source unique. Le vertical slice doit rester local, explicable,
+réversible et sans coût récurrent imposé.
 
-## Architecture cible imposée par la roadmap
+OBSERVÉ dans le dépôt : le contrat public `ViewerManifest` est séparé des
+ressources spatiales de zone. Cette séparation reste nécessaire tant qu'une
+publication d'incident vers une révision spatiale n'a pas été revue et
+archivée.
 
-1. Une URL stable `/incident/{fire_id}` identifie une série géographique persistante.
-2. Un `episode_id` immuable représente une période opérationnelle, y compris une réactivation.
-3. Le backend est la source de vérité transactionnelle. Le manifeste courant référence un asset GLB immuable, hashé et versionné.
-4. Le DOM affiche toujours statut, fraîcheur, incertitude, sources et mode texte. Unity/WebGL reste une couche spatiale remplaçable, jamais le seul canal d'information.
-5. Les agents vision et texte produisent des observations structurées avec incertitude. Ils ne confirment pas seuls un incendie et ne publient pas directement.
-6. Le terrain est daté et géoréférencé. La chaîne privilégiée est données IGN -> PDAL/GDAL -> raster MNT -> TIN contrôlé -> GLB, avec origine ENU et provenance complète.
+NON VÉRIFIÉ dans cette mise à jour : coûts d'hébergement, licences de chaque
+donnée géographique, conformité réglementaire, déploiement public et
+performances mobiles. Ces sujets ne doivent pas être déduits de la présence des
+fichiers locaux.
 
-## Gates de maturité
+Architecture cible maintenue.
 
-| Gate | Usage autorisé | Preuves minimales |
+1. `/incident/{fire_id}` désigne une série d'incident persistante ;
+   `episode_id` distingue les périodes et réactivations.
+2. Le backend reste la source de vérité transactionnelle pour le matching,
+   l'audit, les états publics et les manifestes.
+3. Le parcours incident reste DOM-first : statut, fraîcheur, incertitude et
+   limitations sont lisibles sans WebGL.
+4. Les zones 3D sont des paquets statiques indépendants, publiés par révision
+   et servis du même domaine. Elles ne sont pas une carte d'incidents.
+5. Unity reste un outil d'authoring, de préparation et d'export. Le renderer
+   public retenu est Giro3D, pas Unity WebGL.
+6. Toute archive historique d'incident reste une image PNG immuable. Elle ne
+   réexpose ni GLB ni viewer 3D.
+
+Évolution assumée du plan spatial.
+
+Le plan initial réservait FV-008 à un GLB fictif unique, puis FV-009 à un pont
+Unity WebGL. La disponibilité d'une carte 3D Die–Pontaix impose une séquence
+plus réaliste et plus économique :
+
+| Passe | Objet recalibré | Limite structurante |
 | --- | --- | --- |
-| G0 | conception | contrats, maquettes, tests unitaires, aucune donnée réelle |
-| G1 | démonstration technique contrôlée | idempotence, audit, intégrité asset, mode texte, sécurité de base |
-| G2 | bêta supervisée | E2E, tests utilisateurs, threat model, restauration, monitoring |
-| G3-candidat | évaluation avec professionnels | SLA cible, formation, procédures 24/7, audits, responsabilités |
-| G3 | usage opérationnel | validation formelle, conformité, gouvernance, financement durable |
+| FV-008 | paquet spatial réel Die–Pontaix, catalogue `1.1`, COG LiDAR, aperçus PNG et GLB découpés | une seule zone publique `DIE-PONTAIX-08@R1`; les deux couvertures LiDAR restent techniques |
+| FV-009 | bridge web Giro3D avec chargement local conditionnel | Unity conserve son rôle d'authoring ; il n'est pas chargé dans le navigateur public |
+| FV-010 | clôture reproductible G1 | release GitHub de binaires, verrou et provenance versionnés ; seul le clone neuf la valide |
 
-**OBSERVÉ** : le PDF interdit une confirmation publique sur une source unique, une prévision non validée, l'exposition de données sensibles et toute promesse de disponibilité d'urgence fondée sur un hébergement gratuit.
+Le contrat G1 fixe le catalogue `1.1` à `DIE-PONTAIX-08@R1`, emprise
+`[876000, 6403000, 892000, 6413000]`, avec deux emprises techniques de
+couverture. Les huit tuiles terrain, les huit aperçus PNG et les 128 GLB sont
+des assets de cette seule zone publique. Ils seront installés sous
+`/maps/fireviewer-die-pontaix-r1-v4/` par la récupération contrôlée de la
+release `spatial-die-pontaix-r1-v4`; les binaires ne font pas partie du clone
+Git.
 
-## Ce qui est déjà présent dans les sources reçues
+Le client web doit refuser les chemins absolus, les remontées `..`, les
+emprises invalides, les tailles invalides et un contrat autre que
+`EPSG:2154 / NGF-IGN69`. La récupération vérifie l'archive, refuse les chemins
+hostiles et n'installe le contenu qu'après contrôle du paquet. Le navigateur ne
+recalcule pas le SHA-256 de chaque réponse runtime : GitHub n'est pas une
+origine runtime et ce contrôle reste hors périmètre G1.
 
-| Composant | Observé | Couverture roadmap |
+Le bridge spatial retenu.
+
+```text
+Unity d'authoring
+  → COG + PNG + GLB locaux
+  → catalogue spatial 1.1, verrou de release et provenance IGN
+  → `npm run fetch:spatial` puis contrôle de paquet
+  → route /zones/die-pontaix
+  → Giro3D dans le navigateur
+
+ViewerManifest v2
+  → route /incident/{fire_id}
+  → résumé DOM public minimal
+  → aucun chargement de carte ou GLB sans publication future explicite
+```
+
+OBSERVÉ dans `Giro3DMap.tsx` : les COG et aperçus sont agrégés dans une scène
+Lambert-93 commune ; un GLB source `(E, U, -N)` est tourné de +90° sur X pour
+la scène `(E, N, U)`. Les détails sont demandés dans un rayon de 2 500 m
+autour de la caméra et retirés quand la caméra est à plus de 6 000 m de sa cible.
+
+Cette stratégie répond au besoin visuel de vue lointaine sans rendre la
+géométrie détaillée permanente. La qualité réelle, la mémoire GPU, le temps de
+premier rendu et la bande passante restent NON VÉRIFIÉS tant qu'ils ne sont pas
+mesurés sur les navigateurs et réseaux ciblés.
+
+Gates de maturité.
+
+| Gate | Usage autorisé | État documentaire |
 | --- | --- | --- |
-| `apps/fire-viewer-ui` | React 19, TypeScript, Vite, route incident, modes mock/API explicites, client `ViewerManifest`, DOM accessible et SVG de démonstration isolé | fondation de la phase 1 et préparation des phases 8-9 |
-| `services/fire-viewer-backend` | FastAPI, SQLAlchemy, Alembic, SQLite WAL, matching `create/attach/review`, audit, manifest et endpoints santé | fondation de la phase 2, éléments des phases 6 et 7 |
-| Projet Unity de Die externe | Unity 6.3, glTFast 6.15.1, Cesium, assets GLB et terrain Die | matière potentielle pour les phases 5 et 8, non intégrée |
-| Agents, pipeline IGN, workers, pont JS/C#, publication atomique, cache/hot-swap, infrastructure pilote | absents des deux ZIP | phases 3 à 20 à planifier et réaliser |
+| G0 | conception, contrats et fixtures | historique du dépôt |
+| G1 | démonstration technique locale et contrôlée | clôture en cours : release immuable, clone neuf, E2E de zone unique et preuves finales à vérifier |
+| G2 | bêta supervisée | non engagé |
+| G3-candidat | évaluation avec professionnels | non engagé |
+| G3 | usage opérationnel | hors périmètre |
 
-## Écarts d'intégration à résoudre avant toute démo connectée
+Le périmètre G1 local est VÉRIFIÉ par les commandes consignées ci-dessous. Le
+statut de livraison ne devient pas VÉRIFIÉ par cette analyse : les conditions
+exactes sont dans [PLAN_DE_SUITE.md](PLAN_DE_SUITE.md) et la procédure dans
+[RUNBOOK_G1.md](RUNBOOK_G1.md).
 
-### Contrat HTTP UI/backend
+VÉRIFIÉ le 14 juillet 2026 avant la clôture G1 : FV-007 a exécuté 87/87 tests backend à 88,06 % de
+couverture, avec Ruff, mypy, migrations et compilation. Une sauvegarde et une
+restauration SQLite fraîche ont aussi été exercées. L'interface a passé son
+check, 65 tests Vitest, le build, 8 scénarios E2E, les 4 tests du paquet et le
+contrôle SHA-256 de 146 fichiers. La route Giro3D a été vérifiée avec WebGL
+dans son parcours antérieur. Ces preuves ne couvrent pas encore la zone
+publique unique, la release, le clone neuf ni le nouveau parcours de
+recentrage. Docker réellement exécuté, PostgreSQL/PostGIS et la performance
+mesurée restent hors de cette preuve.
 
-**OBSERVÉ dans la baseline avant FV-006** : le dashboard historique chargeait un
-`IncidentData` camelCase riche depuis l'ancien chemin `/incident/{fire_id}`. Ce contrat ne
-correspondait ni au manifeste public minimal ni aux réponses backend disponibles.
+Risques à maintenir.
 
-**OBSERVÉ dans le code backend** : le manifeste correspondant est disponible via
-`GET /api/v1/incident/{fire_id}/manifest`, au format `snake_case` (`schema_version`,
-`fire_id`, etc.). Le `IncidentPublicResponse` de `/api/v1/incident/{fire_id}` ne contient
-ni asset ni frame et n'est pas le contrat viewer.
-
-**VÉRIFIÉ après FV-003** : l'[ADR-001](adr/ADR-001-viewer-manifest-public-contract.md) fixe désormais le chemin canonique `/api/v1/incident/{fire_id}/manifest` et le schéma `ViewerManifest` v2 en `snake_case`. Le modèle Pydantic, le schéma JSON versionné, l'OpenAPI et les parseurs UI sont couverts par des tests de contrat sur données fictives.
-
-**VÉRIFIÉ après FV-005** : le dataset `FR-83-00042` est déclaratif, entièrement fictif et rejouable sans écrasement. Son manifeste `not_available`, son hash/`ETag` et la matrice des projections publiques sont versionnés. Les couples statut/visibilité non canoniques échouent fermés en `503`; les exemples et le parseur UI n'acceptent plus `UNDER_REVIEW + available` ni `REJECTED + not_available`.
-
-**VÉRIFIÉ dans FV-006** : le shell API remplace ce chemin legacy par
-`GET {VITE_API_BASE_URL}/api/v1/incident/{fire_id}/manifest`. `VITE_USE_MOCKS=true` conserve
-le seul dashboard fictif ; `false` avec une origine HTTP(S) pure active l'API ; toute autre
-configuration affiche `N/A` sans requête ni fixture. La réponse `200` passe par
-`parseViewerManifest()`, doit avoir le bon `fire_id` et un `ETag`, puis est réduite à un
-résumé public.
-
-Le cache de navigation est borné à `sessionStorage` ou, à défaut, à la mémoire du processus.
-La clé contient origine, schéma et `fire_id`. Une revalidation envoie `If-None-Match`; un
-`304` ne sert que si l'`ETag` et l'entrée validée concordent, sinon une seule requête sans
-condition suit la purge. L'ouverture, le retour de visibilité et cinq minutes d'onglet
-visible sont les déclencheurs normaux. Un échec conserve seulement le dernier manifeste
-marqué obsolète, sans fallback mock.
-
-La vue connectée est DOM-first : ni `TerrainViewer` SVG, ni marqueur, ni simulation, ni
-GLB/Unity ne sont montés. Sources, Historique et Journal indiquent qu'ils ne sont pas
-inclus dans le manifeste public. Les métadonnées d'un `available` sont informatives ; le
-chargement GLB/Unity et l'archive PNG restent FV-008/FV-009.
-
-**VÉRIFIÉ localement** : les tests couvrent le raccordement seed réel, le `304` navigateur,
-le timeout, les deux états WebGL et la recette Playwright. Aucun GLB ni module mock n'est
-demandé en mode API. Une compatibilité de déploiement connecté reste **NON VÉRIFIÉE** tant
-qu'aucune infrastructure de production et aucun navigateur supplémentaire ne sont testés.
-
-### Reproduction E2E de l'écart HTTP
-
-**VÉRIFIÉ localement** : `npm run test:e2e` s'appuie sur
-`apps/fire-viewer-ui/e2e/globalSetup.ts`. Il crée un dossier temporaire, prépare une SQLite
-avec `e2e/prepare_backend.py`, lance le seed, Uvicorn (`localhost:8000`) et Vite
-(`localhost:5173`) avec CORS local, puis les arrête. La migration ne lit pas l'URL implicite
-de `alembic.ini` : elle est injectée dans `alembic.config.Config` et le script refuse la
-base de développement par défaut. `npm run test:e2e:install` installe Chromium au préalable.
-Le polling est accéléré seulement dans le Vite de test ; la cadence normale reste cinq
-minutes.
-
-**VÉRIFIÉ dans l'arbre de travail FV-006** : les huit scénarios réussissent avec
-l'environnement Python backend préparé. **VÉRIFIÉ dans un checkout Git neuf** : `npm ci`,
-`npm run check`, les 57 tests et le build UI passent au commit FV-006. L'E2E nécessite
-l'environnement Python backend et reste donc prouvé dans l'arbre de travail contrôlé.
-
-### Repère et échelle Unity
-
-**VÉRIFIÉ** : la roadmap demande `1` mètre = `1` unité dans le manifeste et le GLB, avec une origine ENU. Le projet Unity de Die existant déclare une présentation `1` mètre = `100` unités Unity.
-
-**VÉRIFIÉ après FV-004** : l'[ADR-002](adr/ADR-002-spatial-local-unity-contract.md)
-choisit une adaptation explicite plutôt qu'une normalisation implicite. Le GLB reste
-métrique (`1 mètre` par unité glTF) tandis que le monde Unity emploie `100` unités par
-mètre, soit `ViewerManifest.frame.meters_per_unit = 0.01`. L'origine est `EPSG:4979` dans
-l'ordre `[longitude, latitude, hauteur]`, le repère est ENU et le pont glTF vers Unity est
-versionné par le contrat spatial v1.
-
-**VÉRIFIÉ dans le périmètre documentaire** : le profil RAF20/NGF-IGN69 est limité à la
-France continentale rurale. Corse et outre-mer sont hors périmètre ; la Corse exigera un
-profil RAC23/NGF-IGN78 dédié. Les zones sont versionnées et réutilisables uniquement dans
-leur emprise ; l'archive PNG est attachée à un snapshot de révision de manifeste, pas à une
-zone active en général. Cesium est exclu de cette phase.
-
-**NON VÉRIFIÉ** : aucun GLB réel n'a encore été rendu ou importé dans Unity, et aucun PNG
-d'archive matériel n'a été produit. Les contrôles FV-004 couvrent les transformations,
-axes, origine et hash hors rendu ; les preuves d'intégration restent nécessaires pour
-réduire le risque H3.
-
-## Risques prioritaires à conserver dans le backlog
-
-| Risque roadmap | Barrière vérifiable |
+| Risque | Barrière ou action avant montée de gate |
 | --- | --- |
-| H1 - mauvais rattachement | score explicable, marge, `episode_id`, revue humaine |
-| H2 - donnée obsolète | horodatage, TTL, cache et mode dégradé visibles |
-| H3 - terrain mal aligné | ENU, datum, points de contrôle, unité et hash testés |
-| H4 - faux positif IA | observation seulement, corpus négatif, corroboration |
-| H5 - panne 3D | DOM texte et tests sans WebGL/réseau |
-| H6 - fuite de position | RBAC, minimisation, vues publique/opérateur séparées |
+| rattachement erroné d'une carte à un incident | publication explicite, revue humaine, révision immuable et archive PNG |
+| données spatiales altérées ou incomplètes | manifeste IGN versionné, verrou de release, hash de paquet, contrôle des tailles et exercice de chargement |
+| terrain mal aligné | points de contrôle, axes, datum et échelle contrôlés à l'export et dans le renderer |
+| perte de qualité ou mémoire excessive | mesures de rendu proche/lointain avant toute compression destructrice |
+| panne WebGL | parcours DOM incident conservé et résumé explicite sur la route de zone |
+| fuite de position | contrat public minimal, données de zone séparées, pas de liaison implicite à un incident |
+| coût de diffusion inattendu | release binaire utilisée seulement à la préparation ; mesure de poids, cache et trafic avant tout déploiement |
 
-La passe FV-007 a exécuté 87 tests backend avec 88,06 % de couverture. Elle traverse
-`upgrade -> upgrade idempotent -> check -> downgrade`, le matching déterministe
-`create/attach/review`, le rejet des liens observation/épisode incohérents, l'idempotence
-concurrente, l'audit append-only et une restauration SQLite validée. Une source historique
-`c6d4f13a9b20` est migrée seulement dans un candidat `.part`, puis publiée vers une cible
-neuve après contrôle de l'intégrité, des clés étrangères, des hashes et des triggers.
+Suite recommandée après le gate G1.
 
-Cette passe n'ajoute aucun coût récurrent : SQLite local, Alembic, Python et fichiers de
-sauvegarde locaux suffisent. Docker réellement exécuté, PostgreSQL/PostGIS, stockage distant
-et procédure d'exploitation d'urgence restent hors de cette preuve.
+1. Geler toute évolution de `DIE-PONTAIX-08@R1` sous le tag de release et
+   publier toute évolution future sous une nouvelle révision, jamais en
+   remplaçant la release existante.
+2. Exécuter le runbook depuis un clone neuf, récupérer la release puis conserver
+   dans le registre les résultats, hashes et captures.
+3. Mesurer le runtime Giro3D sur bureau et mobile avant de modifier la
+   géométrie, le relief ou les lisières.
+4. Introduire un registre de zones en base seulement lorsqu'il faudra publier
+   plusieurs zones dynamiquement ; G1 conserve un catalogue statique unique.
+5. Concevoir la publication incident → `SpatialZoneRevision` sans modifier le
+   contrat public minimal par défaut.
+6. Préparer le gate G2 : modèle de menace, RBAC, tests E2E de déploiement,
+   restauration et monitoring.
 
-## Décision de cadrage recommandée
-
-La suite conseillée est FV-008 : un seul asset GLB de démonstration, fictif, immuable et
-contrôlé par hash dans le contrat spatial déjà établi. Unity/WebGL reste à FV-009 ; le
-brancher plus tôt ne réduit pas l'incertitude de publication de l'asset.
+Les services cloud, carte externe, Cesium, build Unity WebGL public et
+traitement automatique de données opérationnelles ne font pas partie de cette
+suite tant qu'une décision explicite et une preuve de coût, sécurité et
+confidentialité ne les justifient pas.
