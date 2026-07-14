@@ -8,10 +8,9 @@ une SQLite de démonstration, le seed fictif, l'API, l'interface et la carte
 statique de la zone publique `DIE-PONTAIX-08@R1`. Il inclut une sauvegarde et
 une restauration non destructives.
 
-Ce document est une procédure, pas une preuve d'exécution. Des contrôles
-préalables ont été exercés localement le 14 juillet 2026 ; le gate G1 ne devient
-VÉRIFIÉ qu'après l'exercice complet depuis un checkout propre et l'ajout des
-résultats dans [le registre](REGISTRE_PROBLEMES_VALIDATIONS.md).
+Ce document est une procédure, pas une preuve d'exécution. Le parcours complet
+a été exercé le 14 juillet 2026 depuis le tag source de clôture ; les résultats
+sont consignés dans [le registre](REGISTRE_PROBLEMES_VALIDATIONS.md).
 
 Préconditions.
 
@@ -19,6 +18,8 @@ Préconditions.
 - disposer de Python 3.13, `uv`, Node/npm et d'un navigateur avec WebGL ;
 - disposer de la GitHub Release publique `spatial-die-pontaix-r1-v4`, ou de son
   archive contrôlée pour la recette hors ligne ;
+- utiliser le tag source `spatial-die-pontaix-r1-v4-fix1`, qui conserve les
+  octets LF des contrats hashés sur un checkout Windows standard ;
 - ne pas employer une base SQLite de développement existante ;
 - ne pas enregistrer de secret, d'incident réel, de position opérationnelle ou
   de fichier `.env` dans Git ;
@@ -31,7 +32,7 @@ Après publication de la release, utiliser un répertoire neuf, sans
 
 ```powershell
 Set-Location <dossier-parent>
-git clone --branch spatial-die-pontaix-r1-v4 --depth 1 https://github.com/charli-dev420/fireviewer.git fireviewer-g1-clean
+git clone --branch spatial-die-pontaix-r1-v4-fix1 --depth 1 https://github.com/charli-dev420/fireviewer.git fireviewer-g1-clean
 Set-Location fireviewer-g1-clean
 git status --short
 git rev-parse --verify HEAD
@@ -94,12 +95,12 @@ npm run pack:spatial
 
 Le script produit l'archive `fireviewer-die-pontaix-r1-v4.tar.gz` et
 `SHA256SUMS`. Contrôler ensuite que ces fichiers correspondent au verrou
-versionné avant publication. Dans l'interface GitHub Releases, créer le tag
-immuable `spatial-die-pontaix-r1-v4`, joindre
-l'archive, `SHA256SUMS` et l'attribution IGN, puis publier la release. GitHub
-sert uniquement à préparer le paquet : la carte publique ne charge aucun asset
-depuis GitHub. Tant que ces trois assets et leur URL publique ne sont pas
-contrôlés, le gate G1 est BLOQUÉ.
+versionné avant publication. La release publique
+`spatial-die-pontaix-r1-v4` contient ces trois assets et n'est jamais déplacée.
+Le tag source `spatial-die-pontaix-r1-v4-fix1` est distinct : il corrige la
+reproductibilité du checkout sans reconstruire ni réimporter les 144 binaires.
+GitHub sert uniquement à préparer le paquet : la carte publique ne charge aucun
+asset depuis GitHub.
 
 Préparer et démarrer l'interface.
 
@@ -205,7 +206,7 @@ G1 est prêt à être déclaré VÉRIFIÉ lorsque :
 - la zone unique, le recentrage, la vue d'ensemble sans GLB, l'absence de
   Cesium et d'URL externe ont été observés sur bureau et mobile ;
 - la sauvegarde et la restauration vers une cible neuve ont été démontrées ;
-- la release immuable contient l'archive, `SHA256SUMS` et l'attribution IGN ;
+- la release publiée contient l'archive, `SHA256SUMS` et l'attribution IGN ;
   le verrou, les hashes des 144 binaires et le manifeste IGN concordent ;
 - le checkout propre a récupéré le paquet avec `npm run fetch:spatial`, puis
   exécuté les contrôles sans réutiliser de build ou d'asset local ;

@@ -80,11 +80,12 @@ G1 — clôture reproductible avec GitHub Releases.
 | ID | État actuel | Problème observé | Correction attendue | Preuve à consigner |
 | --- | --- | --- | --- | --- |
 | G1-001 | VÉRIFIÉ localement le 14 juillet 2026 | Les secteurs Die et Pontaix apparaissaient comme deux zones publiques. | Catalogue `1.1` avec la seule identité `DIE-PONTAIX-08@R1`, emprise globale et deux couvertures techniques non sélectionnables. | `npm run check`, `npm run test` (68 tests) et `npm run test:e2e` (20 scénarios, bureau et émulation mobile) ont confirmé l'intitulé unique et le recentrage. |
-| G1-002 | VÉRIFIÉ localement le 14 juillet 2026 | Le paquet de 144 binaires ne pouvait pas être cloné proprement sans versionner 417 Mo dans Git. | Archive `fireviewer-die-pontaix-r1-v4.tar.gz` distribuée par release, avec `SHA256SUMS`; Git ignore seulement les répertoires binaires installés. | `pack:spatial`, `verify:spatial` et une installation isolée depuis l'archive locale ont validé les 144 hashes et 416850962 octets. Le clone neuf depuis la release reste NON VÉRIFIÉ avant publication. |
+| G1-002 | VÉRIFIÉ le 14 juillet 2026 | Le paquet de 144 binaires ne pouvait pas être cloné proprement sans versionner 417 Mo dans Git. | Archive `fireviewer-die-pontaix-r1-v4.tar.gz` distribuée par release, avec `SHA256SUMS`; Git ignore seulement les répertoires binaires installés. | Clone neuf Windows, `npm ci`, `fetch:spatial`, contrôle des 144 hashes et 416850962 octets passés. |
 | G1-003 | VÉRIFIÉ localement le 14 juillet 2026 | Le catalogue et le manifeste de paquet ne pointaient pas vers le même manifeste de provenance IGN. | `ign_sources.v1.json` versionné et hashé ; catalogue, manifeste et verrou référencent le même SHA-256. | `npm run verify:spatial` a contrôlé le SHA-256 `cff6e9ffa71ce38397defe490bf54f6ba361cc9e5ed8621f22719e5e86d20fe5`, son chemin et ses 265766 octets. |
 | G1-004 | VÉRIFIÉ localement le 14 juillet 2026 | Une extraction directe pourrait installer une archive corrompue ou contenant un chemin hostile. | `fetch:spatial` contrôle hash et liste d'entrées, extrait dans un temporaire puis installe seulement après `verify:spatial`. | `npm run test:spatial` a passé 11 tests, y compris les archives altérées, les liens, les chemins absolus et `..`, ainsi que le retour arrière. |
 | G1-005 | VÉRIFIÉ localement le 14 juillet 2026 | La vue d'ensemble était limitée et le changement de zone ne représentait plus le contrat public. | Caméra sans plafond de 3,6 km, COG/PNG à distance, GLB au rapprochement, bouton `Recentrer la zone` et fallback DOM. | `npm run test:e2e` a passé 20 scénarios, dont `/zones/die-pontaix` sur bureau et émulation mobile : absence de Cesium, d'URL externe et de GLB à la vue d'ensemble. |
-| G1-006 | NON VÉRIFIÉ — publication en attente | Une release GitHub peut exister sans contenir les trois assets cohérents ou sans qu'un clone neuf les consomme. | Tag immuable `spatial-die-pontaix-r1-v4`, archive, `SHA256SUMS` et attribution IGN publiés ; le verrou porte URL HTTPS, taille et hash. | L'archive locale a le SHA-256 `238c97a5e285fefa02a59c7ae4b8783921c5db13815b9a18eb4edae8adbc1a3f`. `git diff --check` et `gitleaks protect --staged --no-banner` ont passé localement ; la publication GitHub, le téléchargement HTTPS public et le clone neuf restent à exécuter. |
+| G1-006 | VÉRIFIÉ le 14 juillet 2026 | Une release GitHub peut exister sans contenir les trois assets cohérents ou sans qu'un clone neuf les consomme. | Release publique `spatial-die-pontaix-r1-v4`, archive, `SHA256SUMS` et attribution IGN publiés ; le verrou porte URL HTTPS, taille et hash. | API GitHub, requête HTTPS et clone neuf ont validé les trois assets. Archive : 401437902 octets, SHA-256 `238c97a5e285fefa02a59c7ae4b8783921c5db13815b9a18eb4edae8adbc1a3f`. |
+| G1-007 | VÉRIFIÉ le 14 juillet 2026 | Le tag v4 convertissait les JSON hashés en CRLF avec `core.autocrlf=true`; Alembic ignorait `FV_DATABASE_URL` dans le runbook. | `.gitattributes` force LF pour catalogue, provenance et attribution. Alembic applique désormais `FV_DATABASE_URL` avant l'URL de repli ; le tag source `spatial-die-pontaix-r1-v4-fix1` conserve le tag binaire v4 inchangé. | Clone Windows au commit `a42e55c`, hashes LF conformes, 68 tests UI, 11 tests spatiaux, 20 E2E, 88/88 backend et restauration SQLite passés. |
 
 Limites actives.
 
@@ -93,8 +94,9 @@ Limites actives.
 - NON VÉRIFIÉ : licence et provenance de publication de chaque donnée
   géographique réelle.
 - NON VÉRIFIÉ : performance mobile, mémoire GPU et temps de premier rendu.
-- NON VÉRIFIÉ : publication de la GitHub Release G1 et récupération depuis son
-  URL publique, jusqu'à la preuve de clôture.
+- NON VÉRIFIÉ : verrouillage technique des tags ou de la release par GitHub ;
+  l'API publique indique `immutable: false` même si le tag v4 observé pointe
+  toujours le commit attendu.
 - NON VÉRIFIÉ : association publique contrôlée d'une `SpatialZoneRevision`
   réelle à un incident.
 - NON VÉRIFIÉ : build Docker et migration contre PostgreSQL/PostGIS réel.

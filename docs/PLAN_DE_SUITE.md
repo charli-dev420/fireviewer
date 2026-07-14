@@ -24,8 +24,9 @@ et que le runbook est rejoué depuis un checkout propre :
 - carte : une seule zone publique `DIE-PONTAIX-08@R1`, lecture du catalogue,
   contrôle des hashes de paquet, route `/zones/die-pontaix` dans un navigateur
   WebGL, recentrage et vue d'ensemble sans chargement de GLB détaillé ;
-- release : le tag immuable `spatial-die-pontaix-r1-v4`, l'archive,
-  `SHA256SUMS`, l'attribution IGN et le verrou versionné concordent ;
+- release : le tag binaire `spatial-die-pontaix-r1-v4`, l'archive,
+  `SHA256SUMS`, l'attribution IGN et le verrou versionné concordent ; le tag
+  source `spatial-die-pontaix-r1-v4-fix1` stabilise le checkout Windows ;
 - runbook : exercice sur un checkout propre, sans réutiliser une base ou un
   build existant.
 
@@ -44,9 +45,9 @@ Suivi d'exécution.
 | FV-005 | seed fictif et matrice de visibilité | historique versionné | second seed sans écriture et projections sûres |
 | FV-006 | UI connectée au manifeste public | historique versionné | cache, ETag/304, CORS local et parcours API |
 | FV-007 | intégrité SQLite | VÉRIFIÉ le 14 juillet 2026 | 87/87 tests, 88,06 % de couverture, Ruff, mypy, migrations, compilation et restauration SQLite fraîche |
-| FV-008 | paquet spatial réel Die–Pontaix | NON VÉRIFIÉ : clôture G1 | catalogue `1.1`, zone unique, 144 binaires invariants, provenance et release contrôlées |
-| FV-009 | bridge web Giro3D | NON VÉRIFIÉ : clôture G1 | vue d'ensemble, recentrage, chargement conditionnel et fallback DOM |
-| FV-010 | runbook G1 | OBSERVÉ : procédure présente | release immuable et exercice complet dans un checkout propre |
+| FV-008 | paquet spatial réel Die–Pontaix | VÉRIFIÉ le 14 juillet 2026 | catalogue `1.1`, zone unique, 144 binaires invariants, provenance et release contrôlées |
+| FV-009 | bridge web Giro3D | VÉRIFIÉ le 14 juillet 2026 | vue d'ensemble, recentrage, chargement conditionnel et fallback DOM par E2E bureau et émulation mobile |
+| FV-010 | runbook G1 | VÉRIFIÉ le 14 juillet 2026 | release v4, tag source correctif et exercice complet dans un checkout propre |
 
 FV-008 — paquet spatial réel, versionné et same-origin.
 
@@ -63,8 +64,8 @@ Le dépôt suit sous
 `apps/fire-viewer-ui/public/maps/fireviewer-die-pontaix-r1-v4/` le catalogue et
 le manifeste seulement ; les répertoires binaires `terrain/` et `vectors/` sont
 ignorés. Le verrou de release et le manifeste IGN sont suivis sous
-`contracts/spatial/releases/`. Après publication, la GitHub Release
-`spatial-die-pontaix-r1-v4` devra distribuer l'archive
+`contracts/spatial/releases/`. La GitHub Release
+`spatial-die-pontaix-r1-v4` distribue l'archive
 `fireviewer-die-pontaix-r1-v4.tar.gz`, `SHA256SUMS` et l'attribution IGN.
 `npm run fetch:spatial` vérifie l'archive avant extraction, refuse les chemins
 hostiles et n'installe les binaires qu'après contrôle. `npm run build` dépend
