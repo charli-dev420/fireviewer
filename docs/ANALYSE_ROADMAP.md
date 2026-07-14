@@ -122,21 +122,28 @@ Risques à maintenir.
 | fuite de position | contrat public minimal, données de zone séparées, pas de liaison implicite à un incident |
 | coût de diffusion inattendu | release binaire utilisée seulement à la préparation ; mesure de poids, cache et trafic avant tout déploiement |
 
-Suite recommandée après le gate G1.
+Suite MVP actée après le gate G1.
 
-1. Geler toute évolution de `DIE-PONTAIX-08@R1` sous le tag de release et
-   publier toute évolution future sous une nouvelle révision, jamais en
-   remplaçant la release existante.
-2. Conserver dans le registre les résultats, hashes et captures du clone neuf ;
-   toute évolution devra répéter cette recette depuis un nouveau tag source.
-3. Mesurer le runtime Giro3D sur bureau et mobile avant de modifier la
-   géométrie, le relief ou les lisières.
-4. Introduire un registre de zones en base seulement lorsqu'il faudra publier
-   plusieurs zones dynamiquement ; G1 conserve un catalogue statique unique.
-5. Concevoir la publication incident → `SpatialZoneRevision` sans modifier le
-   contrat public minimal par défaut.
-6. Préparer le gate G2 : modèle de menace, RBAC, tests E2E de déploiement,
-   restauration et monitoring.
+1. MVP-0 — clôturer et rendre G1 reproductible ; `DIE-PONTAIX-08@R1` reste
+   inchangée et toute évolution spatiale devient une nouvelle révision.
+2. MVP-1 — rendre l'accès administrateur, les rôles, la confidentialité et les
+   données privées réellement utilisables.
+3. MVP-2 — ajouter le signalement public privé.
+4. MVP-3 — ajouter l'analyse, la proposition de placement et la revue humaine.
+5. MVP-4 — administrer les zones, leurs révisions, les paquets contrôlés et les
+   publications depuis l'interface, avant toute carte publique multi-zones.
+6. MVP-5 — associer explicitement un feu validé à une zone/révision, publier
+   cette association sous contrôle et conserver une archive PNG immuable.
+7. MVP-6 — exposer uniquement les zones et feux explicitement publiés sur la
+   carte publique.
+8. MVP-7 — traiter la météo publique, le déploiement, la sécurité,
+   l'exploitation et les mesures Giro3D bureau/mobile avant toute compression
+   destructive.
+
+Le contrat détaillé de MVP-4 est dans
+[MVP_ADMINISTRATION_ZONES.md](MVP_ADMINISTRATION_ZONES.md). Le registre de
+zones devient alors persistant et administré; G1 conserve uniquement son
+catalogue statique de démonstration.
 
 Les services cloud, carte externe, Cesium, build Unity WebGL public et
 traitement automatique de données opérationnelles ne font pas partie de cette
