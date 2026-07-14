@@ -35,6 +35,11 @@
 **/.vite/
 **/*.tsbuildinfo
 
+# Le catalogue et le manifeste du paquet spatial sont versionnés. Les 144
+# binaires sont distribués uniquement par la GitHub Release immuable G1.
+/apps/fire-viewer-ui/public/maps/fireviewer-die-pontaix-r1-v4/terrain/**
+/apps/fire-viewer-ui/public/maps/fireviewer-die-pontaix-r1-v4/vectors/**
+
 # Unity généré localement - ne jamais versionner ces dossiers.
 **/[Ll]ibrary/
 **/[Tt]emp/

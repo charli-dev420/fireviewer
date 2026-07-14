@@ -1,0 +1,14 @@
+Attribution IGN — Die–Pontaix R1
+
+Les données source LiDAR HD et BD TOPO® utilisées pour préparer ce paquet
+spatial proviennent de l'Institut national de l'information géographique et
+forestière (IGN). Leur provenance est déclarée sous Licence Ouverte / Open
+Licence 2.0.
+
+Le détail des ressources, URLs, dates, emprises, hashes et chemins techniques
+est conservé dans ign_sources.v1.json. Le SHA-256 de ce manifeste est :
+cff6e9ffa71ce38397defe490bf54f6ba361cc9e5ed8621f22719e5e86d20fe5
+
+Les identifiants techniques historiques de secteurs présents dans ce manifeste
+de provenance ne sont pas des zones publiques Fire Viewer. La seule zone
+publique de cette release est DIE-PONTAIX-08@R1.

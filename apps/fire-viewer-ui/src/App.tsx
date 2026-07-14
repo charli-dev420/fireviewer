@@ -7,6 +7,7 @@ import {
 } from './components/ManifestWorkspace';
 import { getDataMode, isAbortError, loadViewerManifest } from './lib/manifestClient';
 import { VIEWER_MANIFEST_FIRE_ID_RE } from './lib/viewerManifest';
+import SpatialMapApp from './components/SpatialMapApp';
 import type { ViewId } from './types';
 
 /**
@@ -49,6 +50,10 @@ function resolveRoute(): { fireId: string; view: ViewId } {
 
 function isValidFireId(value: string): boolean {
   return VIEWER_MANIFEST_FIRE_ID_RE.test(value);
+}
+
+function isSpatialMapRoute(): boolean {
+  return /^\/zones\/die-pontaix\/?$/.test(window.location.pathname);
 }
 
 export interface AppProps {
@@ -358,6 +363,7 @@ function LiveManifestApp({ refreshIntervalMs }: AppProps) {
 }
 
 export default function App({ refreshIntervalMs }: AppProps) {
+  if (isSpatialMapRoute()) return <SpatialMapApp />;
   const dataMode = getDataMode();
   if (dataMode === 'unconfigured') return <ConfigurationScreen />;
   if (dataMode === 'mock') {

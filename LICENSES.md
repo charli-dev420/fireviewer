@@ -1,23 +1,23 @@
 # Licences et réutilisation
 
-## Décision enregistrée le 12 juillet 2026
+Décision enregistrée le 12 juillet 2026.
 
 Le titulaire du projet a confirmé que Fire Viewer est libre, open source et gratuit.
 
-- **Code source** : [GNU AGPL-3.0-or-later](LICENSE).
-- **Documentation, roadmap et diagrammes** : [Creative Commons Attribution 4.0 International](LICENSE-DOCS.md).
+- Code source : [GNU AGPL-3.0-or-later](LICENSE).
+- Documentation, roadmap et diagrammes : [Creative Commons Attribution 4.0 International](LICENSE-DOCS.md).
 
-**VÉRIFIÉ** : le backend fourni déclarait déjà `AGPL-3.0-or-later` et embarquait le texte de l'AGPL v3. Le fichier racine `LICENSE` est une copie identique de ce texte. L'UI et les composants communs sont désormais couverts explicitement par la licence racine.
+VÉRIFIÉ : le backend fourni déclarait déjà `AGPL-3.0-or-later` et embarquait le texte de l'AGPL v3. Le fichier racine `LICENSE` est une copie identique de ce texte. L'UI et les composants communs sont désormais couverts explicitement par la licence racine.
 
-## Portée
+Portée.
 
 La licence de code s'applique aux sources Fire Viewer dans ce dépôt. La licence documentaire s'applique notamment au README, aux fichiers Markdown, au PDF de roadmap et aux diagrammes produits pour Fire Viewer.
 
 Les dépendances tierces, données IGN, textures, modèles externes et contenus apportés par des contributeurs conservent leurs propres licences, attributions et contraintes de provenance. Une contribution ne doit être ajoutée que si son auteur peut accorder les droits correspondants.
 
-## Donnée géodésique RAF20 distribuée via PROJ
+Donnée géodésique RAF20 distribuée via PROJ.
 
-**VÉRIFIÉ** : le profil spatial local emploie la grille publique
+VÉRIFIÉ : le profil spatial local emploie la grille publique
 `fr_ign_RAF20.tif`, distribuée avec les données PROJ et épinglée à
 `dc0cc2a38f0ea1029fe72cca3b5b7ed6dfe7e1db2a8d8482b7326ce3d6f25605`.
 La distribution du logiciel PROJ est sous licence MIT ; la provenance CDN/IGN, le hash et
@@ -29,6 +29,18 @@ droit sur de telles données. Son emploi est limité par l'[ADR-002](docs/adr/AD
 au profil France continentale NGF-IGN69/RAF20 ; Corse et outre-mer demandent des profils et
 des conditions de provenance distincts.
 
-## Contribution
+Données de la release spatiale Die–Pontaix R1.
+
+Les données source LiDAR HD et BD TOPO® de l'IGN sont déclarées sous Licence
+Ouverte / Open Licence 2.0. Leur attribution, les URLs de source, les dates et
+les hashes sont conservés dans
+[ATTRIBUTION-IGN.txt](contracts/spatial/releases/ATTRIBUTION-IGN.txt) et
+[`ign_sources.v1.json`](contracts/spatial/releases/ign_sources.v1.json). Le
+manifeste de provenance est distinct du code Fire Viewer ; son SHA-256 est
+`cff6e9ffa71ce38397defe490bf54f6ba361cc9e5ed8621f22719e5e86d20fe5`.
+Les identifiants techniques historiques présents dans ce manifeste ne créent pas
+de zones publiques supplémentaires.
+
+Contribution.
 
 En contribuant du code, vous acceptez de le proposer sous AGPL-3.0-or-later. En contribuant de la documentation ou un diagramme, vous acceptez CC BY 4.0. Consultez [CONTRIBUTING.md](CONTRIBUTING.md) avant toute contribution.

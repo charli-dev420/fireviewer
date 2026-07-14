@@ -2,19 +2,19 @@
 
 ![Architecture Fire Viewer](../assets/diagrams/fire-viewer-architecture.svg)
 
-## Source de vérité et flux de données
+Source de vérité et flux de données.
 
 ```text
 observations -> API transactionnelle -> audit / matching / états
                                       -> manifeste courant -> client web strict
                                                            -> rendu DOM public minimal
-                                                           -> Unity WebGL (FV-009)
-                                      -> asset GLB immuable (FV-008)
+Unity d'authoring -> paquet spatial statique versionné -> route de zone
+                                                    -> Giro3D WebGL ou résumé DOM
 ```
 
-Le backend est responsable des identifiants, de l'audit, des règles de matching et de la publication de manifestes. L'UI affiche la situation avant toute initialisation 3D. FV-006 rend le manifeste public dans le DOM ; Unity ne sera autorisé à charger un asset dont l'intégrité et le repère sont décrits par le manifeste qu'après FV-008/FV-009.
+Le backend est responsable des identifiants, de l'audit, des règles de matching et de la publication de manifestes. L'UI affiche la situation avant toute initialisation 3D. Le manifeste public reste rendu dans le DOM ; la carte de zone est un paquet statique distinct, préparé dans Unity puis rendu par Giro3D, sans association implicite à un incident.
 
-## Identifiants stables
+Identifiants stables.
 
 | Identifiant | Rôle |
 | --- | --- |
@@ -23,7 +23,7 @@ Le backend est responsable des identifiants, de l'audit, des règles de matching
 | `asset_id` + version | Modèle terrain/3D immuable, hashé et publiable atomiquement |
 | `trace_id` | Corrélation d'une opération métier et de son audit |
 
-## Contrat de viewer public v2
+Contrat de viewer public v2.
 
 L'[ADR-001](adr/ADR-001-viewer-manifest-public-contract.md) fixe le contrat à :
 
@@ -37,9 +37,9 @@ L'UI conserve un parseur strict séparé de son agrégat de démonstration ; la 
 réelle du manifeste est décrite ci-dessous. Les vues Sources, Historique et Journal ne
 doivent jamais être alimentées par des données mockées dans ce parcours.
 
-### Consommation web FV-006
+Consommation web FV-006.
 
-**VÉRIFIÉ dans FV-006** : `App` choisit une branche discriminée par
+VÉRIFIÉ dans FV-006 : `App` choisit une branche discriminée par
 `VITE_USE_MOCKS`. La valeur exacte `true` monte le dashboard `IncidentData` fictif ; la
 valeur exacte `false` exige une origine HTTP(S) sans préfixe API et monte la branche
 `ViewerManifest`. Toute autre configuration conduit à `N/A — mode de données non
@@ -60,16 +60,16 @@ comme obsolète au lieu de revenir au mock.
 `not_available` reste explicite, et `withheld` ne produit aucune donnée spatiale inférée.
 Sources, Historique et Journal sont des panneaux vides « non inclus dans le manifeste
 public ». `TerrainViewer`, marqueurs, périmètre, simulations, exports et mode opérateur du
-fixture ne sont pas montés dans la branche API. La vérification WebGL ne charge pas de GLB ;
-elle explique que GLB/Unity restent à FV-008/FV-009.
+fixture ne sont pas montés dans la branche API. La vérification WebGL du manifeste ne charge
+pas de GLB ; la carte de zone est un parcours distinct qui utilise son propre paquet statique.
 
-**VÉRIFIÉ localement** : `npm run check`, 57 tests Vitest, le build Vite et les huit
-scénarios Playwright réels traversent cette séparation, y compris l'absence de requête
-GLB et de module mock en mode API. Le navigateur natif de l'environnement et un
-déploiement public restent **NON VÉRIFIÉS** ; ce résultat ne constitue pas une preuve de
-non-régression globale.
+VÉRIFIÉ localement le 14 juillet 2026 : `npm run check`, 65 tests Vitest, le
+build Vite et les huit scénarios Playwright réels traversent cette séparation,
+y compris l'absence de requête GLB et de module mock en mode API. Le déploiement
+public et le contrôle dans les navigateurs ciblés restent NON VÉRIFIÉS ; ce
+résultat ne constitue pas une preuve de non-régression globale.
 
-### Projection publique canonique
+Projection publique canonique.
 
 La visibilité n'est pas une préférence de rendu : elle suit la machine à états et échoue
 fermée lorsqu'une ligne persistée est incohérente. La matrice versionnée de démonstration
@@ -87,7 +87,7 @@ Le jeu `FR-83-00042` est un identifiant de fixture, non une déclaration de feu 
 localisation opérationnelle. Son seed de référence est sans asset et sert à vérifier le
 fallback texte du manifeste public ; il ne déclenche aucun chargement 3D avant FV-008.
 
-## Contrat spatial
+Contrat spatial.
 
 L'[ADR-002](adr/ADR-002-spatial-local-unity-contract.md) fixe un profil de terrain local
 pour la France continentale rurale. Toute origine est `EPSG:4979` et toute valeur tableau
@@ -109,11 +109,40 @@ NGF-IGN69 H --RAF20 local--> EPSG:4979 [lon, lat, h] --origine--> ENU mètres
                                                                   `-- Unity (100E, 100U, 100N), 0.01 m/u
 ```
 
-**VÉRIFIÉ** : les points de contrôle fictifs WGS84/ENU/Unity, le facteur ×100, le hash
-RAF20 et la migration SQLite sont traversés par les tests backend. **NON VÉRIFIÉ** :
-l'import d'un GLB réel dans Unity, la production matérielle du PNG et l'exécution de la
-migration sur une instance PostgreSQL restent nécessaires avant de déclarer un terrain 3D
-aligné en intégration.
+VÉRIFIÉ : les points de contrôle fictifs WGS84/ENU/Unity, le facteur ×100, le
+hash RAF20 et la migration SQLite sont traversés par les tests backend. NON
+VÉRIFIÉ : l'import d'un GLB réel dans Unity, la production matérielle du PNG et
+l'exécution de la migration sur une instance PostgreSQL restent nécessaires
+avant de déclarer un terrain 3D aligné en intégration.
+
+Paquet spatial G1.
+
+G1 publie une seule zone logique `DIE-PONTAIX-08@R1`. Son catalogue `1.1`
+déclare l'emprise Lambert-93 `[876000, 6403000, 892000, 6413000]` et deux
+emprises techniques de couverture : `[876000, 6403000, 884000, 6411000]` et
+`[884000, 6405000, 892000, 6413000]`. Ces couvertures servent à localiser les
+assets disponibles ; elles ne sont jamais deux zones publiques ni deux choix
+dans l'interface. Les huit COG, huit PNG et 128 GLB sont tous rattachés à cette
+unique identité, sans modifier leur nom, leur taille ou leur SHA-256.
+
+Le dépôt versionne le catalogue, le manifeste de paquet, le verrou de release
+`contracts/spatial/releases/fireviewer-die-pontaix-r1-v4.release-lock.json` et
+la provenance `contracts/spatial/releases/ign_sources.v1.json`. Seuls les
+répertoires binaires installés sous
+`apps/fire-viewer-ui/public/maps/fireviewer-die-pontaix-r1-v4/` sont ignorés.
+La release GitHub immuable attendue `spatial-die-pontaix-r1-v4` doit fournir
+l'archive `fireviewer-die-pontaix-r1-v4.tar.gz`, `SHA256SUMS` et l'attribution
+IGN. Après publication, elle servira au clone et au build, jamais au runtime
+public : Giro3D ne charge que des
+chemins same-origin après installation locale du paquet.
+
+`npm run fetch:spatial` télécharge ou reçoit une archive locale, vérifie son
+hash, refuse les entrées hostiles et installe dans un répertoire temporaire.
+`npm run verify:spatial` recalcule ensuite les hashes du catalogue et du
+manifeste avant publication des fichiers. Le build dépend de cette dernière
+vérification ; il ne peut pas fabriquer un site dont la carte est absente ou
+non contrôlée. Aucun registre spatial en base ni lien incident → zone n'est
+introduit dans G1.
 
 La source de vérité du vertical slice reste une seule SQLite en WAL avec un seul écrivain.
 `BEGIN IMMEDIATE` sérialise la création, le rattachement et la revue; une clé
@@ -133,7 +162,7 @@ Ce mécanisme reste volontairement sans coût récurrent : fichiers SQLite locau
 open source déjà présents. L'exécution réelle de l'image Docker et la reprise sur
 PostgreSQL/PostGIS restent hors des tests SQLite.
 
-## Limites de sécurité
+Limites de sécurité.
 
 - Les agents IA ne confirment jamais seuls un incident.
 - Une position non confirmée ou sensible ne doit pas être rendue publique.

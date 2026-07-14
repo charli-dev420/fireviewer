@@ -1,0 +1,4749 @@
+{
+  "bounds_l93_metres": [
+    876000,
+    6403000,
+    892000,
+    6413000
+  ],
+  "feature_tiles": [
+    {
+      "bounds_l93_metres": [
+        876000,
+        6403000,
+        877000,
+        6404000
+      ],
+      "features": {
+        "byte_count": 390916,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 4,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T00-V00/features.glb",
+        "route_count": 35,
+        "sha256": "c0989a299250935eafc338cddecdd8b36d2321e491903d99665991d7df5df3ba",
+        "tree_count": 439,
+        "triangle_count": 14557,
+        "vertex_count": 10732
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        876000,
+        6403000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T00",
+      "tile_id": "PONTAIX-08-T00-V00",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        877000,
+        6403000,
+        878000,
+        6404000
+      ],
+      "features": {
+        "byte_count": 471496,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T00-V01/features.glb",
+        "route_count": 27,
+        "sha256": "469e90e5b1a91df3fd2d65a14344e8dd80e538ec88c20b984909f56784eab9ee",
+        "tree_count": 295,
+        "triangle_count": 16918,
+        "vertex_count": 13054
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        877000,
+        6403000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T00",
+      "tile_id": "PONTAIX-08-T00-V01",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        878000,
+        6403000,
+        879000,
+        6404000
+      ],
+      "features": {
+        "byte_count": 581312,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T00-V02/features.glb",
+        "route_count": 107,
+        "sha256": "4d00f43857716c640a03bd5264f4322eeebc64d6462c36a54d2e8c046117aed5",
+        "tree_count": 104,
+        "triangle_count": 17270,
+        "vertex_count": 16902
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        878000,
+        6403000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T00",
+      "tile_id": "PONTAIX-08-T00-V02",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        879000,
+        6403000,
+        880000,
+        6404000
+      ],
+      "features": {
+        "byte_count": 376916,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T00-V03/features.glb",
+        "route_count": 47,
+        "sha256": "9ba626fad6a5e9b61c9cc5729c4cc3f530156f1fd656e21722d6a9dd8944e7f7",
+        "tree_count": 139,
+        "triangle_count": 11222,
+        "vertex_count": 10924
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        879000,
+        6403000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T00",
+      "tile_id": "PONTAIX-08-T00-V03",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        876000,
+        6404000,
+        877000,
+        6405000
+      ],
+      "features": {
+        "byte_count": 336720,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 4,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T00-V10/features.glb",
+        "route_count": 16,
+        "sha256": "05273020de14f6bde201333d530166589f0bebffed998511db11259b1ce3c800",
+        "tree_count": 486,
+        "triangle_count": 12616,
+        "vertex_count": 9212
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        876000,
+        6404000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T00",
+      "tile_id": "PONTAIX-08-T00-V10",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        877000,
+        6404000,
+        878000,
+        6405000
+      ],
+      "features": {
+        "byte_count": 319848,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T00-V11/features.glb",
+        "route_count": 16,
+        "sha256": "f3b0b366628c0089826ecc586bec58fb8d603bab5e6423e967af07bb8128cc4c",
+        "tree_count": 387,
+        "triangle_count": 11334,
+        "vertex_count": 8835
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        877000,
+        6404000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T00",
+      "tile_id": "PONTAIX-08-T00-V11",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        878000,
+        6404000,
+        879000,
+        6405000
+      ],
+      "features": {
+        "byte_count": 444568,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T00-V12/features.glb",
+        "route_count": 31,
+        "sha256": "a755bd11a4aa03e0960482b81db3b2f294e3f92073da0dd1653152b6b1e38242",
+        "tree_count": 120,
+        "triangle_count": 14332,
+        "vertex_count": 12647
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        878000,
+        6404000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T00",
+      "tile_id": "PONTAIX-08-T00-V12",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        879000,
+        6404000,
+        880000,
+        6405000
+      ],
+      "features": {
+        "byte_count": 358332,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T00-V13/features.glb",
+        "route_count": 37,
+        "sha256": "ec820ac27bdd4f39eac249261641765098fec24988455370168489292fc5ee13",
+        "tree_count": 233,
+        "triangle_count": 10461,
+        "vertex_count": 10422
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        879000,
+        6404000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T00",
+      "tile_id": "PONTAIX-08-T00-V13",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        876000,
+        6405000,
+        877000,
+        6406000
+      ],
+      "features": {
+        "byte_count": 229584,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T00-V20/features.glb",
+        "route_count": 13,
+        "sha256": "a826df3b6aee18360c115834c3b82bf7e65f0365c57da1f30434bd8e0e006538",
+        "tree_count": 507,
+        "triangle_count": 7461,
+        "vertex_count": 6466
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        876000,
+        6405000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T00",
+      "tile_id": "PONTAIX-08-T00-V20",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        877000,
+        6405000,
+        878000,
+        6406000
+      ],
+      "features": {
+        "byte_count": 290328,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 4,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T00-V21/features.glb",
+        "route_count": 13,
+        "sha256": "ad2fb2e66ea5bd95be2b7623ebdd2f3649d538fb2422529a67bb51d175bbe93b",
+        "tree_count": 479,
+        "triangle_count": 10607,
+        "vertex_count": 7985
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        877000,
+        6405000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T00",
+      "tile_id": "PONTAIX-08-T00-V21",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        878000,
+        6405000,
+        879000,
+        6406000
+      ],
+      "features": {
+        "byte_count": 371224,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T00-V22/features.glb",
+        "route_count": 31,
+        "sha256": "bba55b7c320d750c83dce33100059ffcb7b226d526a56339a3c2fcbe74ecb659",
+        "tree_count": 299,
+        "triangle_count": 12229,
+        "vertex_count": 10478
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        878000,
+        6405000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T00",
+      "tile_id": "PONTAIX-08-T00-V22",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        879000,
+        6405000,
+        880000,
+        6406000
+      ],
+      "features": {
+        "byte_count": 404660,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T00-V23/features.glb",
+        "route_count": 40,
+        "sha256": "a0e2bbeca10964eb9ef7be74f9c7f74ccff02e5e0e28bec26e5bb6aff14e42bc",
+        "tree_count": 82,
+        "triangle_count": 12050,
+        "vertex_count": 11736
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        879000,
+        6405000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T00",
+      "tile_id": "PONTAIX-08-T00-V23",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        876000,
+        6406000,
+        877000,
+        6407000
+      ],
+      "features": {
+        "byte_count": 195804,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 3,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T00-V30/features.glb",
+        "route_count": 2,
+        "sha256": "27464e2db7b1a9a90db6a7bcaf91fe2ba0e0b0cecb6c99b86b83d69c597aa62a",
+        "tree_count": 526,
+        "triangle_count": 6180,
+        "vertex_count": 5584
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        876000,
+        6406000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T00",
+      "tile_id": "PONTAIX-08-T00-V30",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        877000,
+        6406000,
+        878000,
+        6407000
+      ],
+      "features": {
+        "byte_count": 266312,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T00-V31/features.glb",
+        "route_count": 7,
+        "sha256": "0f5dd2fb2768d233dd2e6464b4c92625a99453a7fff43a56934755fe4ffdfcf9",
+        "tree_count": 549,
+        "triangle_count": 9313,
+        "vertex_count": 7381
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        877000,
+        6406000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T00",
+      "tile_id": "PONTAIX-08-T00-V31",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        878000,
+        6406000,
+        879000,
+        6407000
+      ],
+      "features": {
+        "byte_count": 346384,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 4,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T00-V32/features.glb",
+        "route_count": 10,
+        "sha256": "b4f8a13bcbc6fbb914dca1e3880aa31f5646506502a2c3b00556d23930262f41",
+        "tree_count": 389,
+        "triangle_count": 12847,
+        "vertex_count": 9508
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        878000,
+        6406000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T00",
+      "tile_id": "PONTAIX-08-T00-V32",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        879000,
+        6406000,
+        880000,
+        6407000
+      ],
+      "features": {
+        "byte_count": 477888,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T00-V33/features.glb",
+        "route_count": 51,
+        "sha256": "f93d590b911ba410464abfba98482e216eb654bc4a28eb262a062ba83b610f5f",
+        "tree_count": 188,
+        "triangle_count": 15372,
+        "vertex_count": 13640
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        879000,
+        6406000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T00",
+      "tile_id": "PONTAIX-08-T00-V33",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        880000,
+        6403000,
+        881000,
+        6404000
+      ],
+      "features": {
+        "byte_count": 344740,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T01-V00/features.glb",
+        "route_count": 23,
+        "sha256": "b2447f19800f8ded1809b86ee224764fe5fb1b9709e2b59efbb5a4f92a63229b",
+        "tree_count": 415,
+        "triangle_count": 10825,
+        "vertex_count": 9860
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        880000,
+        6403000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T01",
+      "tile_id": "PONTAIX-08-T01-V00",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        881000,
+        6403000,
+        882000,
+        6404000
+      ],
+      "features": {
+        "byte_count": 497668,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T01-V01/features.glb",
+        "route_count": 37,
+        "sha256": "fadba562a265250dad7dd7a5f0256a5fa7805d397019c1f2f6b39fa67af026f1",
+        "tree_count": 192,
+        "triangle_count": 16468,
+        "vertex_count": 14111
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        881000,
+        6403000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T01",
+      "tile_id": "PONTAIX-08-T01-V01",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        882000,
+        6403000,
+        883000,
+        6404000
+      ],
+      "features": {
+        "byte_count": 448272,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T01-V02/features.glb",
+        "route_count": 7,
+        "sha256": "e43d359f5791548fef1d20d95b2dc4563db6c07dfc6e2ee7801862d98e320ad9",
+        "tree_count": 334,
+        "triangle_count": 16130,
+        "vertex_count": 12419
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        882000,
+        6403000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T01",
+      "tile_id": "PONTAIX-08-T01-V02",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        883000,
+        6403000,
+        884000,
+        6404000
+      ],
+      "features": {
+        "byte_count": 276624,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 4,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T01-V03/features.glb",
+        "route_count": 9,
+        "sha256": "307599bec72edca2eaf181897c58c713b80493063081ae2bab21fee9b8e28b6a",
+        "tree_count": 516,
+        "triangle_count": 9206,
+        "vertex_count": 7798
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        883000,
+        6403000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T01",
+      "tile_id": "PONTAIX-08-T01-V03",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        880000,
+        6404000,
+        881000,
+        6405000
+      ],
+      "features": {
+        "byte_count": 508900,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T01-V10/features.glb",
+        "route_count": 50,
+        "sha256": "ca7fc4210acc3999c3bc3625b048b62869fa6c85807cac5e3a6480d95a751c44",
+        "tree_count": 367,
+        "triangle_count": 15990,
+        "vertex_count": 14614
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        880000,
+        6404000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T01",
+      "tile_id": "PONTAIX-08-T01-V10",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        881000,
+        6404000,
+        882000,
+        6405000
+      ],
+      "features": {
+        "byte_count": 440776,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 3,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T01-V11/features.glb",
+        "route_count": 14,
+        "sha256": "18996efe1725b1e11496f59c1c4eeca5838b399fa2cccb9cf28d2634cf86bb78",
+        "tree_count": 428,
+        "triangle_count": 16138,
+        "vertex_count": 12198
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        881000,
+        6404000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T01",
+      "tile_id": "PONTAIX-08-T01-V11",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        882000,
+        6404000,
+        883000,
+        6405000
+      ],
+      "features": {
+        "byte_count": 430356,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T01-V12/features.glb",
+        "route_count": 35,
+        "sha256": "d58b1c937fda38da8dda422806d7dda064e0d130b7e8b65b48bdd0200db80dde",
+        "tree_count": 272,
+        "triangle_count": 13492,
+        "vertex_count": 12344
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        882000,
+        6404000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T01",
+      "tile_id": "PONTAIX-08-T01-V12",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        883000,
+        6404000,
+        884000,
+        6405000
+      ],
+      "features": {
+        "byte_count": 353460,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T01-V13/features.glb",
+        "route_count": 47,
+        "sha256": "de3baa7f95ce27f002a6eab0e427443159e75436c75b8ab2f29145091bea00af",
+        "tree_count": 465,
+        "triangle_count": 11979,
+        "vertex_count": 9923
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        883000,
+        6404000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T01",
+      "tile_id": "PONTAIX-08-T01-V13",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        880000,
+        6405000,
+        881000,
+        6406000
+      ],
+      "features": {
+        "byte_count": 434356,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T01-V20/features.glb",
+        "route_count": 55,
+        "sha256": "7a57be9dbc61190f78147b6c4ef69c59e375e98e74a6ee65e977ec63869a94a3",
+        "tree_count": 273,
+        "triangle_count": 13452,
+        "vertex_count": 12496
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        880000,
+        6405000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T01",
+      "tile_id": "PONTAIX-08-T01-V20",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        881000,
+        6405000,
+        882000,
+        6406000
+      ],
+      "features": {
+        "byte_count": 404180,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T01-V21/features.glb",
+        "route_count": 30,
+        "sha256": "1a2afd70e4d3386e77ea52094be6d8cd3d0fb4bc33892422ceaca7445fb6d38e",
+        "tree_count": 284,
+        "triangle_count": 13007,
+        "vertex_count": 11514
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        881000,
+        6405000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T01",
+      "tile_id": "PONTAIX-08-T01-V21",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        882000,
+        6405000,
+        883000,
+        6406000
+      ],
+      "features": {
+        "byte_count": 487516,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T01-V22/features.glb",
+        "route_count": 13,
+        "sha256": "90306c878d02197fbccfe0466d0fcf494faca16dce81530c002f1be7ca62c3b4",
+        "tree_count": 350,
+        "triangle_count": 17460,
+        "vertex_count": 13535
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        882000,
+        6405000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T01",
+      "tile_id": "PONTAIX-08-T01-V22",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        883000,
+        6405000,
+        884000,
+        6406000
+      ],
+      "features": {
+        "byte_count": 315992,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T01-V23/features.glb",
+        "route_count": 12,
+        "sha256": "498bdb8716d742ba0bf166a361694b8b5c0d72af08b92ed6b1bc0fc1b51b460b",
+        "tree_count": 433,
+        "triangle_count": 10711,
+        "vertex_count": 8857
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        883000,
+        6405000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T01",
+      "tile_id": "PONTAIX-08-T01-V23",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        880000,
+        6406000,
+        881000,
+        6407000
+      ],
+      "features": {
+        "byte_count": 418432,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T01-V30/features.glb",
+        "route_count": 46,
+        "sha256": "58296aebe882ef1786bc17eb39945ca9d23b93866b410373d45fc4267d8bfc0c",
+        "tree_count": 181,
+        "triangle_count": 13476,
+        "vertex_count": 11922
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        880000,
+        6406000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T01",
+      "tile_id": "PONTAIX-08-T01-V30",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        881000,
+        6406000,
+        882000,
+        6407000
+      ],
+      "features": {
+        "byte_count": 610840,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T01-V31/features.glb",
+        "route_count": 71,
+        "sha256": "43f8291520a6c1be0844e5646a5d68fbdfac3473712ff4d6ef4cf9d2cbdd19b2",
+        "tree_count": 159,
+        "triangle_count": 18939,
+        "vertex_count": 17623
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        881000,
+        6406000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T01",
+      "tile_id": "PONTAIX-08-T01-V31",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        882000,
+        6406000,
+        883000,
+        6407000
+      ],
+      "features": {
+        "byte_count": 453208,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T01-V32/features.glb",
+        "route_count": 28,
+        "sha256": "5ff524ab1400ac43bd814b5336831cd92c5cdd541dc45730558bec58a0772bd3",
+        "tree_count": 400,
+        "triangle_count": 16230,
+        "vertex_count": 12574
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        882000,
+        6406000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T01",
+      "tile_id": "PONTAIX-08-T01-V32",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        883000,
+        6406000,
+        884000,
+        6407000
+      ],
+      "features": {
+        "byte_count": 220356,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 4,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T01-V33/features.glb",
+        "route_count": 26,
+        "sha256": "0f6f181da8abc349a4182977496a3eb097630313d4975723e577cadd09079cb9",
+        "tree_count": 540,
+        "triangle_count": 6946,
+        "vertex_count": 6272
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        883000,
+        6406000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T01",
+      "tile_id": "PONTAIX-08-T01-V33",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        876000,
+        6407000,
+        877000,
+        6408000
+      ],
+      "features": {
+        "byte_count": 207100,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 3,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T10-V00/features.glb",
+        "route_count": 6,
+        "sha256": "2cfbddb3d146610dd57a617e9b42e0a73a4ecea7716abac427540064aa16476e",
+        "tree_count": 562,
+        "triangle_count": 6588,
+        "vertex_count": 5900
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        876000,
+        6407000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T10",
+      "tile_id": "PONTAIX-08-T10-V00",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        877000,
+        6407000,
+        878000,
+        6408000
+      ],
+      "features": {
+        "byte_count": 229460,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T10-V01/features.glb",
+        "route_count": 32,
+        "sha256": "4fcb50242fe0c436f17f57abb8b7e1c3ee36397a220a3581df916e14cf0bb018",
+        "tree_count": 524,
+        "triangle_count": 7170,
+        "vertex_count": 6524
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        877000,
+        6407000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T10",
+      "tile_id": "PONTAIX-08-T10-V01",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        878000,
+        6407000,
+        879000,
+        6408000
+      ],
+      "features": {
+        "byte_count": 252564,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 3,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T10-V02/features.glb",
+        "route_count": 8,
+        "sha256": "817e66e2e57b8bef4cc255ea4a7cbf3539b87cf2ae8d04a40f8b2c5adbfea742",
+        "tree_count": 494,
+        "triangle_count": 8748,
+        "vertex_count": 7060
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        878000,
+        6407000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T10",
+      "tile_id": "PONTAIX-08-T10-V02",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        879000,
+        6407000,
+        880000,
+        6408000
+      ],
+      "features": {
+        "byte_count": 373628,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T10-V03/features.glb",
+        "route_count": 28,
+        "sha256": "eb972554305957a2f4fffbc5dada939d6272074ed7ed07267725034c7eb3cf43",
+        "tree_count": 221,
+        "triangle_count": 12482,
+        "vertex_count": 10536
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        879000,
+        6407000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T10",
+      "tile_id": "PONTAIX-08-T10-V03",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        876000,
+        6408000,
+        877000,
+        6409000
+      ],
+      "features": {
+        "byte_count": 290532,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T10-V10/features.glb",
+        "route_count": 18,
+        "sha256": "d02079d04a07b382e462e065c29e6735de8fac9ee159510d6b29cbaf81d67fea",
+        "tree_count": 419,
+        "triangle_count": 9417,
+        "vertex_count": 8224
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        876000,
+        6408000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T10",
+      "tile_id": "PONTAIX-08-T10-V10",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        877000,
+        6408000,
+        878000,
+        6409000
+      ],
+      "features": {
+        "byte_count": 355648,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T10-V11/features.glb",
+        "route_count": 35,
+        "sha256": "c0e9693a0a4ee0856151cf0fc05adef7c38ab1dbe2e97243732bb39996b98798",
+        "tree_count": 397,
+        "triangle_count": 11452,
+        "vertex_count": 10113
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        877000,
+        6408000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T10",
+      "tile_id": "PONTAIX-08-T10-V11",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        878000,
+        6408000,
+        879000,
+        6409000
+      ],
+      "features": {
+        "byte_count": 335492,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T10-V12/features.glb",
+        "route_count": 47,
+        "sha256": "b958f5294a086e2eb734446d83f6046a1071858cef6ce3c5de8534a16084232e",
+        "tree_count": 369,
+        "triangle_count": 10882,
+        "vertex_count": 9515
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        878000,
+        6408000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T10",
+      "tile_id": "PONTAIX-08-T10-V12",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        879000,
+        6408000,
+        880000,
+        6409000
+      ],
+      "features": {
+        "byte_count": 533844,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T10-V13/features.glb",
+        "route_count": 86,
+        "sha256": "ba17b80969af4a6bb52fcbc203594cf8f36f9c98caac40fd75c045e053c8be19",
+        "tree_count": 351,
+        "triangle_count": 15732,
+        "vertex_count": 15561
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        879000,
+        6408000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T10",
+      "tile_id": "PONTAIX-08-T10-V13",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        876000,
+        6409000,
+        877000,
+        6410000
+      ],
+      "features": {
+        "byte_count": 259324,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 4,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T10-V20/features.glb",
+        "route_count": 13,
+        "sha256": "aea2cd8817ea8661d2d99ba7ec65ecc243a2b9226ee56079b20ffa6035882115",
+        "tree_count": 524,
+        "triangle_count": 8858,
+        "vertex_count": 7254
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        876000,
+        6409000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T10",
+      "tile_id": "PONTAIX-08-T10-V20",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        877000,
+        6409000,
+        878000,
+        6410000
+      ],
+      "features": {
+        "byte_count": 316600,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T10-V21/features.glb",
+        "route_count": 14,
+        "sha256": "c0cc385386bfaf3e104acf33b926f0a7021c29de881335a157ea795bc38a1381",
+        "tree_count": 475,
+        "triangle_count": 10747,
+        "vertex_count": 8870
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        877000,
+        6409000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T10",
+      "tile_id": "PONTAIX-08-T10-V21",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        878000,
+        6409000,
+        879000,
+        6410000
+      ],
+      "features": {
+        "byte_count": 366324,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T10-V22/features.glb",
+        "route_count": 30,
+        "sha256": "2208861a4059e816aba6fc566c265fdb3a577c5e03b1debd2d6bd8d65f1cd09e",
+        "tree_count": 372,
+        "triangle_count": 12276,
+        "vertex_count": 10318
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        878000,
+        6409000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T10",
+      "tile_id": "PONTAIX-08-T10-V22",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        879000,
+        6409000,
+        880000,
+        6410000
+      ],
+      "features": {
+        "byte_count": 525700,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T10-V23/features.glb",
+        "route_count": 45,
+        "sha256": "01a37c35fc4dfb920e3e163ab12713cad4464cb807a5b6e2ee04f929a81cf2cd",
+        "tree_count": 416,
+        "triangle_count": 15487,
+        "vertex_count": 15323
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        879000,
+        6409000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T10",
+      "tile_id": "PONTAIX-08-T10-V23",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        876000,
+        6410000,
+        877000,
+        6411000
+      ],
+      "features": {
+        "byte_count": 248584,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T10-V30/features.glb",
+        "route_count": 18,
+        "sha256": "677750c42b5fdf26a74a6cfcdb166bed17a14a45ae7b4e6ee279e487744b910e",
+        "tree_count": 551,
+        "triangle_count": 8269,
+        "vertex_count": 6972
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        876000,
+        6410000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T10",
+      "tile_id": "PONTAIX-08-T10-V30",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        877000,
+        6410000,
+        878000,
+        6411000
+      ],
+      "features": {
+        "byte_count": 308196,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 4,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T10-V31/features.glb",
+        "route_count": 9,
+        "sha256": "969f7012ce36c761a096ae2abfc27541c710bf12f78065aef964d02c44058fe7",
+        "tree_count": 543,
+        "triangle_count": 10917,
+        "vertex_count": 8558
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        877000,
+        6410000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T10",
+      "tile_id": "PONTAIX-08-T10-V31",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        878000,
+        6410000,
+        879000,
+        6411000
+      ],
+      "features": {
+        "byte_count": 400516,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 4,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T10-V32/features.glb",
+        "route_count": 11,
+        "sha256": "08614300bf66228f54ff2ce78952b5f062df93395b7560f91d323eb6a1ada985",
+        "tree_count": 465,
+        "triangle_count": 13773,
+        "vertex_count": 11243
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        878000,
+        6410000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T10",
+      "tile_id": "PONTAIX-08-T10-V32",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        879000,
+        6410000,
+        880000,
+        6411000
+      ],
+      "features": {
+        "byte_count": 481864,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T10-V33/features.glb",
+        "route_count": 39,
+        "sha256": "b9654af6d871bcd8cea3f996575c83a3801edf6fce053a9444df23d347afccbd",
+        "tree_count": 339,
+        "triangle_count": 15443,
+        "vertex_count": 13742
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        879000,
+        6410000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T10",
+      "tile_id": "PONTAIX-08-T10-V33",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        880000,
+        6407000,
+        881000,
+        6408000
+      ],
+      "features": {
+        "byte_count": 351236,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 2,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T11-V00/features.glb",
+        "route_count": 0,
+        "sha256": "7f3715d9a702d7a83918e0753fc542150331aa36a3b32826a6b1121fa95b0ebe",
+        "tree_count": 306,
+        "triangle_count": 13290,
+        "vertex_count": 9636
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        880000,
+        6407000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T11",
+      "tile_id": "PONTAIX-08-T11-V00",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        881000,
+        6407000,
+        882000,
+        6408000
+      ],
+      "features": {
+        "byte_count": 402060,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 3,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T11-V01/features.glb",
+        "route_count": 1,
+        "sha256": "cf6c11141ecdaa27c9a95f39d05c16da6ba922870c0941672d9340227cc60625",
+        "tree_count": 281,
+        "triangle_count": 14703,
+        "vertex_count": 11124
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        881000,
+        6407000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T11",
+      "tile_id": "PONTAIX-08-T11-V01",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        882000,
+        6407000,
+        883000,
+        6408000
+      ],
+      "features": {
+        "byte_count": 469948,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 3,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T11-V02/features.glb",
+        "route_count": 3,
+        "sha256": "fa25429f3d23f6de2fc8fd2869cddfe39d3051f195005c10ca90c15f99d66530",
+        "tree_count": 348,
+        "triangle_count": 16690,
+        "vertex_count": 13122
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        882000,
+        6407000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T11",
+      "tile_id": "PONTAIX-08-T11-V02",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        883000,
+        6407000,
+        884000,
+        6408000
+      ],
+      "features": {
+        "byte_count": 304952,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T11-V03/features.glb",
+        "route_count": 13,
+        "sha256": "79d725e43fd81484ea3c56e9be82a4e8b1ed80bc51ce8a8a3acc31db5b823ab0",
+        "tree_count": 514,
+        "triangle_count": 10282,
+        "vertex_count": 8554
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        883000,
+        6407000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T11",
+      "tile_id": "PONTAIX-08-T11-V03",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        880000,
+        6408000,
+        881000,
+        6409000
+      ],
+      "features": {
+        "byte_count": 312472,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T11-V10/features.glb",
+        "route_count": 10,
+        "sha256": "5f81da6256e13a8b3536e9c083fade6160165ce21b317b9d90051658c92cdb7f",
+        "tree_count": 470,
+        "triangle_count": 10969,
+        "vertex_count": 8675
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        880000,
+        6408000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T11",
+      "tile_id": "PONTAIX-08-T11-V10",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        881000,
+        6408000,
+        882000,
+        6409000
+      ],
+      "features": {
+        "byte_count": 256212,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 3,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T11-V11/features.glb",
+        "route_count": 1,
+        "sha256": "14bafb407efac067e6f47e74ea4104213da23516c23a16ee092cb79e9db11385",
+        "tree_count": 480,
+        "triangle_count": 9944,
+        "vertex_count": 6934
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        881000,
+        6408000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T11",
+      "tile_id": "PONTAIX-08-T11-V11",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        882000,
+        6408000,
+        883000,
+        6409000
+      ],
+      "features": {
+        "byte_count": 224092,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 4,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T11-V12/features.glb",
+        "route_count": 10,
+        "sha256": "e878a0c8128482794d51ee50679c65248eb59593948a5f59f63096b50a4f0c72",
+        "tree_count": 575,
+        "triangle_count": 7595,
+        "vertex_count": 6266
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        882000,
+        6408000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T11",
+      "tile_id": "PONTAIX-08-T11-V12",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        883000,
+        6408000,
+        884000,
+        6409000
+      ],
+      "features": {
+        "byte_count": 284452,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 4,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T11-V13/features.glb",
+        "route_count": 17,
+        "sha256": "370413a9bc8e8bf2fe64c7f0def1e529008c27bf07b02f408baf30ea0b1adc7a",
+        "tree_count": 566,
+        "triangle_count": 9756,
+        "vertex_count": 7959
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        883000,
+        6408000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T11",
+      "tile_id": "PONTAIX-08-T11-V13",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        880000,
+        6409000,
+        881000,
+        6410000
+      ],
+      "features": {
+        "byte_count": 366664,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T11-V20/features.glb",
+        "route_count": 65,
+        "sha256": "2e7638b3b4f7ec4c9e8b2cfa5903277332673f01a0b47f5ad05f55ecd4b9c8a8",
+        "tree_count": 342,
+        "triangle_count": 11166,
+        "vertex_count": 10568
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        880000,
+        6409000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T11",
+      "tile_id": "PONTAIX-08-T11-V20",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        881000,
+        6409000,
+        882000,
+        6410000
+      ],
+      "features": {
+        "byte_count": 267404,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T11-V21/features.glb",
+        "route_count": 20,
+        "sha256": "da58a2a44977574b9fcb44fef59a5635269d9b66390b8a97bb7e41592fb4ee9e",
+        "tree_count": 470,
+        "triangle_count": 7880,
+        "vertex_count": 7702
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        881000,
+        6409000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T11",
+      "tile_id": "PONTAIX-08-T11-V21",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        882000,
+        6409000,
+        883000,
+        6410000
+      ],
+      "features": {
+        "byte_count": 294080,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T11-V22/features.glb",
+        "route_count": 17,
+        "sha256": "35c94e6a73e52338d55b15f5e777e671154ab86de78a276c9ca1ad96c5ebafc2",
+        "tree_count": 439,
+        "triangle_count": 8753,
+        "vertex_count": 8468
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        882000,
+        6409000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T11",
+      "tile_id": "PONTAIX-08-T11-V22",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        883000,
+        6409000,
+        884000,
+        6410000
+      ],
+      "features": {
+        "byte_count": 431432,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 4,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T11-V23/features.glb",
+        "route_count": 21,
+        "sha256": "75efbde8c533b6f6b0fa132c448f48e53885b110393cd0e7ab8c5c7bdb196f82",
+        "tree_count": 459,
+        "triangle_count": 15794,
+        "vertex_count": 11915
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        883000,
+        6409000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T11",
+      "tile_id": "PONTAIX-08-T11-V23",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        880000,
+        6410000,
+        881000,
+        6411000
+      ],
+      "features": {
+        "byte_count": 596460,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T11-V30/features.glb",
+        "route_count": 113,
+        "sha256": "57bb73e8f39e00cb721331df713ded0b5f3cbcf30124829e175460b1f50cd448",
+        "tree_count": 210,
+        "triangle_count": 17577,
+        "vertex_count": 17376
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        880000,
+        6410000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T11",
+      "tile_id": "PONTAIX-08-T11-V30",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        881000,
+        6410000,
+        882000,
+        6411000
+      ],
+      "features": {
+        "byte_count": 352452,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T11-V31/features.glb",
+        "route_count": 26,
+        "sha256": "81374ee1523388f0b3d73c46e58909be85b6949a43a6acbb55af92635177df6a",
+        "tree_count": 386,
+        "triangle_count": 11568,
+        "vertex_count": 9950
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        881000,
+        6410000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T11",
+      "tile_id": "PONTAIX-08-T11-V31",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        882000,
+        6410000,
+        883000,
+        6411000
+      ],
+      "features": {
+        "byte_count": 455128,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T11-V32/features.glb",
+        "route_count": 21,
+        "sha256": "14eb222c5ff2943f2330ac119241fd7f45de2bc37995c99b5ab40b0b5b203b72",
+        "tree_count": 465,
+        "triangle_count": 15764,
+        "vertex_count": 12718
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        882000,
+        6410000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T11",
+      "tile_id": "PONTAIX-08-T11-V32",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        883000,
+        6410000,
+        884000,
+        6411000
+      ],
+      "features": {
+        "byte_count": 397956,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/PONTAIX-08-T11-V33/features.glb",
+        "route_count": 55,
+        "sha256": "0c46a217934e83c85a2ff1f6311d5dcefe5389f4ef0cb6d40bb786c27adcdcc7",
+        "tree_count": 183,
+        "triangle_count": 11926,
+        "vertex_count": 11500
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        883000,
+        6410000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "PONTAIX-08-T11",
+      "tile_id": "PONTAIX-08-T11-V33",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        884000,
+        6405000,
+        885000,
+        6406000
+      ],
+      "features": {
+        "byte_count": 285680,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T00-V00/features.glb",
+        "route_count": 23,
+        "sha256": "76ad8e511d61ec7f7f56b3a9643143ea73f7e6ddfce5acbf65e6bac3bbd8606d",
+        "tree_count": 452,
+        "triangle_count": 10206,
+        "vertex_count": 7882
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        884000,
+        6405000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T00",
+      "tile_id": "DIE-08-T00-V00",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        885000,
+        6405000,
+        886000,
+        6406000
+      ],
+      "features": {
+        "byte_count": 427536,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T00-V01/features.glb",
+        "route_count": 60,
+        "sha256": "afad5a6e1b71ae55a42f50376a45d3144e25b5d062da791b1ebfc615d4e33163",
+        "tree_count": 442,
+        "triangle_count": 15452,
+        "vertex_count": 11799
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        885000,
+        6405000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T00",
+      "tile_id": "DIE-08-T00-V01",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        886000,
+        6405000,
+        887000,
+        6406000
+      ],
+      "features": {
+        "byte_count": 318992,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T00-V02/features.glb",
+        "route_count": 43,
+        "sha256": "dcbc43e1013cad33b05f6938c54355ec38ade894d7308bd544f5626d90963845",
+        "tree_count": 515,
+        "triangle_count": 11677,
+        "vertex_count": 8756
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        886000,
+        6405000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T00",
+      "tile_id": "DIE-08-T00-V02",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        887000,
+        6405000,
+        888000,
+        6406000
+      ],
+      "features": {
+        "byte_count": 408280,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T00-V03/features.glb",
+        "route_count": 25,
+        "sha256": "0d496306a6d0bf8f4ba72330abbd6f03d50e6f9c0a8b2b415291e8016ea04f69",
+        "tree_count": 417,
+        "triangle_count": 15029,
+        "vertex_count": 11202
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        887000,
+        6405000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T00",
+      "tile_id": "DIE-08-T00-V03",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        884000,
+        6406000,
+        885000,
+        6407000
+      ],
+      "features": {
+        "byte_count": 336256,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T00-V10/features.glb",
+        "route_count": 42,
+        "sha256": "77dbec292e8662a070cef94ad007c50ce4ae334b20a4106d4dea6acfc2376b5a",
+        "tree_count": 479,
+        "triangle_count": 11901,
+        "vertex_count": 9300
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        884000,
+        6406000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T00",
+      "tile_id": "DIE-08-T00-V10",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        885000,
+        6406000,
+        886000,
+        6407000
+      ],
+      "features": {
+        "byte_count": 284788,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T00-V11/features.glb",
+        "route_count": 29,
+        "sha256": "9de912a53097d4445adcbe812a04a0b626c7b1268eee5f01c3fc6c5008a42c23",
+        "tree_count": 520,
+        "triangle_count": 9486,
+        "vertex_count": 8003
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        885000,
+        6406000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T00",
+      "tile_id": "DIE-08-T00-V11",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        886000,
+        6406000,
+        887000,
+        6407000
+      ],
+      "features": {
+        "byte_count": 272332,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T00-V12/features.glb",
+        "route_count": 54,
+        "sha256": "eb460920efecab8503ca1eb4072a77373846d6b1da46f2242d3ee48addb4bc9d",
+        "tree_count": 501,
+        "triangle_count": 9367,
+        "vertex_count": 7584
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        886000,
+        6406000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T00",
+      "tile_id": "DIE-08-T00-V12",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        887000,
+        6406000,
+        888000,
+        6407000
+      ],
+      "features": {
+        "byte_count": 247460,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T00-V13/features.glb",
+        "route_count": 19,
+        "sha256": "00f2fe52ccd1a3ab610e57f93dadbe226e1a4bdff669a8c2519a573d22f2c10d",
+        "tree_count": 508,
+        "triangle_count": 8042,
+        "vertex_count": 6980
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        887000,
+        6406000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T00",
+      "tile_id": "DIE-08-T00-V13",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        884000,
+        6407000,
+        885000,
+        6408000
+      ],
+      "features": {
+        "byte_count": 211168,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T00-V20/features.glb",
+        "route_count": 23,
+        "sha256": "2426dd75db0f52cdcfa0101307de4d3aadd625c2e76dadb3fce94e78be64d71a",
+        "tree_count": 599,
+        "triangle_count": 6737,
+        "vertex_count": 5964
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        884000,
+        6407000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T00",
+      "tile_id": "DIE-08-T00-V20",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        885000,
+        6407000,
+        886000,
+        6408000
+      ],
+      "features": {
+        "byte_count": 265528,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T00-V21/features.glb",
+        "route_count": 17,
+        "sha256": "15edc711f513ac032207885f50090d3de64b4bdb8ae99a6bea64c89ba083dc24",
+        "tree_count": 561,
+        "triangle_count": 8921,
+        "vertex_count": 7412
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        885000,
+        6407000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T00",
+      "tile_id": "DIE-08-T00-V21",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        886000,
+        6407000,
+        887000,
+        6408000
+      ],
+      "features": {
+        "byte_count": 240596,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T00-V22/features.glb",
+        "route_count": 38,
+        "sha256": "b87a01cee6b989b4af026abf98fdd52e2480b8570b6cfcf3a5b9a61e4672f28d",
+        "tree_count": 579,
+        "triangle_count": 7762,
+        "vertex_count": 6771
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        886000,
+        6407000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T00",
+      "tile_id": "DIE-08-T00-V22",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        887000,
+        6407000,
+        888000,
+        6408000
+      ],
+      "features": {
+        "byte_count": 276612,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T00-V23/features.glb",
+        "route_count": 22,
+        "sha256": "2182871c88ea7bb5d8da131cd1055e6c05190dfc393d78b65deedd700a84c9fc",
+        "tree_count": 461,
+        "triangle_count": 8237,
+        "vertex_count": 7956
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        887000,
+        6407000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T00",
+      "tile_id": "DIE-08-T00-V23",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        884000,
+        6408000,
+        885000,
+        6409000
+      ],
+      "features": {
+        "byte_count": 312296,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T00-V30/features.glb",
+        "route_count": 52,
+        "sha256": "375322fb0e84304f328fc207c2159f0744e878da62580363a7402984ebabc4f1",
+        "tree_count": 455,
+        "triangle_count": 9190,
+        "vertex_count": 9025
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        884000,
+        6408000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T00",
+      "tile_id": "DIE-08-T00-V30",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        885000,
+        6408000,
+        886000,
+        6409000
+      ],
+      "features": {
+        "byte_count": 279876,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 4,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T00-V31/features.glb",
+        "route_count": 17,
+        "sha256": "a69cf2654519d2a07ccbb76f421d9d7dab0a07cf6dcc044b1f93a7d9acbd2278",
+        "tree_count": 560,
+        "triangle_count": 8914,
+        "vertex_count": 7976
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        885000,
+        6408000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T00",
+      "tile_id": "DIE-08-T00-V31",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        886000,
+        6408000,
+        887000,
+        6409000
+      ],
+      "features": {
+        "byte_count": 351532,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T00-V32/features.glb",
+        "route_count": 42,
+        "sha256": "e8be035e51bdc148bd895f83fd3c67bbd0c3b95d2efdc043cac7ea6474fa954f",
+        "tree_count": 457,
+        "triangle_count": 11409,
+        "vertex_count": 9976
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        886000,
+        6408000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T00",
+      "tile_id": "DIE-08-T00-V32",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        887000,
+        6408000,
+        888000,
+        6409000
+      ],
+      "features": {
+        "byte_count": 1172484,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T00-V33/features.glb",
+        "route_count": 410,
+        "sha256": "1e1284aecaf94a6d2ff41ab722a0e24f73866a336c0988272fc404764f35f382",
+        "tree_count": 81,
+        "triangle_count": 31549,
+        "vertex_count": 34956
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        887000,
+        6408000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T00",
+      "tile_id": "DIE-08-T00-V33",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        888000,
+        6405000,
+        889000,
+        6406000
+      ],
+      "features": {
+        "byte_count": 382096,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T01-V00/features.glb",
+        "route_count": 34,
+        "sha256": "68f0258186bdd0d7bd5dfe4f342a5bc5696585df59532f2c702d1383dc67c13c",
+        "tree_count": 291,
+        "triangle_count": 12233,
+        "vertex_count": 10866
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        888000,
+        6405000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T01",
+      "tile_id": "DIE-08-T01-V00",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        889000,
+        6405000,
+        890000,
+        6406000
+      ],
+      "features": {
+        "byte_count": 405212,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T01-V01/features.glb",
+        "route_count": 91,
+        "sha256": "b10c6bd40a8baa0db217b6006c149ae9b9f4b4f7f2e119505bc3d1eed2be1930",
+        "tree_count": 159,
+        "triangle_count": 11845,
+        "vertex_count": 11775
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        889000,
+        6405000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T01",
+      "tile_id": "DIE-08-T01-V01",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        890000,
+        6405000,
+        891000,
+        6406000
+      ],
+      "features": {
+        "byte_count": 538944,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T01-V02/features.glb",
+        "route_count": 61,
+        "sha256": "32167a1ba8990768da29bc5a0283eb3a58f75f904ab8d8e29a0af694bd18f07e",
+        "tree_count": 359,
+        "triangle_count": 15854,
+        "vertex_count": 15691
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        890000,
+        6405000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T01",
+      "tile_id": "DIE-08-T01-V02",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        891000,
+        6405000,
+        892000,
+        6406000
+      ],
+      "features": {
+        "byte_count": 340036,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T01-V03/features.glb",
+        "route_count": 23,
+        "sha256": "063534f4177e6688ece90e8f428d6a2bc446be7fe04b84aa37dcd4a433e721a3",
+        "tree_count": 509,
+        "triangle_count": 10441,
+        "vertex_count": 9748
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        891000,
+        6405000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T01",
+      "tile_id": "DIE-08-T01-V03",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        888000,
+        6406000,
+        889000,
+        6407000
+      ],
+      "features": {
+        "byte_count": 404396,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T01-V10/features.glb",
+        "route_count": 14,
+        "sha256": "23fce078210e933396759e6fb90e1b8f0bb29cdf4bca7e12536fde5863ce80dd",
+        "tree_count": 389,
+        "triangle_count": 13454,
+        "vertex_count": 11425
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        888000,
+        6406000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T01",
+      "tile_id": "DIE-08-T01-V10",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        889000,
+        6406000,
+        890000,
+        6407000
+      ],
+      "features": {
+        "byte_count": 361876,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T01-V11/features.glb",
+        "route_count": 55,
+        "sha256": "da3ef78e43bfcaabe69d749be0ed13ee92c820b6698dd0276bdef233f5dd5860",
+        "tree_count": 177,
+        "triangle_count": 10358,
+        "vertex_count": 10545
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        889000,
+        6406000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T01",
+      "tile_id": "DIE-08-T01-V11",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        890000,
+        6406000,
+        891000,
+        6407000
+      ],
+      "features": {
+        "byte_count": 291692,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T01-V12/features.glb",
+        "route_count": 22,
+        "sha256": "d516f65f4e584db4ca3389af49abd3fbf2ddc622c66a96688cfc0bea30bbda2b",
+        "tree_count": 274,
+        "triangle_count": 8451,
+        "vertex_count": 8447
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        890000,
+        6406000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T01",
+      "tile_id": "DIE-08-T01-V12",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        891000,
+        6406000,
+        892000,
+        6407000
+      ],
+      "features": {
+        "byte_count": 460048,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 4,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T01-V13/features.glb",
+        "route_count": 22,
+        "sha256": "756133b4f0a30ed72c394dfee4bddfde73bedeab810565748a9c9caa80835997",
+        "tree_count": 410,
+        "triangle_count": 15084,
+        "vertex_count": 13088
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        891000,
+        6406000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T01",
+      "tile_id": "DIE-08-T01-V13",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        888000,
+        6407000,
+        889000,
+        6408000
+      ],
+      "features": {
+        "byte_count": 526220,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T01-V20/features.glb",
+        "route_count": 103,
+        "sha256": "9dc1528aa25406d26edeb6d0b6078b8d124ff733cb06fe95fb30e972d502d46d",
+        "tree_count": 195,
+        "triangle_count": 15168,
+        "vertex_count": 15384
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        888000,
+        6407000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T01",
+      "tile_id": "DIE-08-T01-V20",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        889000,
+        6407000,
+        890000,
+        6408000
+      ],
+      "features": {
+        "byte_count": 377508,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T01-V21/features.glb",
+        "route_count": 66,
+        "sha256": "98f6216db255f0909ad0e8845f8197aca06035536f5242197fd29bb79d3db040",
+        "tree_count": 170,
+        "triangle_count": 10610,
+        "vertex_count": 11050
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        889000,
+        6407000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T01",
+      "tile_id": "DIE-08-T01-V21",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        890000,
+        6407000,
+        891000,
+        6408000
+      ],
+      "features": {
+        "byte_count": 420680,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T01-V22/features.glb",
+        "route_count": 20,
+        "sha256": "26d0735de7470b37c5ae0cf7b170ec2d0d6fb475d641c5baf698573af0ddb6cd",
+        "tree_count": 309,
+        "triangle_count": 14221,
+        "vertex_count": 11817
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        890000,
+        6407000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T01",
+      "tile_id": "DIE-08-T01-V22",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        891000,
+        6407000,
+        892000,
+        6408000
+      ],
+      "features": {
+        "byte_count": 458028,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T01-V23/features.glb",
+        "route_count": 34,
+        "sha256": "ad6dece10ca47d0d26cced4c72132423615be3ecad5b4c5a6daa35a63eaf9503",
+        "tree_count": 454,
+        "triangle_count": 17106,
+        "vertex_count": 12534
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        891000,
+        6407000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T01",
+      "tile_id": "DIE-08-T01-V23",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        888000,
+        6408000,
+        889000,
+        6409000
+      ],
+      "features": {
+        "byte_count": 787992,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T01-V30/features.glb",
+        "route_count": 238,
+        "sha256": "29e96ce9f0e854114485ee04000bf40b5afa507980ed754ea11470c6260017cc",
+        "tree_count": 140,
+        "triangle_count": 22185,
+        "vertex_count": 23230
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        888000,
+        6408000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T01",
+      "tile_id": "DIE-08-T01-V30",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        889000,
+        6408000,
+        890000,
+        6409000
+      ],
+      "features": {
+        "byte_count": 556284,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T01-V31/features.glb",
+        "route_count": 52,
+        "sha256": "0f88bc844af4df670c45293f8cd8d832fe99129ed9a5528606f15f0f64f377c4",
+        "tree_count": 418,
+        "triangle_count": 16799,
+        "vertex_count": 16109
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        889000,
+        6408000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T01",
+      "tile_id": "DIE-08-T01-V31",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        890000,
+        6408000,
+        891000,
+        6409000
+      ],
+      "features": {
+        "byte_count": 275932,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 4,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T01-V32/features.glb",
+        "route_count": 23,
+        "sha256": "dfd3fd8edd7407fa9f40b8198e0b0e0ae5751f673226b6ee518625deb3def73f",
+        "tree_count": 524,
+        "triangle_count": 8700,
+        "vertex_count": 7880
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        890000,
+        6408000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T01",
+      "tile_id": "DIE-08-T01-V32",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        891000,
+        6408000,
+        892000,
+        6409000
+      ],
+      "features": {
+        "byte_count": 280728,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T01-V33/features.glb",
+        "route_count": 29,
+        "sha256": "62022248cbe93665911caa422a0f5de310cd6677fcb264256b1248d3a3bf26a7",
+        "tree_count": 493,
+        "triangle_count": 8433,
+        "vertex_count": 8060
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        891000,
+        6408000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T01",
+      "tile_id": "DIE-08-T01-V33",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        884000,
+        6409000,
+        885000,
+        6410000
+      ],
+      "features": {
+        "byte_count": 484268,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T10-V00/features.glb",
+        "route_count": 39,
+        "sha256": "3b48a8ea4518c44367e5a4eb10d113b833e9042a7e0a0f104c39c6f5ae7a5c0b",
+        "tree_count": 395,
+        "triangle_count": 16596,
+        "vertex_count": 13606
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        884000,
+        6409000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T10",
+      "tile_id": "DIE-08-T10-V00",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        885000,
+        6409000,
+        886000,
+        6410000
+      ],
+      "features": {
+        "byte_count": 477524,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T10-V01/features.glb",
+        "route_count": 97,
+        "sha256": "2d20000f9464591a39b1bb9867ed4fb98927296c97ede2aa77d97c03f2092d48",
+        "tree_count": 243,
+        "triangle_count": 15122,
+        "vertex_count": 13680
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        885000,
+        6409000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T10",
+      "tile_id": "DIE-08-T10-V01",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        886000,
+        6409000,
+        887000,
+        6410000
+      ],
+      "features": {
+        "byte_count": 508400,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T10-V02/features.glb",
+        "route_count": 157,
+        "sha256": "013041abf04f48e129caaefa1c315058697eeb977467ca813ebb35ad9a3c72d7",
+        "tree_count": 106,
+        "triangle_count": 14243,
+        "vertex_count": 14972
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        886000,
+        6409000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T10",
+      "tile_id": "DIE-08-T10-V02",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        887000,
+        6409000,
+        888000,
+        6410000
+      ],
+      "features": {
+        "byte_count": 773752,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T10-V03/features.glb",
+        "route_count": 229,
+        "sha256": "285b42d31801430d8f80190def859a408a5300ef68cfcecdca24064377ac2dcd",
+        "tree_count": 103,
+        "triangle_count": 20921,
+        "vertex_count": 22993
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        887000,
+        6409000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T10",
+      "tile_id": "DIE-08-T10-V03",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        884000,
+        6410000,
+        885000,
+        6411000
+      ],
+      "features": {
+        "byte_count": 359252,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T10-V10/features.glb",
+        "route_count": 81,
+        "sha256": "2c698c1bc40850b1a2d0a7b5a47a8ede05106d9358c2bb88ea17125570670623",
+        "tree_count": 114,
+        "triangle_count": 10211,
+        "vertex_count": 10509
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        884000,
+        6410000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T10",
+      "tile_id": "DIE-08-T10-V10",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        885000,
+        6410000,
+        886000,
+        6411000
+      ],
+      "features": {
+        "byte_count": 295316,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T10-V11/features.glb",
+        "route_count": 58,
+        "sha256": "81543cd3468c434af9e9bb55f18c356dd75173a885f3c4e7ddaf17e151548e1c",
+        "tree_count": 99,
+        "triangle_count": 8629,
+        "vertex_count": 8564
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        885000,
+        6410000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T10",
+      "tile_id": "DIE-08-T10-V11",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        886000,
+        6410000,
+        887000,
+        6411000
+      ],
+      "features": {
+        "byte_count": 405636,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T10-V12/features.glb",
+        "route_count": 108,
+        "sha256": "769f38796a992d00cd9a67126e285a6d6de3e15b89148f1cceb1bf37c3329cf7",
+        "tree_count": 122,
+        "triangle_count": 11219,
+        "vertex_count": 11949
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        886000,
+        6410000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T10",
+      "tile_id": "DIE-08-T10-V12",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        887000,
+        6410000,
+        888000,
+        6411000
+      ],
+      "features": {
+        "byte_count": 625072,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T10-V13/features.glb",
+        "route_count": 94,
+        "sha256": "4d33cae31e35fa66ebb0b34b932edf3ee0b890e82e7e3407e6dca8eedf26f572",
+        "tree_count": 94,
+        "triangle_count": 18615,
+        "vertex_count": 18201
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        887000,
+        6410000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T10",
+      "tile_id": "DIE-08-T10-V13",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        884000,
+        6411000,
+        885000,
+        6412000
+      ],
+      "features": {
+        "byte_count": 387888,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T10-V20/features.glb",
+        "route_count": 24,
+        "sha256": "4eb38a80ca078142c42f4c83c026835f0c42d4be620c897ddab7e5fc9012357a",
+        "tree_count": 397,
+        "triangle_count": 11991,
+        "vertex_count": 11149
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        884000,
+        6411000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T10",
+      "tile_id": "DIE-08-T10-V20",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        885000,
+        6411000,
+        886000,
+        6412000
+      ],
+      "features": {
+        "byte_count": 355640,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T10-V21/features.glb",
+        "route_count": 49,
+        "sha256": "802df4959d4be579a669330d5df2bc967f3548bff039a5a7ac9a0f1daafea5a0",
+        "tree_count": 217,
+        "triangle_count": 11438,
+        "vertex_count": 10116
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        885000,
+        6411000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T10",
+      "tile_id": "DIE-08-T10-V21",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        886000,
+        6411000,
+        887000,
+        6412000
+      ],
+      "features": {
+        "byte_count": 540456,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T10-V22/features.glb",
+        "route_count": 51,
+        "sha256": "32a635ade59460107d2e3b8f0c099d05ebb259ccd9ef6123cf7f0bc0f86806c9",
+        "tree_count": 292,
+        "triangle_count": 17705,
+        "vertex_count": 15374
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        886000,
+        6411000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T10",
+      "tile_id": "DIE-08-T10-V22",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        887000,
+        6411000,
+        888000,
+        6412000
+      ],
+      "features": {
+        "byte_count": 473084,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T10-V23/features.glb",
+        "route_count": 39,
+        "sha256": "ddc8d2e983faf4b47ea97be708d5c215e5a8352c20660417bfa78e1c796b191d",
+        "tree_count": 415,
+        "triangle_count": 15640,
+        "vertex_count": 13386
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        887000,
+        6411000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T10",
+      "tile_id": "DIE-08-T10-V23",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        884000,
+        6412000,
+        885000,
+        6413000
+      ],
+      "features": {
+        "byte_count": 214944,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 3,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T10-V30/features.glb",
+        "route_count": 5,
+        "sha256": "9649b7428f031f6e76495b436c279c75decf26b771dacacedc2c2aa58b2ebf62",
+        "tree_count": 396,
+        "triangle_count": 7410,
+        "vertex_count": 6004
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        884000,
+        6412000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T10",
+      "tile_id": "DIE-08-T10-V30",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        885000,
+        6412000,
+        886000,
+        6413000
+      ],
+      "features": {
+        "byte_count": 398124,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T10-V31/features.glb",
+        "route_count": 17,
+        "sha256": "4abdb604aa44b87160c4a6f16a989ff3bb20f92f0c61513bc841cdf4077f4b82",
+        "tree_count": 425,
+        "triangle_count": 14079,
+        "vertex_count": 11068
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        885000,
+        6412000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T10",
+      "tile_id": "DIE-08-T10-V31",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        886000,
+        6412000,
+        887000,
+        6413000
+      ],
+      "features": {
+        "byte_count": 354752,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T10-V32/features.glb",
+        "route_count": 11,
+        "sha256": "a6d63624990a41266549c554c000780066809fe48c6aaafe680ea112183cc288",
+        "tree_count": 483,
+        "triangle_count": 12307,
+        "vertex_count": 9898
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        886000,
+        6412000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T10",
+      "tile_id": "DIE-08-T10-V32",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        887000,
+        6412000,
+        888000,
+        6413000
+      ],
+      "features": {
+        "byte_count": 368900,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T10-V33/features.glb",
+        "route_count": 36,
+        "sha256": "ce39fe646e5485d0f98fb0cc9de27affad76fda0f022406de0d27c1a5886fe50",
+        "tree_count": 461,
+        "triangle_count": 11780,
+        "vertex_count": 10493
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        887000,
+        6412000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T10",
+      "tile_id": "DIE-08-T10-V33",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        888000,
+        6409000,
+        889000,
+        6410000
+      ],
+      "features": {
+        "byte_count": 522288,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T11-V00/features.glb",
+        "route_count": 62,
+        "sha256": "8b3affc6f8b55ffba6f5d84351b9a6e4634bfabb365a24e7d74307801b90c17d",
+        "tree_count": 180,
+        "triangle_count": 15247,
+        "vertex_count": 15227
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        888000,
+        6409000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T11",
+      "tile_id": "DIE-08-T11-V00",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        889000,
+        6409000,
+        890000,
+        6410000
+      ],
+      "features": {
+        "byte_count": 433288,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T11-V01/features.glb",
+        "route_count": 42,
+        "sha256": "b7aeff8901485130f0c36c2a36baa711a6bc6ca46d98aca08e3c0ead2af7c9cb",
+        "tree_count": 356,
+        "triangle_count": 13810,
+        "vertex_count": 12356
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        889000,
+        6409000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T11",
+      "tile_id": "DIE-08-T11-V01",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        890000,
+        6409000,
+        891000,
+        6410000
+      ],
+      "features": {
+        "byte_count": 222600,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 3,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T11-V02/features.glb",
+        "route_count": 16,
+        "sha256": "4e3155e904c925c17c5c788d45f0cb5f9a5a4ea699aa7167d7aeda6781b10e87",
+        "tree_count": 577,
+        "triangle_count": 7189,
+        "vertex_count": 6324
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        890000,
+        6409000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T11",
+      "tile_id": "DIE-08-T11-V02",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        891000,
+        6409000,
+        892000,
+        6410000
+      ],
+      "features": {
+        "byte_count": 488184,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 3,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T11-V03/features.glb",
+        "route_count": 3,
+        "sha256": "cccabca290c740b96e67cd2a1d55689e4dd7a2c6b35222c4f1dbf606d953e144",
+        "tree_count": 431,
+        "triangle_count": 17151,
+        "vertex_count": 13675
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        891000,
+        6409000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T11",
+      "tile_id": "DIE-08-T11-V03",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        888000,
+        6410000,
+        889000,
+        6411000
+      ],
+      "features": {
+        "byte_count": 443300,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T11-V10/features.glb",
+        "route_count": 41,
+        "sha256": "1aa6a85cfa550c36775bdb099868c48022a651c6c211841fa9ce8f541a6e8155",
+        "tree_count": 174,
+        "triangle_count": 14058,
+        "vertex_count": 12660
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        888000,
+        6410000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T11",
+      "tile_id": "DIE-08-T11-V10",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        889000,
+        6410000,
+        890000,
+        6411000
+      ],
+      "features": {
+        "byte_count": 406824,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T11-V11/features.glb",
+        "route_count": 35,
+        "sha256": "ab3fc1cf04508a12b45baead82488666c800cb4e438a6dfbfc9ec6f09b2b82f7",
+        "tree_count": 333,
+        "triangle_count": 14141,
+        "vertex_count": 11364
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        889000,
+        6410000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T11",
+      "tile_id": "DIE-08-T11-V11",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        890000,
+        6410000,
+        891000,
+        6411000
+      ],
+      "features": {
+        "byte_count": 253776,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 4,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T11-V12/features.glb",
+        "route_count": 16,
+        "sha256": "edad3aaa074003f725f1a8c2e5e006604d9f59e7a678b6593c225ed1aed83897",
+        "tree_count": 535,
+        "triangle_count": 7649,
+        "vertex_count": 7314
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        890000,
+        6410000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T11",
+      "tile_id": "DIE-08-T11-V12",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        891000,
+        6410000,
+        892000,
+        6411000
+      ],
+      "features": {
+        "byte_count": 348396,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 3,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T11-V13/features.glb",
+        "route_count": 7,
+        "sha256": "57967ce8526e1a169cad4c733bbcdbb6d07aa673a09fe6c8b1e60922d24535d4",
+        "tree_count": 479,
+        "triangle_count": 11653,
+        "vertex_count": 9860
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        891000,
+        6410000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T11",
+      "tile_id": "DIE-08-T11-V13",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        888000,
+        6411000,
+        889000,
+        6412000
+      ],
+      "features": {
+        "byte_count": 363772,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T11-V20/features.glb",
+        "route_count": 46,
+        "sha256": "6ea20e5756bf989ca7cbf3321b6075d64f5901c928678a047dce1f6d4f9c1ec5",
+        "tree_count": 441,
+        "triangle_count": 11547,
+        "vertex_count": 10358
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        888000,
+        6411000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T11",
+      "tile_id": "DIE-08-T11-V20",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        889000,
+        6411000,
+        890000,
+        6412000
+      ],
+      "features": {
+        "byte_count": 407400,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T11-V21/features.glb",
+        "route_count": 28,
+        "sha256": "5e6679e2bf759a2c137cb31b15ec03d32c12da0a7b98342d819d6c60c1f20643",
+        "tree_count": 474,
+        "triangle_count": 15688,
+        "vertex_count": 11053
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        889000,
+        6411000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T11",
+      "tile_id": "DIE-08-T11-V21",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        890000,
+        6411000,
+        891000,
+        6412000
+      ],
+      "features": {
+        "byte_count": 655568,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T11-V22/features.glb",
+        "route_count": 98,
+        "sha256": "f20c1aa62fb751394c914b0556dc9edfc34fff40f75a7580f96ed5c84c3b0736",
+        "tree_count": 353,
+        "triangle_count": 20361,
+        "vertex_count": 18915
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        890000,
+        6411000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T11",
+      "tile_id": "DIE-08-T11-V22",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        891000,
+        6411000,
+        892000,
+        6412000
+      ],
+      "features": {
+        "byte_count": 454428,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T11-V23/features.glb",
+        "route_count": 22,
+        "sha256": "9cdc24f64f73989070dd5e3edd631cf6c2638ca60f30010c4dae70eded141f09",
+        "tree_count": 369,
+        "triangle_count": 17215,
+        "vertex_count": 12406
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        891000,
+        6411000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T11",
+      "tile_id": "DIE-08-T11-V23",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        888000,
+        6412000,
+        889000,
+        6413000
+      ],
+      "features": {
+        "byte_count": 268204,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 4,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T11-V30/features.glb",
+        "route_count": 5,
+        "sha256": "22ef5fd8cfbbd4928a817cba44967ddbacd5d0a906ad845f111a06a3e5a85444",
+        "tree_count": 573,
+        "triangle_count": 9437,
+        "vertex_count": 7447
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        888000,
+        6412000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T11",
+      "tile_id": "DIE-08-T11-V30",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        889000,
+        6412000,
+        890000,
+        6413000
+      ],
+      "features": {
+        "byte_count": 289932,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 6,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T11-V31/features.glb",
+        "route_count": 24,
+        "sha256": "ed10c2359872bf8a583737f223070345d9badf000fe522d05d8435cbdfa35dbb",
+        "tree_count": 552,
+        "triangle_count": 9790,
+        "vertex_count": 8098
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        889000,
+        6412000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T11",
+      "tile_id": "DIE-08-T11-V31",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        890000,
+        6412000,
+        891000,
+        6413000
+      ],
+      "features": {
+        "byte_count": 378312,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 5,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T11-V32/features.glb",
+        "route_count": 37,
+        "sha256": "7fa251dc68d02562b8e987ca22418fd810a85e233c9c0509880376ce13308e40",
+        "tree_count": 430,
+        "triangle_count": 13694,
+        "vertex_count": 10442
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        890000,
+        6412000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T11",
+      "tile_id": "DIE-08-T11-V32",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        891000,
+        6412000,
+        892000,
+        6413000
+      ],
+      "features": {
+        "byte_count": 283776,
+        "format": "glTF 2.0 binary",
+        "geometry_count": 3,
+        "optimization": {
+          "geometry_compression": false,
+          "mode": "gltf-transform lossless cleanup",
+          "network": "offline",
+          "simplify": false,
+          "texture_compression": false,
+          "tool": "@gltf-transform/cli@4.2.1"
+        },
+        "path": "vectors/DIE-08-T11-V33/features.glb",
+        "route_count": 4,
+        "sha256": "ab82da11477f8d9e14fe5d24e2dcf76c2c724491bf417b2b57b3f19f84802f5f",
+        "tree_count": 499,
+        "triangle_count": 10743,
+        "vertex_count": 7748
+      },
+      "gltf_local_origin_l93_ngf_ign69": [
+        891000,
+        6412000,
+        291.2471618652344
+      ],
+      "terrain_tile_id": "DIE-08-T11",
+      "tile_id": "DIE-08-T11-V33",
+      "zone_id": "DIE-PONTAIX-08"
+    }
+  ],
+  "generator": "export_die_pontaix_web_catalog.py",
+  "quality_profile": {
+    "colour_pixel_spacing_metres": null,
+    "lidar_sample_spacing_metres": null,
+    "transport_and_vegetation_edges": "source vector geometry retained without export simplification",
+    "trees": "low-poly only inside vegetation zones; source positions and heights retained",
+    "vector_simplification_tolerance_metres": null
+  },
+  "runtime": {
+    "delivery": "same-origin static files only",
+    "external_map_or_cesium": false,
+    "load_policy": "terrain COGs by visible map extent; detailed GLB tiles around the camera",
+    "renderer": "Giro3D"
+  },
+  "schema_version": "1.1",
+  "source_manifest_sha256": "cff6e9ffa71ce38397defe490bf54f6ba361cc9e5ed8621f22719e5e86d20fe5",
+  "spatial_contract": {
+    "common_anchor_l93_metres": [
+      884000,
+      6408000
+    ],
+    "giro3d_axes": "EPSG:2154 (E, N, U) metres",
+    "gltf_axes": "local glTF (E, U, -N) metres",
+    "gltf_to_giro3d": "rotate local GLB +90 degrees around X, then place at its L93/NGF origin",
+    "grid_crs": "EPSG:2154",
+    "height_maximum_ngf_ign69_m": 1154.3878173828125,
+    "height_origin_ngf_ign69_m": 291.2471618652344,
+    "horizontal_datum": "RGF93",
+    "unity_bridge": "Unity (100E, 100U, 100N) = glTF (E, U, -N) * (100, 100, -100)",
+    "vertical_datum": "NGF-IGN69"
+  },
+  "terrain_tiles": [
+    {
+      "bounds_l93_metres": [
+        876000,
+        6403000,
+        880000,
+        6407000
+      ],
+      "colour": {
+        "byte_count": 2092914,
+        "format": "PNG RGB north-up",
+        "path": "terrain/PONTAIX-08-T00/colour.png",
+        "sha256": "52658f52f4cfec01770956e8cedd162ab845eb044ea23e69a754df25dacadfe1"
+      },
+      "elevation": {
+        "byte_count": 42232259,
+        "format": "Cloud Optimized GeoTIFF, Float32, north-up",
+        "path": "terrain/PONTAIX-08-T00/elevation.cog.tif",
+        "sha256": "78d8c52cc63a6c67f8e3ef6f89adcbee6ac0b66b899dbb36721a6c725163499f"
+      },
+      "height_sample_count": 4097,
+      "sample_spacing_metres": 0.9765625,
+      "terrain_tile_id": "PONTAIX-08-T00",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        880000,
+        6403000,
+        884000,
+        6407000
+      ],
+      "colour": {
+        "byte_count": 2322541,
+        "format": "PNG RGB north-up",
+        "path": "terrain/PONTAIX-08-T01/colour.png",
+        "sha256": "926980da35570861689511d7c97ab448b7ccdc7a53205f672eb71a2329266ecb"
+      },
+      "elevation": {
+        "byte_count": 44692688,
+        "format": "Cloud Optimized GeoTIFF, Float32, north-up",
+        "path": "terrain/PONTAIX-08-T01/elevation.cog.tif",
+        "sha256": "9424da772901805436714521424326b1d1d78d730ba9d336ea7bff8402683a38"
+      },
+      "height_sample_count": 4097,
+      "sample_spacing_metres": 0.9765625,
+      "terrain_tile_id": "PONTAIX-08-T01",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        876000,
+        6407000,
+        880000,
+        6411000
+      ],
+      "colour": {
+        "byte_count": 2159504,
+        "format": "PNG RGB north-up",
+        "path": "terrain/PONTAIX-08-T10/colour.png",
+        "sha256": "b2883039a5873a5249337d823762355152c002f48dfae4c6c146ccb46ef8789d"
+      },
+      "elevation": {
+        "byte_count": 45134138,
+        "format": "Cloud Optimized GeoTIFF, Float32, north-up",
+        "path": "terrain/PONTAIX-08-T10/elevation.cog.tif",
+        "sha256": "6821b9f19e732b135b90638c740d3781565c03f03f5053cac1efd4a46b0e26f7"
+      },
+      "height_sample_count": 4097,
+      "sample_spacing_metres": 0.9765625,
+      "terrain_tile_id": "PONTAIX-08-T10",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        880000,
+        6407000,
+        884000,
+        6411000
+      ],
+      "colour": {
+        "byte_count": 2229547,
+        "format": "PNG RGB north-up",
+        "path": "terrain/PONTAIX-08-T11/colour.png",
+        "sha256": "d71e45ba0bc0fe4219bbacf06b10f1bce6db6e3573eafa616172d0f6f06f54d0"
+      },
+      "elevation": {
+        "byte_count": 44383441,
+        "format": "Cloud Optimized GeoTIFF, Float32, north-up",
+        "path": "terrain/PONTAIX-08-T11/elevation.cog.tif",
+        "sha256": "d587de52b71fcf58d80f7647350f7c28a370f23402ba3bed841f58560e52acdf"
+      },
+      "height_sample_count": 4097,
+      "sample_spacing_metres": 0.9765625,
+      "terrain_tile_id": "PONTAIX-08-T11",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        884000,
+        6405000,
+        888000,
+        6409000
+      ],
+      "colour": {
+        "byte_count": 2236712,
+        "format": "PNG RGB north-up",
+        "path": "terrain/DIE-08-T00/colour.png",
+        "sha256": "25b3bd0a341c42fa34fcf6de4c15d8aed635e0b9654d6fd47aac4294e2e90bba"
+      },
+      "elevation": {
+        "byte_count": 44274368,
+        "format": "Cloud Optimized GeoTIFF, Float32, north-up",
+        "path": "terrain/DIE-08-T00/elevation.cog.tif",
+        "sha256": "cd539e68370d4ba0a0f6f270d8133560061ea4ac371416f2eb5132b9ef5d33ba"
+      },
+      "height_sample_count": 4097,
+      "sample_spacing_metres": 0.9765625,
+      "terrain_tile_id": "DIE-08-T00",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        888000,
+        6405000,
+        892000,
+        6409000
+      ],
+      "colour": {
+        "byte_count": 2399206,
+        "format": "PNG RGB north-up",
+        "path": "terrain/DIE-08-T01/colour.png",
+        "sha256": "4dc6a297abe24d1dc67e38b6e0c13cdc82af0a2c51d13a55c2a18afec36f3eb4"
+      },
+      "elevation": {
+        "byte_count": 42499998,
+        "format": "Cloud Optimized GeoTIFF, Float32, north-up",
+        "path": "terrain/DIE-08-T01/elevation.cog.tif",
+        "sha256": "f3224fb919762359c935374dd7e28b5f756d072f114530c798a165a8ef66bd21"
+      },
+      "height_sample_count": 4097,
+      "sample_spacing_metres": 0.9765625,
+      "terrain_tile_id": "DIE-08-T01",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        884000,
+        6409000,
+        888000,
+        6413000
+      ],
+      "colour": {
+        "byte_count": 2306076,
+        "format": "PNG RGB north-up",
+        "path": "terrain/DIE-08-T10/colour.png",
+        "sha256": "d8c819c0dcc228a55fa3eb73d781a623686de17c60981ae2025b3c70cbb840af"
+      },
+      "elevation": {
+        "byte_count": 42117136,
+        "format": "Cloud Optimized GeoTIFF, Float32, north-up",
+        "path": "terrain/DIE-08-T10/elevation.cog.tif",
+        "sha256": "b7b42ba1f9f19d3f07beb444c2fb16e886f5cd02ab7518fcab360546f74357d5"
+      },
+      "height_sample_count": 4097,
+      "sample_spacing_metres": 0.9765625,
+      "terrain_tile_id": "DIE-08-T10",
+      "zone_id": "DIE-PONTAIX-08"
+    },
+    {
+      "bounds_l93_metres": [
+        888000,
+        6409000,
+        892000,
+        6413000
+      ],
+      "colour": {
+        "byte_count": 2275436,
+        "format": "PNG RGB north-up",
+        "path": "terrain/DIE-08-T11/colour.png",
+        "sha256": "366b6923a9e0adff28006b24d3fd984a60443e969b8b0d5b2eac3d27d7764b1a"
+      },
+      "elevation": {
+        "byte_count": 43932510,
+        "format": "Cloud Optimized GeoTIFF, Float32, north-up",
+        "path": "terrain/DIE-08-T11/elevation.cog.tif",
+        "sha256": "2f5e8237669fa40a2ed7b5d4e08ca21191bef504764295a66ca66810f3e58f58"
+      },
+      "height_sample_count": 4097,
+      "sample_spacing_metres": 0.9765625,
+      "terrain_tile_id": "DIE-08-T11",
+      "zone_id": "DIE-PONTAIX-08"
+    }
+  ],
+  "zones": [
+    {
+      "zone_id": "DIE-PONTAIX-08",
+      "revision_id": "R1",
+      "bounds_l93_metres": [
+        876000,
+        6403000,
+        892000,
+        6413000
+      ],
+      "coverage_patches_l93_metres": [
+        [
+          876000,
+          6403000,
+          884000,
+          6411000
+        ],
+        [
+          884000,
+          6405000,
+          892000,
+          6413000
+        ]
+      ]
+    }
+  ],
+  "provenance": {
+    "source_manifest": {
+      "identifier": "ign_sources.v1",
+      "path": "contracts/spatial/releases/ign_sources.v1.json",
+      "sha256": "cff6e9ffa71ce38397defe490bf54f6ba361cc9e5ed8621f22719e5e86d20fe5",
+      "byte_count": 265766
+    }
+  }
+}

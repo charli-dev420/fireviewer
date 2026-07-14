@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0",
+  "package_id": "fireviewer-die-pontaix-r1-v4",
+  "public_root": "/maps/fireviewer-die-pontaix-r1-v4/",
+  "zone": {
+    "zone_id": "DIE-PONTAIX-08",
+    "revision_id": "R1"
+  },
+  "catalog": {
+    "path": "catalog.json",
+    "sha256": "63a07bc703f54c90ba0101b2e32f4ade2c860c1ea646fc983d67871d84b871fe",
+    "byte_count": 136473
+  },
+  "provenance": {
+    "path": "contracts/spatial/releases/ign_sources.v1.json",
+    "sha256": "cff6e9ffa71ce38397defe490bf54f6ba361cc9e5ed8621f22719e5e86d20fe5",
+    "byte_count": 265766
+  },
+  "release": {
+    "repository": "charli-dev420/fireviewer",
+    "tag": "spatial-die-pontaix-r1-v4",
+    "asset_name": "fireviewer-die-pontaix-r1-v4.tar.gz",
+    "url": "https://github.com/charli-dev420/fireviewer/releases/download/spatial-die-pontaix-r1-v4/fireviewer-die-pontaix-r1-v4.tar.gz",
+    "sha256": "238c97a5e285fefa02a59c7ae4b8783921c5db13815b9a18eb4edae8adbc1a3f",
+    "byte_count": 401437902,
+    "tar_byte_count": 416962560,
+    "asset_count": 144,
+    "asset_byte_count": 416850962
+  }
+}

@@ -98,7 +98,7 @@ test.describe('ViewerManifest live integration', () => {
 
     await page.goto(`/incident/${seedFireId}`);
     await expect(page.getByRole('heading', { name: 'Aucun modèle public disponible' }).first()).toBeVisible();
-    await expect(page.getByText('Manifeste revalidé').first()).toBeVisible();
+    await expect(page.locator('.manifest-freshness').getByText('Manifeste revalidé')).toBeVisible();
 
     const revalidated = page.waitForResponse(
       (response) => isManifestResponse(response.url()) && response.status() === 304,

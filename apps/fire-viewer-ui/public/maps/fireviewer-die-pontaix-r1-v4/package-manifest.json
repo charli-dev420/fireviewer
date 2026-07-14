@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.1",
+  "package_id": "fireviewer-die-pontaix-r1-v4",
+  "catalog": {
+    "path": "catalog.json",
+    "sha256": "63a07bc703f54c90ba0101b2e32f4ade2c860c1ea646fc983d67871d84b871fe",
+    "byte_count": 136473
+  },
+  "zones": [
+    {
+      "zone_id": "DIE-PONTAIX-08",
+      "revision_id": "R1"
+    }
+  ],
+  "spatial_profile": {
+    "grid_crs": "EPSG:2154",
+    "vertical_datum": "NGF-IGN69"
+  },
+  "runtime": {
+    "renderer": "Giro3D",
+    "delivery": "same-origin static files only",
+    "external_map_or_cesium": false
+  },
+  "provenance": {
+    "license": "Licence Ouverte / Open Licence 2.0",
+    "datasets": [
+      "IGN LiDAR-HD",
+      "IGN BD TOPO"
+    ],
+    "source_manifest": {
+      "identifier": "ign_sources.v1",
+      "path": "contracts/spatial/releases/ign_sources.v1.json",
+      "sha256": "cff6e9ffa71ce38397defe490bf54f6ba361cc9e5ed8621f22719e5e86d20fe5",
+      "byte_count": 265766
+    }
+  }
+}
