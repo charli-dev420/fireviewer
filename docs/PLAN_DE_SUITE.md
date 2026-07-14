@@ -24,11 +24,19 @@ et que le runbook est rejoué depuis un checkout propre :
 - carte : une seule zone publique `DIE-PONTAIX-08@R1`, lecture du catalogue,
   contrôle des hashes de paquet, route `/zones/die-pontaix` dans un navigateur
   WebGL, recentrage et vue d'ensemble sans chargement de GLB détaillé ;
-- release : le tag binaire `spatial-die-pontaix-r1-v4`, l'archive,
+- release : la GitHub Release associée au tag `spatial-die-pontaix-r1-v4`,
+  l'archive,
   `SHA256SUMS`, l'attribution IGN et le verrou versionné concordent ; le tag
   source `spatial-die-pontaix-r1-v4-fix1` stabilise le checkout Windows ;
 - runbook : exercice sur un checkout propre, sans réutiliser une base ou un
   build existant.
+
+VÉRIFIÉ le 14 juillet 2026 : le correctif de reproductibilité a été fusionné
+dans `main` par la PR #10, au commit `6ae41d3fc6e5c9be9c9b3050902c593c6f0a196f`.
+Le tag source `spatial-die-pontaix-r1-v4-fix1` reste le repère de la recette
+historique ; la release binaire associée reste `spatial-die-pontaix-r1-v4`.
+Sa cohérence est VÉRIFIÉE par le verrou et les hashes ; son verrouillage
+technique GitHub reste NON VÉRIFIÉ (`immutable: false` lors du contrôle).
 
 Un échec conserve le gate au statut BLOQUÉ, avec l'erreur et la voie de reprise
 dans le registre. Aucun résultat historique n'est réinterprété ici comme une

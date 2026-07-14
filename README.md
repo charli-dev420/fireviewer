@@ -13,9 +13,17 @@ spatial n'est volontairement pas stocké dans Git. La release publique
 `spatial-die-pontaix-r1-v4` le distribue ; le tag source de clôture
 `spatial-die-pontaix-r1-v4-fix1` préserve les contrats hashés en LF et permet
 à un checkout Windows standard de le récupérer, le vérifier puis l'installer
-avant le build. Le tag v4 publié est conservé tel quel. Il ne s'agit pas d'un
-service d'urgence, d'un outil de prévision, ni d'un système de confirmation
-automatique d'incendie.
+avant le build. La release GitHub associée au tag v4 reste la référence logique
+du paquet, contrôlée par son verrou et ses SHA-256. Son verrouillage technique
+par GitHub reste NON VÉRIFIÉ : l'API publique indiquait `immutable: false` lors
+du contrôle. Toute correction binaire doit donc publier une nouvelle release,
+sans remplacer les assets v4. Il ne s'agit pas d'un service d'urgence, d'un
+outil de prévision, ni d'un système de confirmation automatique d'incendie.
+
+VÉRIFIÉ le 14 juillet 2026 : la PR correctrice #10 est fusionnée dans `main`
+au commit `6ae41d3fc6e5c9be9c9b3050902c593c6f0a196f`. Le tag source
+`spatial-die-pontaix-r1-v4-fix1` reste un repère reproductible distinct et un
+ancêtre de `main` ; la release binaire demeure celle du tag v4.
 
 OBSERVÉ dans l'arbre de travail : deux parcours publics sont séparés.
 
@@ -98,6 +106,7 @@ une base de démonstration dédiée ; ne pas remplacer une base locale existante
 Set-Location services/fire-viewer-backend
 uv venv --python 3.13 .venv
 uv pip install --python .venv\Scripts\python.exe -e '.[dev]'
+New-Item -ItemType Directory -Force data | Out-Null
 $env:FV_DATABASE_URL = 'sqlite:///./data/fire_viewer_g1.db'
 .\.venv\Scripts\alembic.exe upgrade head
 .\.venv\Scripts\fire-viewer-seed.exe
@@ -106,6 +115,7 @@ $env:FV_DATABASE_URL = 'sqlite:///./data/fire_viewer_g1.db'
 # Interface, dans un second terminal
 Set-Location apps/fire-viewer-ui
 npm ci
+npm run fetch:spatial
 $env:VITE_USE_MOCKS = 'false'
 $env:VITE_API_BASE_URL = 'http://127.0.0.1:8000'
 npm run dev
@@ -155,6 +165,8 @@ La release publique `spatial-die-pontaix-r1-v4` contient
 `fireviewer-die-pontaix-r1-v4.tar.gz`, `SHA256SUMS` et l'attribution IGN. Le
 tag source de clôture `spatial-die-pontaix-r1-v4-fix1` ne remplace ni ne modifie
 cette release : il corrige seulement la reproductibilité du checkout Windows.
+Le verrou et les hashes détectent une divergence éventuelle du paquet, mais ne
+constituent pas un verrouillage matériel de la release GitHub.
 GitHub sert seulement à reconstituer le paquet au build : la carte ne charge
 jamais d'asset depuis GitHub au runtime. `npm run fetch:spatial` contrôle
 l'archive avant extraction et `npm run verify:spatial` recalcule les chemins,
@@ -194,7 +206,15 @@ npm run test:e2e
 
 # Backend
 Set-Location ../../services/fire-viewer-backend
+# Si GNU Make est disponible :
 make quality
+# Sinon, depuis le même environnement virtuel :
+.\.venv\Scripts\ruff.exe check .
+.\.venv\Scripts\ruff.exe format --check .
+.\.venv\Scripts\mypy.exe
+.\.venv\Scripts\pytest.exe
+.\.venv\Scripts\python.exe -m fire_viewer.scripts.check_migrations
+.\.venv\Scripts\python.exe -m compileall -q src
 ```
 
 Le résultat de ces commandes doit être enregistré dans
