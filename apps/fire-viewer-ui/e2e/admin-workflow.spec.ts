@@ -2,14 +2,15 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 
 const UI_ORIGIN = 'http://localhost:5173';
 const ADMIN_API_ORIGIN = 'http://localhost:8000';
-const ADMIN_BEARER = 'e2e-admin-opaque-token';
+const ADMIN_USERNAME = 'admin';
+const ADMIN_PASSWORD = 'e2e-admin-password';
+const ADMIN_CSRF = 'e2e-admin-csrf-token';
 const ZONE_ID = 'SECONDE-ZONE-99';
 const CORS_HEADERS = {
-  // Le client ne transmet aucun cookie (`credentials: "omit"`) : le double
-  // de contrat peut donc accepter les deux origines locales de Playwright.
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': UI_ORIGIN,
+  'Access-Control-Allow-Credentials': 'true',
   'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type, Idempotency-Key',
+  'Access-Control-Allow-Headers': 'Content-Type, Idempotency-Key, X-CSRF-Token',
 };
 
 interface MockZone {
@@ -25,7 +26,7 @@ interface MockZone {
 interface CapturedRequest {
   readonly url: string;
   readonly method: string;
-  readonly authorization: string | undefined;
+  readonly csrfToken: string | undefined;
   readonly idempotencyKey: string | undefined;
 }
 
@@ -70,6 +71,7 @@ async function installAdminApiContract(page: Page): Promise<{ readonly requests:
   let zone: MockZone | null = null;
   let uploads: Array<Record<string, unknown>> = [];
   let information: Array<Record<string, unknown>> = [];
+  let authenticated = false;
   await page.route(`${ADMIN_API_ORIGIN}/api/v1/admin/**`, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -79,7 +81,7 @@ async function installAdminApiContract(page: Page): Promise<{ readonly requests:
     requests.push({
       url: request.url(),
       method,
-      authorization: headers.authorization,
+      csrfToken: headers['x-csrf-token'],
       idempotencyKey: headers['idempotency-key'],
     });
 
@@ -87,12 +89,30 @@ async function installAdminApiContract(page: Page): Promise<{ readonly requests:
       await route.fulfill({ status: 204, headers: CORS_HEADERS });
       return;
     }
-    if (headers.authorization !== `Bearer ${ADMIN_BEARER}`) {
-      await fulfillJson(route, problem(401, 'trace-admin-e2e-unauthorized'), 401);
+    if (path === '/api/v1/admin/auth/login' && method === 'POST') {
+      const payload = requestJson<{ username: string; password: string }>(route);
+      if (payload.username !== ADMIN_USERNAME || payload.password !== ADMIN_PASSWORD) {
+        await fulfillJson(route, problem(401, 'trace-admin-e2e-login-refused'), 401);
+        return;
+      }
+      authenticated = true;
+      await fulfillJson(route, { csrf_token: ADMIN_CSRF });
       return;
     }
     if (path === '/api/v1/admin/session' && method === 'GET') {
-      await fulfillJson(route, { authenticated: true });
+      if (!authenticated) {
+        await fulfillJson(route, problem(401, 'trace-admin-e2e-session-required'), 401);
+        return;
+      }
+      await fulfillJson(route, { authenticated: true, csrf_token: ADMIN_CSRF });
+      return;
+    }
+    if (!authenticated) {
+      await fulfillJson(route, problem(401, 'trace-admin-e2e-unauthorized'), 401);
+      return;
+    }
+    if (!['GET', 'HEAD'].includes(method) && headers['x-csrf-token'] !== ADMIN_CSRF) {
+      await fulfillJson(route, problem(403, 'trace-admin-e2e-csrf'), 403);
       return;
     }
     if (path === '/api/v1/admin/zones' && method === 'GET') {
@@ -224,7 +244,7 @@ async function installAdminApiContract(page: Page): Promise<{ readonly requests:
 }
 
 test.describe('Administration privée des zones', () => {
-  test('crée, modifie, téléverse, publie, positionne et revoit sans charger de carte binaire', async ({ page }) => {
+  test('authentifie, crée, modifie, publie, positionne et revoit sans charger de carte binaire', async ({ page }) => {
     const contract = await installAdminApiContract(page);
     const forbiddenRequests: string[] = [];
     const failedRequests: string[] = [];
@@ -248,12 +268,13 @@ test.describe('Administration privée des zones', () => {
     await test.step('connexion et création de la zone autonome', async () => {
       await page.goto('/admin/zones');
       await expect(page.getByRole('heading', { name: 'Connexion administrateur requise' })).toBeVisible();
-      await page.getByLabel('Bearer JWT administrateur').fill(`Bearer ${ADMIN_BEARER}`);
+      await page.getByLabel('Identifiant').fill(ADMIN_USERNAME);
+      await page.getByLabel('Mot de passe').fill(ADMIN_PASSWORD);
       await page.getByRole('button', { name: 'Ouvrir l’administration' }).click();
       await expect(page.getByRole('heading', { name: 'Zones administrées' })).toBeVisible();
       await expect(page.getByText('Aucune zone administrée')).toBeVisible();
 
-      await page.getByRole('link', { name: 'Nouvelle zone' }).click();
+      await page.getByRole('link', { name: 'Créer une zone', exact: true }).click();
       await expect(page.getByRole('heading', { name: 'Créer une zone' })).toBeVisible();
       await page.getByLabel('Identifiant stable').fill(ZONE_ID);
       await page.getByLabel('Nom public').fill('Seconde zone rurale');
@@ -270,20 +291,12 @@ test.describe('Administration privée des zones', () => {
       await expect(page.getByRole('heading', { name: 'Seconde zone rurale' })).toBeVisible();
     });
 
-    await test.step('téléversement direct et publication explicite', async () => {
-      await page.getByRole('link', { name: 'Téléverser une archive' }).click();
-      await expect(page.getByRole('heading', { name: `Téléverser une archive — ${ZONE_ID}` })).toBeVisible();
-      const archive = page.getByLabel('Archive spatiale .tar.gz');
-      await archive.setInputFiles({ name: 'mauvaise-archive.zip', mimeType: 'application/zip', buffer: Buffer.from('pas une archive') });
-      await expect(page.getByRole('alert')).toContainText('Sélectionnez une archive .tar.gz non vide.');
-      expect(contract.requests.filter((request) => request.url.endsWith(`/zones/${ZONE_ID}/uploads`))).toHaveLength(0);
-      await archive.setInputFiles({ name: 'seconde-zone-r1.tar.gz', mimeType: 'application/gzip', buffer: Buffer.from('archive test') });
-      await page.getByLabel('Motif de l’envoi').fill('Premier paquet spatial synthétique.');
-      await page.getByRole('button', { name: 'Envoyer pour contrôle' }).click();
-      await expect(page.getByRole('heading', { name: 'Archive enregistrée' })).toBeVisible();
-      await page.getByRole('link', { name: 'Revenir à la zone' }).click();
-      await expect(page.getByText('seconde-zone-r1.tar.gz')).toBeVisible();
-
+    await test.step('modification et visibilité explicite', async () => {
+      await page.getByLabel('Nom public').fill('Seconde zone rurale vérifiée');
+      await page.getByLabel('Motif administratif').fill('Correction éditoriale après contrôle humain.');
+      await page.getByRole('button', { name: 'Enregistrer les modifications' }).click();
+      await expect(page.getByText('La définition de la zone a été mise à jour.')).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Seconde zone rurale vérifiée' })).toBeVisible();
       await page.getByLabel('Motif de publication ou de masquage').fill('Contrôle humain terminé.');
       await page.getByRole('button', { name: 'Publier la zone' }).click();
       await expect.poll(() => contract.requests.some((request) => request.url.endsWith(`/zones/${ZONE_ID}/visibility`) && request.method === 'POST')).toBe(true);
@@ -313,36 +326,34 @@ test.describe('Administration privée des zones', () => {
       await expect(page.getByText('Information mise à jour.')).toBeVisible();
     });
 
-    const protectedRequests = contract.requests.filter((request) => request.authorization !== undefined && request.method !== 'OPTIONS');
+    const protectedRequests = contract.requests.filter((request) => !request.url.endsWith('/auth/login') && !request.url.endsWith('/session') && request.method !== 'OPTIONS');
     const mutationRequests = protectedRequests.filter((request) => ['POST', 'PATCH'].includes(request.method));
     expect(protectedRequests.length).toBeGreaterThan(6);
-    expect(protectedRequests.every((request) => request.url.startsWith(`${ADMIN_API_ORIGIN}/api/v1/admin/`) && request.authorization === `Bearer ${ADMIN_BEARER}`)).toBe(true);
+    expect(protectedRequests.every((request) => request.url.startsWith(`${ADMIN_API_ORIGIN}/api/v1/admin/`))).toBe(true);
     expect(mutationRequests.length).toBeGreaterThanOrEqual(6);
     expect(mutationRequests.every((request) => Boolean(request.idempotencyKey))).toBe(true);
+    expect(mutationRequests.every((request) => request.csrfToken === ADMIN_CSRF)).toBe(true);
     // Les liens `<a>` rechargent la page : la validation de session initiée
     // au montage peut donc être annulée pendant cette navigation normale.
     expect(failedRequests.filter((request) => !request.startsWith(`GET ${ADMIN_API_ORIGIN}/api/v1/admin/session net::ERR_ABORTED`))).toEqual([]);
     expect(forbiddenRequests).toEqual([]);
   });
 
-  test('ne monte jamais l’administration lorsque l’API refuse le bearer', async ({ page }) => {
-    await page.route(`${ADMIN_API_ORIGIN}/api/v1/admin/session`, async (route) => {
+  test('ne monte jamais l’administration lorsque l’API refuse le mot de passe', async ({ page }) => {
+    await page.route(`${ADMIN_API_ORIGIN}/api/v1/admin/**`, async (route) => {
       if (route.request().method() === 'OPTIONS') {
         await route.fulfill({ status: 204, headers: CORS_HEADERS });
-        return;
-      }
-      if (route.request().method() !== 'GET') {
-        await route.continue();
         return;
       }
       await fulfillJson(route, problem(401, 'trace-admin-e2e-rejected'), 401);
     });
 
     await page.goto('/admin/zones');
-    await page.getByLabel('Bearer JWT administrateur').fill('forged.none.token');
+    await page.getByLabel('Identifiant').fill(ADMIN_USERNAME);
+    await page.getByLabel('Mot de passe').fill('mot-de-passe-refuse');
     await page.getByRole('button', { name: 'Ouvrir l’administration' }).click();
 
-    await expect(page.getByRole('alert')).toHaveText('Le jeton administrateur a été refusé par l’API.');
+    await expect(page.getByRole('alert')).toHaveText('Identifiants administrateur refusés.');
     await expect(page.getByRole('heading', { name: 'Fire-Viewer Admin' })).not.toBeVisible();
     await expect(page.locator('body')).not.toContainText('Détail interne de test qui ne doit jamais être affiché par le navigateur.');
     await expect
@@ -354,6 +365,7 @@ test.describe('Administration privée des zones', () => {
 test.describe('Rapprochement spatial administrateur', () => {
   test('rattache une observation motivée sans fusion implicite', async ({ page }) => {
     let resolved = false;
+    let authenticated = false;
     let resolveRequest: { readonly body: Record<string, unknown>; readonly idempotencyKey: string | undefined } | null = null;
 
     await page.route(`${ADMIN_API_ORIGIN}/api/v1/admin/**`, async (route) => {
@@ -362,12 +374,26 @@ test.describe('Rapprochement spatial administrateur', () => {
         await route.fulfill({ status: 204, headers: CORS_HEADERS });
         return;
       }
-      if (route.request().headers().authorization !== `Bearer ${ADMIN_BEARER}`) {
-        await fulfillJson(route, problem(401, 'trace-spatial-unauthorized'), 401);
+      if (path === '/api/v1/admin/auth/login' && route.request().method() === 'POST') {
+        const payload = requestJson<{ username: string; password: string }>(route);
+        authenticated = payload.username === ADMIN_USERNAME && payload.password === ADMIN_PASSWORD;
+        await fulfillJson(route, authenticated ? { csrf_token: ADMIN_CSRF } : problem(401, 'trace-spatial-login-refused'), authenticated ? 200 : 401);
         return;
       }
       if (path === '/api/v1/admin/session') {
-        await fulfillJson(route, { authenticated: true });
+        await fulfillJson(route, authenticated ? { authenticated: true, csrf_token: ADMIN_CSRF } : problem(401, 'trace-spatial-session-required'), authenticated ? 200 : 401);
+        return;
+      }
+      await fulfillJson(route, problem(404, 'trace-spatial-admin-not-found'), 404);
+    });
+    await page.route(`${ADMIN_API_ORIGIN}/api/v2/admin/**`, async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (route.request().method() === 'OPTIONS') {
+        await route.fulfill({ status: 204, headers: CORS_HEADERS });
+        return;
+      }
+      if (!authenticated) {
+        await fulfillJson(route, problem(401, 'trace-spatial-unauthorized'), 401);
         return;
       }
       if (path === '/api/v2/admin/work-queue') {
@@ -382,14 +408,14 @@ test.describe('Rapprochement spatial administrateur', () => {
         });
         return;
       }
-      await fulfillJson(route, problem(404, 'trace-spatial-admin-not-found'), 404);
+      await fulfillJson(route, problem(404, 'trace-spatial-v2-not-found'), 404);
     });
     await page.route(`${ADMIN_API_ORIGIN}/api/v1/operator/**`, async (route) => {
       if (route.request().method() === 'OPTIONS') {
         await route.fulfill({ status: 204, headers: CORS_HEADERS });
         return;
       }
-      if (route.request().headers().authorization !== `Bearer ${ADMIN_BEARER}`) {
+      if (!authenticated || route.request().headers()['x-csrf-token'] !== ADMIN_CSRF) {
         await fulfillJson(route, problem(401, 'trace-spatial-operator-unauthorized'), 401);
         return;
       }
@@ -406,7 +432,8 @@ test.describe('Rapprochement spatial administrateur', () => {
     });
 
     await page.goto('/admin/rapprochement-spatial');
-    await page.getByLabel('Bearer JWT administrateur').fill(`Bearer ${ADMIN_BEARER}`);
+    await page.getByLabel('Identifiant').fill(ADMIN_USERNAME);
+    await page.getByLabel('Mot de passe').fill(ADMIN_PASSWORD);
     await page.getByRole('button', { name: 'Ouvrir l’administration' }).click();
     await expect(page.getByRole('heading', { name: 'Observations à rattacher' })).toBeVisible();
     await expect(page.getByText('distance cohérente')).toBeVisible();

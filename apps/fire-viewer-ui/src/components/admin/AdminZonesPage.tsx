@@ -34,7 +34,7 @@ export function AdminZonesPage() {
           title="Aucune zone administrée"
           action={<a className="button button--primary" href="/admin/zones/nouvelle">Créer la première zone</a>}
         >
-          Créez une zone logique, puis téléversez son archive contrôlée et ajoutez les informations localisées.
+          Créez une zone logique, puis une révision et importez le dossier du package produit localement.
         </AdminEmptyState>
       ) : null}
       {state.kind === 'ready' && state.data.length > 0 ? (

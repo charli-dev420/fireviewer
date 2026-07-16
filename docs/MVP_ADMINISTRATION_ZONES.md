@@ -105,42 +105,41 @@ consulter le rapport de contrôle, prévisualiser sans accès public, publier ou
 retirer une révision et consulter les incidents liés. La page d'incident de
 MVP-5 propose ensuite la republication explicite vers une révision compatible.
 
-État de la première passe administrateur.
+État de l'implémentation administrateur.
 
-VÉRIFIÉ le 14 juillet 2026 : le shell privé, les cinq routes prévues, la
-lecture des zones, des révisions et des métadonnées de prévisualisation sont
-présents. Les identifiants de zone suivent le contrat canonique en majuscules,
-par exemple `DIE-PONTAIX-08`, et les révisions transportent leur entier, par
-exemple `1`, affiché comme `R1`.
+VÉRIFIÉ le 16 juillet 2026 : le shell privé, les routes de lecture et de mutation,
+la création et modification des zones, les révisions, l'import direct d'un dossier
+de package vers Blob, la finalisation, la validation, la prévisualisation privée et
+les transitions de publication sont présents. Les identifiants de zone suivent le
+contrat canonique en majuscules, par exemple `DIE-PONTAIX-08`, et les révisions
+transportent leur entier, par exemple `1`, affiché comme `R1`.
 
-NON VÉRIFIÉ comme fonction utilisateur complète : création, dépôt de paquet,
-contrôle métier, rendu privé et transition de publication depuis l'interface.
-Les endpoints de mutation restent volontairement `501` et les écrans le disent
-explicitement ; ils ne constituent pas encore MVP-4 achevé.
+NON VÉRIFIÉ en hébergement réel : l'import du package de 417 Mo dans le store Blob
+de production, le raccordement à Neon/PostGIS et le cycle publication/retrait après
+déploiement du backend Vercel.
 
 Séparation des accès.
 
-Le shell navigateur traite le bearer comme opaque et consulte
-`GET /api/v1/admin/session` avant de monter toute page privée. Le serveur
-vérifie le JWT/OIDC et le rôle `administrator`; les réponses `/api/v1/admin/*`
-portent `Cache-Control: no-store`. Le bearer n'est transmis qu'à une origine
-HTTPS, ou à une boucle locale de développement, et les réponses de problème ne
-révèlent pas leur détail serveur dans l'interface.
+Le shell navigateur consulte `GET /api/v1/admin/session` avant de monter toute
+page privée. Le compte administrateur local unique ouvre une session persistée
+en base ; le navigateur reçoit un cookie `HttpOnly` et conserve uniquement le
+jeton CSRF en mémoire. Les réponses `/api/v1/admin/*` portent
+`Cache-Control: no-store`, les mutations sont idempotentes et les réponses de
+problème ne révèlent pas leur détail serveur dans l'interface.
 
-L'ouverture de session interactive auprès de l'émetteur OIDC, la politique de
-rôles complète, l'isolement de stockage des assets privés et les mutations
-transactionnelles restent à réaliser. Aucune URL de fichier privé n'est
-renvoyée par la prévisualisation actuelle.
+Les comptes multiples, les rôles nominatifs et la MFA sont hors périmètre de ce
+MVP à administrateur unique. Aucune URL permanente de fichier privé n'est
+renvoyée par la prévisualisation.
 
 Persistance et coût.
 
 Le registre dynamique de zones nécessite une base de données : il ne peut pas
 reposer sur le catalogue versionné G1. SQLite reste la référence locale,
 reproductible et sans coût récurrent imposé pour les migrations, les tests et
-les démonstrations. Une persistance partagée et durable pour un déploiement
-public est NON VÉRIFIÉE à ce stade; son choix appartient à MVP-1 et MVP-7. Le
-MVP-4 introduit une interface de stockage avec une implémentation locale, sans
-imposer de service payant ni de reconstruction Unity dans le navigateur.
+les démonstrations. La cible de persistance partagée est Neon PostgreSQL/PostGIS
+et la cible des objets privés est Vercel Blob. Leur raccordement réel reste NON
+VÉRIFIÉ. Le MVP-4 conserve SQLite et le stockage local pour les tests
+reproductibles, sans reconstruction Unity dans le navigateur.
 
 Ordre MVP acté.
 
@@ -174,7 +173,7 @@ Critères d'acceptation MVP-4.
 
 Limites conservées.
 
-La génération Unity, l'optimisation 3D, le chargement d'un GLB public, toute
-carte globale, la connexion automatique d'un incident et le déploiement ne
-font pas partie de cette passe documentaire. Aucun terrain réel, incident réel,
-donnée opérationnelle ou secret ne doit être ajouté pour la réaliser.
+La génération Unity et l'optimisation 3D restent hors site. La carte nationale
+est strictement interne à l'Admin ; aucune carte globale publique n'est ajoutée.
+La connexion automatique d'un incident et la validation métier opérationnelle
+restent hors de cette passe. Aucun secret ne doit être ajouté au dépôt.

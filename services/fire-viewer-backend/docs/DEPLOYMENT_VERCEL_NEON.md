@@ -143,22 +143,27 @@ VITE_API_BASE_URL=https://api.exemple.fr
 L'origine doit être HTTPS, sans chemin final. La même origine doit être présente dans
 `FV_CORS_ORIGINS` côté API. Les cookies Admin nécessitent des choix de domaine cohérents ; la
 configuration la plus simple est `www.exemple.fr` pour le site et `api.exemple.fr` pour l'API.
+Avec `SameSite=Strict`, deux domaines de preview Vercel distincts ne constituent pas un
+raccordement Admin valide. Utiliser les sous-domaines d'un même domaine enregistré ou un proxy
+même origine.
 
-## 8. Limite actuelle des gros packages
+## 8. Upload direct des packages
 
-Le formulaire Admin envoie encore l'archive `.tar.gz` à FastAPI. Cette voie est adaptée aux tests
-locaux mais pas aux gros packages 3D hébergés : le corps traverse la Function avant Blob.
-Vercel recommande les uploads client et Blob prend en charge le multipart pour les gros fichiers :
+L'Admin sélectionne directement le dossier produit localement. Le navigateur vérifie
+`package-manifest.json`, `catalog.json`, les chemins et les tailles, puis envoie chaque objet au
+Blob privé avec le client officiel et le mode multipart. Aucun binaire ne traverse FastAPI :
 [guide Blob SDK](https://vercel.com/docs/vercel-blob/using-blob-sdk).
 
-Avant un usage hébergé avec des packages réalistes, implémenter :
+Le parcours implémenté est :
 
-1. création serveur d'un upload privé limité à un chemin et une taille ;
-2. upload multipart direct navigateur vers Blob ;
-3. finalisation serveur avec taille, SHA-256, type et identifiant d'objet ;
-4. validation de l'archive depuis la quarantaine ;
-5. promotion atomique vers le préfixe immuable de la révision ;
-6. expiration et purge des uploads abandonnés.
+1. émission serveur d'un jeton client limité à `packages/{upload_id}/` ;
+2. upload direct et multipart depuis le navigateur ;
+3. finalisation légère avec la liste des objets ;
+4. contrôle serveur par `head()` de la présence, taille et type ;
+5. enregistrement atomique du package en brouillon ;
+6. validation, preview privée et publication explicites.
+
+NON VÉRIFIÉ dans ce dépôt : un envoi réel du package de 417 Mo vers le store Vercel de production.
 
 ## 9. Vérifications de raccordement
 
