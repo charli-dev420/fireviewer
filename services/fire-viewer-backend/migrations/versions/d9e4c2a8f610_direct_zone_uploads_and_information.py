@@ -104,7 +104,7 @@ def upgrade() -> None:
         sa.CheckConstraint("catalog_size_bytes > 0", name="ck_zone_upload_catalog_size"),
         sa.CheckConstraint("revision >= 1", name="ck_zone_upload_revision_positive"),
         sa.CheckConstraint(
-            "is_active = 0 OR state = 'VALIDATED'",
+            "NOT is_active OR state = 'VALIDATED'",
             name="ck_zone_upload_active_requires_validated",
         ),
         sa.ForeignKeyConstraint(["spatial_zone_id"], ["spatial_zone.id"], ondelete="RESTRICT"),

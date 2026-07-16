@@ -464,7 +464,7 @@ class ZoneUpload(Base):
         CheckConstraint("catalog_size_bytes > 0", name="ck_zone_upload_catalog_size"),
         CheckConstraint("revision >= 1", name="ck_zone_upload_revision_positive"),
         CheckConstraint(
-            "is_active = 0 OR state = 'VALIDATED'",
+            "NOT is_active OR state = 'VALIDATED'",
             name="ck_zone_upload_active_requires_validated",
         ),
     )
@@ -835,7 +835,7 @@ class ZonePublication(Base):
             postgresql_where=text("is_active"),
         ),
         CheckConstraint(
-            "(is_active = 1 AND state = 'PUBLISHED') OR (is_active = 0 AND state != 'PUBLISHED')",
+            "(is_active AND state = 'PUBLISHED') OR (NOT is_active AND state != 'PUBLISHED')",
             name="ck_zone_publication_active_state",
         ),
     )

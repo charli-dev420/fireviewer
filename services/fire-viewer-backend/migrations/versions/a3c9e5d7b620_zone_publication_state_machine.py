@@ -64,7 +64,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.CheckConstraint(
-            "(is_active = 1 AND state = 'PUBLISHED') OR (is_active = 0 AND state != 'PUBLISHED')",
+            "(is_active AND state = 'PUBLISHED') OR (NOT is_active AND state != 'PUBLISHED')",
             name="ck_zone_publication_active_state",
         ),
         sa.ForeignKeyConstraint(
