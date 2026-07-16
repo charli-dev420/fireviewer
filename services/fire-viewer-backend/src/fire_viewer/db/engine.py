@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Connection, Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from fire_viewer.core.config import Settings
@@ -26,12 +26,6 @@ def create_db_engine(settings: Settings) -> Engine:
             "timeout": settings.sqlite_busy_timeout_ms / 1_000,
         }
     else:
-        connect_args = {
-            "options": (
-                "-c timezone=UTC "
-                f"-c statement_timeout={settings.database_statement_timeout_ms}"
-            )
-        }
         engine_options = {
             "pool_size": settings.database_pool_size,
             "max_overflow": settings.database_max_overflow,
@@ -56,6 +50,16 @@ def create_db_engine(settings: Settings) -> Engine:
             cursor.execute("PRAGMA synchronous=NORMAL")
             cursor.execute(f"PRAGMA busy_timeout={settings.sqlite_busy_timeout_ms}")
             cursor.close()
+
+    if engine.dialect.name == "postgresql":
+        statement_timeout_ms = settings.database_statement_timeout_ms
+
+        @event.listens_for(engine, "begin")
+        def set_postgres_transaction_settings(connection: Connection) -> None:
+            # Neon pooler rejects statement_timeout as a startup parameter.
+            # SET LOCAL is transaction-scoped and therefore safe with transaction pooling.
+            connection.exec_driver_sql("SET LOCAL TIME ZONE 'UTC'")
+            connection.exec_driver_sql(f"SET LOCAL statement_timeout = {statement_timeout_ms}")
 
     return engine
 
