@@ -123,6 +123,7 @@ def test_local_admin_session_returns_in_memory_csrf_and_protects_logout(tmp_path
             assert login.status_code == 200, login.text
             csrf = login.json()["csrf_token"]
             session_status = client.get("/api/v1/admin/session")
+            dashboard = client.get("/api/v2/admin/dashboard")
             rejected_logout = client.post("/api/v1/admin/auth/logout")
             logout = client.post(
                 "/api/v1/admin/auth/logout",
@@ -136,8 +137,10 @@ def test_local_admin_session_returns_in_memory_csrf_and_protects_logout(tmp_path
     assert isinstance(csrf, str) and len(csrf) >= 32
     assert "fireviewer_admin=" in login.headers["set-cookie"]
     assert "HttpOnly" in login.headers["set-cookie"]
+    assert "Path=/api" in login.headers["set-cookie"]
     assert "fireviewer_csrf" not in login.headers["set-cookie"]
     assert session_status.json() == {"authenticated": True, "csrf_token": csrf}
+    assert dashboard.status_code == 200, dashboard.text
     assert rejected_logout.status_code == 403
     assert logout.status_code == 204
     assert expired.status_code == 401

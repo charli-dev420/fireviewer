@@ -262,7 +262,7 @@ def login_local_admin(
         httponly=True,
         secure=settings.environment != "development",
         samesite="strict",
-        path="/api/v1",
+        path="/api",
     )
     _set_admin_read_headers(response)
     return AdminSessionStatus(csrf_token=csrf)
@@ -287,7 +287,7 @@ def logout_local_admin(
         if row and row.revoked_at is None:
             row.revoked_at = utcnow()
             session.commit()
-    response.delete_cookie("fireviewer_admin", path="/api/v1")
+    response.delete_cookie("fireviewer_admin", path="/api")
     response.status_code = 204
     _set_admin_read_headers(response)
     return response
