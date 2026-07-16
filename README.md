@@ -167,11 +167,13 @@ tag source de clôture `spatial-die-pontaix-r1-v4-fix1` ne remplace ni ne modifi
 cette release : il corrige seulement la reproductibilité du checkout Windows.
 Le verrou et les hashes détectent une divergence éventuelle du paquet, mais ne
 constituent pas un verrouillage matériel de la release GitHub.
-GitHub sert seulement à reconstituer le paquet au build : la carte ne charge
-jamais d'asset depuis GitHub au runtime. `npm run fetch:spatial` contrôle
+GitHub sert seulement à reconstituer le paquet pour une recette locale : la carte ne
+charge jamais d'asset depuis GitHub au runtime. `npm run fetch:spatial` contrôle
 l'archive avant extraction et `npm run verify:spatial` recalcule les chemins,
-tailles et SHA-256 installés. `npm run build` dépend de cette vérification et
-échoue explicitement si la carte n'a pas été récupérée et contrôlée.
+tailles et SHA-256 installés. `npm run build:spatial` dépend de cette vérification
+et échoue explicitement si la carte n'a pas été récupérée et contrôlée. Le build
+web standard reste indépendant de ces 417 Mo, désormais importés par l'Admin dans
+le stockage Blob privé.
 
 La vue d'ensemble couvre l'emprise complète sans plafond artificiel de 3,6 km.
 Les COG et aperçus PNG restent visibles à distance ; les GLB détaillés ne sont
@@ -201,7 +203,7 @@ npm run check
 npm run test
 npm run test:spatial
 npm run verify:spatial
-npm run build
+npm run build:spatial
 npm run test:e2e
 
 # Backend

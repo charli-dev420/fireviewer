@@ -173,8 +173,9 @@ chemins hostiles, extrait dans un répertoire temporaire puis n'installe les
 binaires qu'après `npm run verify:spatial`. Ce dernier vérifie chaque chemin,
 taille et SHA-256 déclarés par
 `public/maps/fireviewer-die-pontaix-r1-v4/catalog.json`, le manifeste de
-paquet, le verrou et la provenance IGN. `npm run build` en dépend : sans paquet
-contrôlé, le build doit échouer explicitement.
+paquet, le verrou et la provenance IGN. `npm run build:spatial` en dépend : sans
+paquet contrôlé, le build de recette doit échouer explicitement. Le build web
+standard n'embarque pas le paquet local.
 
 Sauvegarder la SQLite G1.
 

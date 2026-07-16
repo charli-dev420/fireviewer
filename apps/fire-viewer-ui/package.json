@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "npm run verify:spatial && tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build",
+    "build:spatial": "npm run verify:spatial && npm run build",
     "check": "tsc --noEmit",
     "test": "vitest run",
     "test:spatial": "node --test tools/spatial-package-verifier.test.mjs tools/spatial-release.test.mjs",

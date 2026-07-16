@@ -53,9 +53,10 @@ npm run build
 npm run test:e2e
 ```
 
-`npm run build` vérifie aussi le package spatial avant de produire le bundle. La recette
-E2E prépare une base SQLite temporaire, migre le backend puis démarre Uvicorn et Vite
-avec CORS local. Elle nécessite l'environnement Python du backend.
+`npm run build` produit le site sans exiger les 417 Mo du paquet spatial local. Utiliser
+`npm run build:spatial` pour vérifier ce paquet avant un build de recette. La recette E2E
+conserve cette vérification, prépare une base SQLite temporaire, migre le backend puis
+démarre Uvicorn et Vite avec CORS local. Elle nécessite l'environnement Python du backend.
 
 ## Structure utile
 

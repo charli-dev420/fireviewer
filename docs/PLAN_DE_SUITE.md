@@ -76,8 +76,10 @@ ignorés. Le verrou de release et le manifeste IGN sont suivis sous
 `spatial-die-pontaix-r1-v4` distribue l'archive
 `fireviewer-die-pontaix-r1-v4.tar.gz`, `SHA256SUMS` et l'attribution IGN.
 `npm run fetch:spatial` vérifie l'archive avant extraction, refuse les chemins
-hostiles et n'installe les binaires qu'après contrôle. `npm run build` dépend
-de `npm run verify:spatial` ; un build sans paquet vérifié échoue.
+hostiles et n'installe les binaires qu'après contrôle. `npm run build:spatial`
+dépend de `npm run verify:spatial` ; un build de recette sans paquet vérifié
+échoue. `npm run build` reste déployable sans les binaires locaux, qui sont
+importés séparément dans le stockage Blob privé.
 
 Le paquet est un contenu de zone, pas un manifeste d'incident. Il ne doit pas
 ajouter implicitement une position, un feu ou un asset au contrat
