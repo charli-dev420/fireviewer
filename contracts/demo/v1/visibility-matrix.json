@@ -1,10 +1,11 @@
 {
-  "matrix_version": "1.0",
+  "matrix_version": "2.0",
   "description": "Canonical public projections for fictitious Fire Viewer lifecycle scenarios.",
   "scenarios": [
     {
       "id": "candidate_withheld",
       "status": "CANDIDATE",
+      "verification_state": "UNVERIFIED",
       "visibility": "LIMITED",
       "model_state": "withheld",
       "http_status": 200,
@@ -13,6 +14,7 @@
     {
       "id": "under_review_withheld",
       "status": "UNDER_REVIEW",
+      "verification_state": "UNVERIFIED",
       "visibility": "LIMITED",
       "model_state": "withheld",
       "http_status": 200,
@@ -21,6 +23,7 @@
     {
       "id": "rejected_withheld",
       "status": "REJECTED",
+      "verification_state": "REJECTED",
       "visibility": "LIMITED",
       "model_state": "withheld",
       "http_status": 200,
@@ -29,6 +32,7 @@
     {
       "id": "suspended_withheld",
       "status": "SUSPENDED",
+      "verification_state": "UNVERIFIED",
       "visibility": "SUSPENDED",
       "model_state": "withheld",
       "http_status": 200,
@@ -37,6 +41,7 @@
     {
       "id": "active_confirmed_available",
       "status": "ACTIVE_CONFIRMED",
+      "verification_state": "VERIFIED",
       "visibility": "PUBLIC",
       "model_state": "available",
       "asset_fixture": "published_metadata_only",
@@ -46,6 +51,7 @@
     {
       "id": "active_confirmed_not_available",
       "status": "ACTIVE_CONFIRMED",
+      "verification_state": "VERIFIED",
       "visibility": "PUBLIC",
       "model_state": "not_available",
       "asset_fixture": "none",
@@ -55,6 +61,7 @@
     {
       "id": "monitoring_available",
       "status": "MONITORING",
+      "verification_state": "VERIFIED",
       "visibility": "PUBLIC",
       "model_state": "available",
       "asset_fixture": "published_metadata_only",
@@ -64,6 +71,7 @@
     {
       "id": "monitoring_not_available",
       "status": "MONITORING",
+      "verification_state": "VERIFIED",
       "visibility": "PUBLIC",
       "model_state": "not_available",
       "asset_fixture": "none",
@@ -73,6 +81,7 @@
     {
       "id": "extinguished_available",
       "status": "EXTINGUISHED",
+      "verification_state": "VERIFIED",
       "visibility": "PUBLIC",
       "model_state": "available",
       "asset_fixture": "published_metadata_only",
@@ -82,6 +91,7 @@
     {
       "id": "extinguished_not_available",
       "status": "EXTINGUISHED",
+      "verification_state": "VERIFIED",
       "visibility": "PUBLIC",
       "model_state": "not_available",
       "asset_fixture": "none",
@@ -91,6 +101,7 @@
     {
       "id": "closed_archive_not_available",
       "status": "CLOSED",
+      "verification_state": "VERIFIED",
       "visibility": "PUBLIC",
       "model_state": "not_available",
       "asset_fixture": "internal_png_snapshot",

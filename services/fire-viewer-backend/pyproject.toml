@@ -17,6 +17,8 @@ dependencies = [
   "alembic==1.18.4",
   "pydantic==2.13.4",
   "pydantic-settings==2.14.1",
+  "psycopg[binary]==3.3.4",
+  "vercel==0.7.0",
   "PyJWT[crypto]==2.13.0",
   "prometheus-client==0.25.0",
   "pyproj==3.7.2",
@@ -38,6 +40,7 @@ fire-viewer-export-openapi = "fire_viewer.scripts.export_openapi:main"
 fire-viewer-backup = "fire_viewer.scripts.backup_sqlite:main"
 fire-viewer-restore = "fire_viewer.scripts.restore_sqlite:main"
 fire-viewer-check-migrations = "fire_viewer.scripts.check_migrations:main"
+fire-viewer-hash-admin-password = "fire_viewer.scripts.hash_admin_password:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

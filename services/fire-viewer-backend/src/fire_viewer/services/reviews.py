@@ -9,10 +9,11 @@ from sqlalchemy.orm import Session
 from fire_viewer.core.config import Settings
 from fire_viewer.core.ids import FIRE_ID_RE
 from fire_viewer.core.security import Actor
-from fire_viewer.core.time import as_utc
+from fire_viewer.core.time import as_utc, utcnow
 from fire_viewer.db.models import Episode, IncidentSeries, Observation
 from fire_viewer.db.transactions import begin_write_transaction
 from fire_viewer.domain.enums import (
+    EvidenceSpatialMode,
     IncidentStatus,
     MatchDecision,
     ReviewResolutionAction,
@@ -30,7 +31,9 @@ from fire_viewer.services.common import (
     observation_snapshot,
     record_operator_audit,
 )
+from fire_viewer.services.evidence_policy import recalculate_episode_evidence
 from fire_viewer.services.idempotency import find_replay, store_response
+from fire_viewer.services.retention import purge_observation_transient_metadata
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,9 +97,29 @@ def resolve_review(
     reactivated_previous_episode: Episode | None = None
     before_incident: dict[str, Any] | None = None
     before_episode: dict[str, Any] | None = None
+    evidence_before_episode: dict[str, Any] | None = None
+    evidence_before_incident: dict[str, Any] | None = None
+    now = utcnow()
 
     if payload.action == ReviewResolutionAction.REJECT:
+        if (
+            observation.attached_incident_id is not None
+            and observation.attached_episode_id is not None
+        ):
+            incident = session.execute(
+                select(IncidentSeries)
+                .where(IncidentSeries.id == observation.attached_incident_id)
+                .with_for_update()
+            ).scalar_one()
+            episode = session.execute(
+                select(Episode)
+                .where(Episode.id == observation.attached_episode_id)
+                .with_for_update()
+            ).scalar_one()
+            evidence_before_incident = incident_snapshot(incident)
+            evidence_before_episode = episode_snapshot(episode)
         observation.verification_state = VerificationState.REJECTED
+        observation.public_spatial_mode = EvidenceSpatialMode.WITHHELD
     elif payload.action == ReviewResolutionAction.CREATE:
         incident, episode = create_incident_and_episode(
             session,
@@ -116,7 +139,14 @@ def resolve_review(
         observation.proposed_episode_id = None
         observation.match_decision = MatchDecision.CREATE
         observation.verification_state = VerificationState.VERIFIED
+        observation.public_spatial_mode = (
+            EvidenceSpatialMode.EXACT
+            if payload.publish_spatial_evidence
+            else EvidenceSpatialMode.WITHHELD
+        )
         observation.review_reasons = []
+        evidence_before_incident = incident_snapshot(incident)
+        evidence_before_episode = episode_snapshot(episode)
     else:
         if payload.target_fire_id is None or not FIRE_ID_RE.fullmatch(payload.target_fire_id):
             raise BadRequestError("invalid_fire_id", "target_fire_id has an invalid format.")
@@ -160,10 +190,29 @@ def resolve_review(
         observation.proposed_episode_id = None
         observation.match_decision = MatchDecision.ATTACH
         observation.verification_state = VerificationState.VERIFIED
+        observation.public_spatial_mode = (
+            EvidenceSpatialMode.EXACT
+            if payload.publish_spatial_evidence
+            else EvidenceSpatialMode.WITHHELD
+        )
         observation.review_reasons = []
+        evidence_before_incident = incident_snapshot(incident)
+        evidence_before_episode = episode_snapshot(episode)
 
     observation.version += 1
+    purge_observation_transient_metadata(observation, decided_at=now)
     session.flush()
+    evidence_result = None
+    if incident is not None and episode is not None:
+        evidence_result = recalculate_episode_evidence(
+            session,
+            incident=incident,
+            episode=episode,
+            threshold=settings.corroboration_min_independent_proofs,
+            now=now,
+            human_validated_at=(now if payload.action != ReviewResolutionAction.REJECT else None),
+        )
+        session.flush()
     after = observation_snapshot(observation)
     if created_incident and incident is not None and episode is not None:
         record_operator_audit(
@@ -238,6 +287,40 @@ def resolve_review(
             before=before_episode,
             after=episode_snapshot(episode),
             payload={"resolution": payload.action.value},
+        )
+    if (
+        evidence_result is not None
+        and evidence_before_episode is not None
+        and evidence_before_incident is not None
+        and evidence_result.previous_state != evidence_result.verification_state
+        and incident is not None
+        and episode is not None
+    ):
+        action = (
+            "episode.evidence.verified"
+            if evidence_result.verification_state == VerificationState.VERIFIED
+            else "episode.corroboration.withdrawn"
+        )
+        record_operator_audit(
+            session,
+            actor=actor,
+            action=action,
+            target_type="episode",
+            target_id=f"{incident.fire_id}/{episode.episode_id}",
+            reason=payload.reason,
+            trace_id=trace_id,
+            before={
+                "episode": evidence_before_episode,
+                "incident": evidence_before_incident,
+            },
+            after={
+                "episode": episode_snapshot(episode),
+                "incident": incident_snapshot(incident),
+            },
+            payload={
+                "resolution": payload.action.value,
+                "independent_proof_count": evidence_result.independent_proof_count,
+            },
         )
     record_operator_audit(
         session,

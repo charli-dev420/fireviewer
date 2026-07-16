@@ -15,7 +15,7 @@ from fire_viewer.domain.spatial import RAF20_GRID_SHA256
 
 
 def seed_zone(session: Session) -> None:
-    zone = SpatialZone(zone_id="die-pontaix", label="Die-Pontaix")
+    zone = SpatialZone(zone_id="DIE-PONTAIX-08", label="Die-Pontaix")
     session.add(zone)
     session.flush()
     revision = SpatialZoneRevision(
@@ -36,70 +36,99 @@ def seed_zone(session: Session) -> None:
     )
     session.add(revision)
     session.flush()
-    session.add(
-        SpatialPackage(
-            package_id="pkg-die-pontaix-private-preview",
-            manifest_uri="s3://private-admin/pkg-die-pontaix/manifest.json",
-            manifest_sha256="a" * 64,
-            manifest_size_bytes=512,
-            storage_uri="s3://private-admin/pkg-die-pontaix/",
-            state=SpatialPackageState.VERIFIED,
-            provenance={"pipeline": "unity-export"},
-            verification_report={"status": "passed"},
-            created_by="admin-ui-test",
-            verified_at=datetime.now(UTC),
-            spatial_zone_revision_id=revision.id,
-            files=[
-                SpatialPackageFile(
-                    kind=SpatialPackageFileKind.GLB,
-                    uri="s3://private-admin/pkg-die-pontaix/model.glb",
-                    sha256="b" * 64,
-                    size_bytes=1024,
-                    media_type="model/gltf-binary",
-                    provenance={},
-                )
-            ],
-        )
+    package = SpatialPackage(
+        package_id="pkg-die-pontaix-private-preview",
+        manifest_uri="s3://private-admin/pkg-die-pontaix/manifest.json",
+        manifest_sha256="a" * 64,
+        manifest_size_bytes=512,
+        storage_uri="s3://private-admin/pkg-die-pontaix/",
+        state=SpatialPackageState.DRAFT,
+        provenance={"pipeline": "unity-export"},
+        verification_report={},
+        created_by="admin-ui-test",
+        files=[
+            SpatialPackageFile(
+                kind=SpatialPackageFileKind.GLB,
+                uri="s3://private-admin/pkg-die-pontaix/model.glb",
+                sha256="b" * 64,
+                size_bytes=1024,
+                media_type="model/gltf-binary",
+                provenance={},
+            )
+        ],
     )
+    session.add(package)
+    session.flush()
+    package.verification_report = {"status": "passed"}
+    package.verified_at = datetime.now(UTC)
+    package.state = SpatialPackageState.VERIFIED
+    session.flush()
+    package.spatial_zone_revision_id = revision.id
+    package.state = SpatialPackageState.PREVIEWABLE
     session.commit()
 
 
-def test_admin_zones_list_and_detail_are_available_to_administrators(client, session) -> None:
-    seed_zone(session)
+def test_admin_session_confirms_the_server_authorized_actor_without_cache(client) -> None:
+    response = client.get("/api/v1/admin/session")
+
+    assert response.status_code == 200
+    assert response.json() == {"authenticated": True}
+    assert response.headers["Cache-Control"] == "no-store"
+
+
+def test_admin_zones_list_and_detail_are_available_to_administrators(client) -> None:
+    created = client.post(
+        "/api/v1/admin/zones",
+        json={
+            "zone_id": "DIE-PONTAIX-08",
+            "label": "Die-Pontaix",
+            "description": "Zone locale administrée pour les essais d'API.",
+            "bounds_l93_m": [900_000.0, 6_400_000.0, 901_000.0, 6_401_000.0],
+            "reason": "Création de la zone d'essai administrateur.",
+        },
+        headers={"Idempotency-Key": "admin-zone-list-detail-0001"},
+    )
+
+    assert created.status_code == 201
+    assert created.headers["Cache-Control"] == "no-store"
+    assert created.json()["zone"] == {
+        "zone_id": "DIE-PONTAIX-08",
+        "label": "Die-Pontaix",
+        "description": "Zone locale administrée pour les essais d'API.",
+        "visibility": "DRAFT",
+        "bounds_l93_m": [900_000.0, 6_400_000.0, 901_000.0, 6_401_000.0],
+        "created_at": created.json()["zone"]["created_at"],
+        "updated_at": created.json()["zone"]["updated_at"],
+    }
 
     listing = client.get("/api/v1/admin/zones")
 
     assert listing.status_code == 200
-    assert listing.json() == {
-        "zones": [
-            {
-                "zone_id": "die-pontaix",
-                "label": "Die-Pontaix",
-                "revisions": [
-                    {
-                        "revision": 1,
-                        "origin_wgs84": [5.2601, 44.7555, 460.0],
-                        "local_frame": "ENU",
-                        "meters_per_unit": 0.01,
-                        "vertical_datum": "EPSG:4979",
-                        "bounds_m": {
-                            "east": [-100.0, 100.0],
-                            "north": [-120.0, 120.0],
-                            "up": [-10.0, 50.0],
-                        },
-                    }
-                ],
-            }
-        ]
+    assert listing.headers["Cache-Control"] == "no-store"
+    assert len(listing.json()["zones"]) == 1
+    listed_zone = listing.json()["zones"][0]
+    assert {
+        key: listed_zone[key]
+        for key in ("zone_id", "label", "description", "visibility", "bounds_l93_m")
+    } == {
+        key: created.json()["zone"][key]
+        for key in ("zone_id", "label", "description", "visibility", "bounds_l93_m")
     }
+    assert listed_zone["created_at"]
+    assert listed_zone["updated_at"]
 
-    detail = client.get("/api/v1/admin/zones/die-pontaix")
+    detail = client.get("/api/v1/admin/zones/DIE-PONTAIX-08")
     assert detail.status_code == 200
-    assert detail.json()["zone_id"] == "die-pontaix"
-
-    revision = client.get("/api/v1/admin/zones/die-pontaix/revisions/1")
-    assert revision.status_code == 200
-    assert revision.json()["revision"] == 1
+    assert detail.headers["Cache-Control"] == "no-store"
+    assert detail.json()["uploads"] == []
+    assert detail.json()["information"] == []
+    assert {
+        key: detail.json()["zone"][key]
+        for key in ("zone_id", "label", "description", "visibility", "bounds_l93_m")
+    } == {
+        key: created.json()["zone"][key]
+        for key in ("zone_id", "label", "description", "visibility", "bounds_l93_m")
+    }
 
 
 def test_admin_private_preview_exposes_metadata_without_private_file_locations(
@@ -107,9 +136,14 @@ def test_admin_private_preview_exposes_metadata_without_private_file_locations(
 ) -> None:
     seed_zone(session)
 
-    response = client.get("/api/v1/admin/zones/die-pontaix/revisions/1/preview")
+    revision = client.get("/api/v1/admin/zones/DIE-PONTAIX-08/revisions/1")
+    assert revision.status_code == 200
+    assert revision.headers["Cache-Control"] == "no-store"
+
+    response = client.get("/api/v1/admin/zones/DIE-PONTAIX-08/revisions/1/preview")
 
     assert response.status_code == 200
+    assert response.headers["Cache-Control"] == "no-store"
     payload = response.json()
     assert payload["preview_scope"] == "private-admin"
     assert payload["package_id"] == "pkg-die-pontaix-private-preview"
@@ -126,24 +160,22 @@ def test_admin_private_preview_exposes_metadata_without_private_file_locations(
 
 
 def test_admin_zone_missing_resources_return_problem_details(client) -> None:
-    response = client.get("/api/v1/admin/zones/unknown-zone")
+    response = client.get("/api/v1/admin/zones/UNKNOWN-ZONE")
 
     assert response.status_code == 404
+    assert response.headers["Cache-Control"] == "no-store"
     assert response.json()["type"].endswith("not_found")
 
 
-def test_admin_mutation_workflow_endpoints_are_reserved_and_role_guarded(client) -> None:
-    endpoints = [
-        ("post", "/api/v1/admin/zones"),
-        ("post", "/api/v1/admin/zones/die-pontaix/revisions"),
-        ("post", "/api/v1/admin/zones/die-pontaix/revisions/1/packages"),
-        ("post", "/api/v1/admin/zones/die-pontaix/revisions/1/validations"),
-        ("post", "/api/v1/admin/zones/die-pontaix/revisions/1/preview"),
-        ("get", "/api/v1/admin/publications"),
-        ("post", "/api/v1/admin/publications"),
-    ]
+def test_admin_zone_id_requires_the_canonical_uppercase_format(client) -> None:
+    response = client.get("/api/v1/admin/zones/die-pontaix-08")
 
-    for method, path in endpoints:
-        response = getattr(client, method)(path)
-        assert response.status_code == 501
-        assert response.json()["type"].endswith("admin_endpoint_not_implemented")
+    assert response.status_code == 422
+
+
+def test_publication_listing_returns_an_empty_registry(client) -> None:
+    response = client.get("/api/v1/admin/publications")
+
+    assert response.status_code == 200
+    assert response.json() == {"publications": []}
+    assert response.headers["Cache-Control"] == "no-store"

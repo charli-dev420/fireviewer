@@ -131,11 +131,11 @@ Suite MVP actée après le gate G1.
 3. MVP-2 — ajouter le signalement public privé.
 4. MVP-3 — ajouter l'analyse, la proposition de placement et la revue humaine.
 5. MVP-4 — administrer les zones, leurs révisions, les paquets contrôlés et les
-   publications depuis l'interface, avant toute carte publique multi-zones.
+   publications depuis l'interface, avant toute ouverture publique par zone.
 6. MVP-5 — associer explicitement un feu validé à une zone/révision, publier
    cette association sous contrôle et conserver une archive PNG immuable.
-7. MVP-6 — exposer uniquement les zones et feux explicitement publiés sur la
-   carte publique.
+7. MVP-6 — exposer une zone explicitement publiée à son adresse propre et les
+   feux qui lui sont explicitement liés, sans carte globale.
 8. MVP-7 — traiter la météo publique, le déploiement, la sécurité,
    l'exploitation et les mesures Giro3D bureau/mobile avant toute compression
    destructive.

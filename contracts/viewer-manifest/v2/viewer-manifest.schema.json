@@ -3,7 +3,10 @@
     "AssetLod": {
       "enum": [
         "mobile",
-        "desktop"
+        "desktop",
+        "close",
+        "local",
+        "extended"
       ],
       "title": "AssetLod",
       "type": "string"

@@ -51,6 +51,10 @@ def test_operator_can_register_authenticated_trusted_source_then_ingest(
             "type": "institutional",
             "trust": "institutional",
             "display_name": "Official feed 83",
+            "public_display_name": "Official public feed 83",
+            "public_license": "CC-BY-4.0",
+            "public_reference_url": "https://example.invalid/official-feed-83",
+            "public_transformations": ["normalisation horaire"],
             "enabled": True,
             "ingest_token": TRUSTED_SOURCE_TOKEN,
             "reason": "Approved test source registration.",
@@ -58,6 +62,8 @@ def test_operator_can_register_authenticated_trusted_source_then_ingest(
     )
     assert registration.status_code == 200
     assert registration.json()["credential_configured"] is True
+    assert registration.json()["public_display_name"] == "Official public feed 83"
+    assert registration.json()["public_transformations"] == ["normalisation horaire"]
     assert "ingest_token" not in registration.text
 
     missing = client.post(

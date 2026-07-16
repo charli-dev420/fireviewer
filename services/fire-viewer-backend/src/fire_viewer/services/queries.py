@@ -15,8 +15,14 @@ from fire_viewer.db.models import (
     SpatialZoneRevision,
     ZoneArchiveSnapshot,
 )
-from fire_viewer.domain.enums import AssetState, IncidentStatus, PublicVisibility
+from fire_viewer.domain.enums import (
+    AssetState,
+    IncidentStatus,
+    PublicVisibility,
+    VerificationState,
+)
 from fire_viewer.domain.errors import DomainError, NotFoundError
+from fire_viewer.domain.model_eligibility import evaluate_model_generation_eligibility
 from fire_viewer.domain.public_visibility import (
     has_canonical_public_visibility,
     permits_public_location,
@@ -68,7 +74,9 @@ def _current_episode(incident: IncidentSeries) -> Episode:
 def _require_canonical_public_visibility(incident: IncidentSeries, current: Episode) -> None:
     """Reject corrupted lifecycle/visibility pairs before constructing any public DTO."""
 
-    if has_canonical_public_visibility(current.status, incident.public_visibility):
+    if has_canonical_public_visibility(
+        current.status, incident.public_visibility, current.verification_state
+    ):
         return
     raise DomainError(
         status_code=503,
@@ -79,21 +87,62 @@ def _require_canonical_public_visibility(incident: IncidentSeries, current: Epis
 
 
 def _public_location(incident: IncidentSeries, current: Episode) -> PointGeometryInput | None:
-    if not permits_public_location(current.status, incident.public_visibility):
+    if not permits_public_location(
+        current.status, incident.public_visibility, current.verification_state
+    ):
         return None
+    if current.verification_state == VerificationState.CORROBORATED:
+        return PointGeometryInput(
+            coordinates=(round(incident.reference_lon, 2), round(incident.reference_lat, 2)),
+            horizontal_uncertainty_m=max(incident.horizontal_uncertainty_m, 1_500.0),
+        )
     return PointGeometryInput(
         coordinates=(incident.reference_lon, incident.reference_lat),
         horizontal_uncertainty_m=incident.horizontal_uncertainty_m,
     )
 
 
-def get_incident_public(session: Session, fire_id: str) -> IncidentPublicResponse:
+def _episode_summary(episode: Episode, settings: Settings) -> EpisodeSummary:
+    eligibility = evaluate_model_generation_eligibility(
+        estimated_area_ha=episode.estimated_area_ha,
+        evacuation_established=episode.evacuation_established,
+        area_threshold_ha=settings.model_generation_min_area_ha,
+    )
+    return EpisodeSummary(
+        episode_id=episode.episode_id,
+        ordinal=episode.ordinal,
+        status=episode.status,
+        verification_state=episode.verification_state,
+        corroborating_source_count=episode.corroborating_source_count,
+        evidence_basis_at=(
+            as_utc(episode.evidence_basis_at) if episode.evidence_basis_at else None
+        ),
+        estimated_area_ha=episode.estimated_area_ha,
+        evacuation_established=episode.evacuation_established,
+        model_generation_eligible=eligibility.eligible,
+        review_required=episode.review_required,
+        started_at=as_utc(episode.started_at),
+        last_observed_at=as_utc(episode.last_observed_at),
+        validated_at=as_utc(episode.validated_at) if episode.validated_at else None,
+        ended_at=as_utc(episode.ended_at) if episode.ended_at else None,
+        is_current=episode.is_current,
+        version=episode.version,
+    )
+
+
+def get_incident_public(
+    session: Session, fire_id: str, settings: Settings
+) -> IncidentPublicResponse:
     incident = _load_incident(session, fire_id)
     current = _current_episode(incident)
     _require_canonical_public_visibility(incident, current)
     return IncidentPublicResponse(
         fire_id=incident.fire_id,
-        canonical_name=incident.canonical_name,
+        canonical_name=(
+            incident.canonical_name
+            if current.verification_state == VerificationState.VERIFIED
+            else None
+        ),
         visibility=incident.public_visibility,
         status=current.status,
         current_episode_id=current.episode_id,
@@ -102,18 +151,7 @@ def get_incident_public(session: Session, fire_id: str) -> IncidentPublicRespons
         last_observed_at=as_utc(current.last_observed_at),
         created_at=as_utc(incident.created_at),
         episodes=[
-            EpisodeSummary(
-                episode_id=episode.episode_id,
-                ordinal=episode.ordinal,
-                status=episode.status,
-                review_required=episode.review_required,
-                started_at=as_utc(episode.started_at),
-                last_observed_at=as_utc(episode.last_observed_at),
-                validated_at=as_utc(episode.validated_at) if episode.validated_at else None,
-                ended_at=as_utc(episode.ended_at) if episode.ended_at else None,
-                is_current=episode.is_current,
-                version=episode.version,
-            )
+            _episode_summary(episode, settings)
             for episode in sorted(incident.episodes, key=lambda item: item.ordinal, reverse=True)
         ],
     )
@@ -170,7 +208,9 @@ def get_viewer_manifest(
 
     if withheld:
         model_state = "withheld"
-    elif not permits_public_viewer_asset(current.status, incident.public_visibility):
+    elif not permits_public_viewer_asset(
+        current.status, incident.public_visibility, current.verification_state
+    ):
         # The immutable archive retains a PNG internally.  It intentionally does not leak a
         # historic GLB, a viewer frame, or an archive URL through the public v2 manifest.
         # This also applies to every CLOSED episode before checking any stored asset.

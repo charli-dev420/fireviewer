@@ -6,9 +6,14 @@ import pytest
 from pydantic import ValidationError
 
 from fire_viewer.db.models import ManifestRevision, ModelAsset, SpatialZone, SpatialZoneRevision
-from fire_viewer.domain.enums import AssetLod, AssetState, IncidentStatus, PublicVisibility
+from fire_viewer.domain.enums import (
+    AssetLod,
+    AssetState,
+    IncidentStatus,
+    PublicVisibility,
+    VerificationState,
+)
 from fire_viewer.domain.public_visibility import (
-    CANONICAL_VISIBILITY_BY_STATUS,
     canonical_public_visibility,
     permits_public_location,
     permits_public_viewer_asset,
@@ -18,28 +23,76 @@ from fire_viewer.domain.spatial import derive_raf20_origin
 
 
 @pytest.mark.parametrize(
-    ("status", "visibility", "location_allowed", "asset_allowed"),
+    ("status", "verification", "visibility", "location_allowed", "asset_allowed"),
     [
-        (IncidentStatus.CANDIDATE, PublicVisibility.LIMITED, False, False),
-        (IncidentStatus.UNDER_REVIEW, PublicVisibility.LIMITED, False, False),
-        (IncidentStatus.REJECTED, PublicVisibility.LIMITED, False, False),
-        (IncidentStatus.SUSPENDED, PublicVisibility.SUSPENDED, False, False),
-        (IncidentStatus.ACTIVE_CONFIRMED, PublicVisibility.PUBLIC, True, True),
-        (IncidentStatus.MONITORING, PublicVisibility.PUBLIC, True, True),
-        (IncidentStatus.EXTINGUISHED, PublicVisibility.PUBLIC, True, True),
-        (IncidentStatus.CLOSED, PublicVisibility.PUBLIC, True, False),
+        (
+            IncidentStatus.CANDIDATE,
+            VerificationState.CORROBORATED,
+            PublicVisibility.PUBLIC,
+            True,
+            False,
+        ),
+        (
+            IncidentStatus.UNDER_REVIEW,
+            VerificationState.UNVERIFIED,
+            PublicVisibility.LIMITED,
+            False,
+            False,
+        ),
+        (
+            IncidentStatus.REJECTED,
+            VerificationState.VERIFIED,
+            PublicVisibility.LIMITED,
+            False,
+            False,
+        ),
+        (
+            IncidentStatus.SUSPENDED,
+            VerificationState.VERIFIED,
+            PublicVisibility.SUSPENDED,
+            False,
+            False,
+        ),
+        (
+            IncidentStatus.ACTIVE_CONFIRMED,
+            VerificationState.VERIFIED,
+            PublicVisibility.PUBLIC,
+            True,
+            True,
+        ),
+        (
+            IncidentStatus.MONITORING,
+            VerificationState.CORROBORATED,
+            PublicVisibility.PUBLIC,
+            True,
+            False,
+        ),
+        (
+            IncidentStatus.EXTINGUISHED,
+            VerificationState.VERIFIED,
+            PublicVisibility.PUBLIC,
+            True,
+            True,
+        ),
+        (
+            IncidentStatus.CLOSED,
+            VerificationState.VERIFIED,
+            PublicVisibility.PUBLIC,
+            True,
+            False,
+        ),
     ],
 )
-def test_canonical_visibility_mapping_covers_every_lifecycle_status(
+def test_canonical_visibility_policy_combines_lifecycle_and_evidence(
     status: IncidentStatus,
+    verification: VerificationState,
     visibility: PublicVisibility,
     location_allowed: bool,
     asset_allowed: bool,
 ) -> None:
-    assert set(CANONICAL_VISIBILITY_BY_STATUS) == set(IncidentStatus)
-    assert canonical_public_visibility(status) == visibility
-    assert permits_public_location(status, visibility) is location_allowed
-    assert permits_public_viewer_asset(status, visibility) is asset_allowed
+    assert canonical_public_visibility(status, verification) == visibility
+    assert permits_public_location(status, visibility, verification) is location_allowed
+    assert permits_public_viewer_asset(status, visibility, verification) is asset_allowed
 
 
 def _create_incident(client, payload_factory, key: str, longitude: float) -> str:
@@ -81,15 +134,29 @@ def _transition(
     return response.json()["version"]
 
 
-def _assert_public_state(client, fire_id: str, status: IncidentStatus) -> None:
+def _assert_public_state(
+    client,
+    fire_id: str,
+    status: IncidentStatus,
+    verification: VerificationState = VerificationState.UNVERIFIED,
+) -> None:
     response = client.get(f"/api/v1/incident/{fire_id}")
 
     assert response.status_code == 200
     payload = response.json()
-    expected_visibility = canonical_public_visibility(status)
+    expected_visibility = canonical_public_visibility(status, verification)
     assert payload["status"] == status.value
     assert payload["visibility"] == expected_visibility.value
-    assert (payload["location"] is not None) is permits_public_location(status, expected_visibility)
+    assert (payload["location"] is not None) is permits_public_location(
+        status, expected_visibility, verification
+    )
+
+
+def _current_episode_version(client, fire_id: str) -> int:
+    payload = client.get(f"/api/v1/incident/{fire_id}").json()
+    return next(episode for episode in payload["episodes"] if episode["is_current"])[
+        "version"
+    ]
 
 
 def test_operator_transitions_apply_the_canonical_visibility_policy(
@@ -101,7 +168,7 @@ def test_operator_transitions_apply_the_canonical_visibility_policy(
         client,
         fire_id=rejected_id,
         target=IncidentStatus.UNDER_REVIEW,
-        version=1,
+        version=_current_episode_version(client, rejected_id),
         suffix="review-0001",
     )
     _assert_public_state(client, rejected_id, IncidentStatus.UNDER_REVIEW)
@@ -121,7 +188,7 @@ def test_operator_transitions_apply_the_canonical_visibility_policy(
         client,
         fire_id=suspended_id,
         target=IncidentStatus.SUSPENDED,
-        version=1,
+        version=_current_episode_version(client, suspended_id),
         suffix="suspend-0001",
     )
     _assert_public_state(client, suspended_id, IncidentStatus.SUSPENDED)
@@ -131,10 +198,15 @@ def test_operator_transitions_apply_the_canonical_visibility_policy(
         client,
         fire_id=public_id,
         target=IncidentStatus.ACTIVE_CONFIRMED,
-        version=1,
+        version=_current_episode_version(client, public_id),
         suffix="confirm-0001",
     )
-    _assert_public_state(client, public_id, IncidentStatus.ACTIVE_CONFIRMED)
+    _assert_public_state(
+        client,
+        public_id,
+        IncidentStatus.ACTIVE_CONFIRMED,
+        VerificationState.VERIFIED,
+    )
     version = _transition(
         client,
         fire_id=public_id,
@@ -142,7 +214,9 @@ def test_operator_transitions_apply_the_canonical_visibility_policy(
         version=version,
         suffix="monitoring-0001",
     )
-    _assert_public_state(client, public_id, IncidentStatus.MONITORING)
+    _assert_public_state(
+        client, public_id, IncidentStatus.MONITORING, VerificationState.VERIFIED
+    )
     version = _transition(
         client,
         fire_id=public_id,
@@ -150,7 +224,9 @@ def test_operator_transitions_apply_the_canonical_visibility_policy(
         version=version,
         suffix="extinguished-0001",
     )
-    _assert_public_state(client, public_id, IncidentStatus.EXTINGUISHED)
+    _assert_public_state(
+        client, public_id, IncidentStatus.EXTINGUISHED, VerificationState.VERIFIED
+    )
     _transition(
         client,
         fire_id=public_id,
@@ -158,7 +234,9 @@ def test_operator_transitions_apply_the_canonical_visibility_policy(
         version=version,
         suffix="closed-0001",
     )
-    _assert_public_state(client, public_id, IncidentStatus.CLOSED)
+    _assert_public_state(
+        client, public_id, IncidentStatus.CLOSED, VerificationState.VERIFIED
+    )
 
 
 def _publish_valid_asset(session, incident, episode) -> None:
@@ -303,5 +381,8 @@ def test_viewer_manifest_rejects_lifecycle_states_that_cannot_publish_a_model(
     invalid_withheld["asset"] = None
     invalid_withheld["frame"] = None
     invalid_withheld["model_state"] = "withheld"
-    with pytest.raises(ValidationError, match="non-public lifecycle"):
-        ViewerManifest.model_validate(invalid_withheld)
+    withheld = ViewerManifest.model_validate(invalid_withheld)
+    assert withheld.model_state == "withheld"
+    assert withheld.location is None
+    assert withheld.asset is None
+    assert withheld.frame is None

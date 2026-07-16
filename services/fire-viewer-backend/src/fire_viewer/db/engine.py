@@ -6,19 +6,44 @@ from sqlalchemy.orm import Session, sessionmaker
 from fire_viewer.core.config import Settings
 
 
+def normalize_database_url(database_url: str) -> str:
+    """Select psycopg 3 explicitly for PostgreSQL URLs supplied by Neon/Vercel."""
+
+    if database_url.startswith("postgres://"):
+        return database_url.replace("postgres://", "postgresql+psycopg://", 1)
+    if database_url.startswith("postgresql://"):
+        return database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    return database_url
+
+
 def create_db_engine(settings: Settings) -> Engine:
+    database_url = normalize_database_url(settings.database_url)
     connect_args: dict[str, object] = {}
-    if settings.database_url.startswith("sqlite"):
+    engine_options: dict[str, object] = {}
+    if database_url.startswith("sqlite"):
         connect_args = {
             "check_same_thread": False,
             "timeout": settings.sqlite_busy_timeout_ms / 1_000,
         }
+    else:
+        connect_args = {
+            "options": (
+                "-c timezone=UTC "
+                f"-c statement_timeout={settings.database_statement_timeout_ms}"
+            )
+        }
+        engine_options = {
+            "pool_size": settings.database_pool_size,
+            "max_overflow": settings.database_max_overflow,
+            "pool_recycle": settings.database_pool_recycle_seconds,
+        }
 
     engine = create_engine(
-        settings.database_url,
+        database_url,
         connect_args=connect_args,
         pool_pre_ping=True,
         future=True,
+        **engine_options,
     )
 
     if engine.dialect.name == "sqlite":

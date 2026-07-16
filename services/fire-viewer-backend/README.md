@@ -1,6 +1,9 @@
-# Fire-Viewer - socle backend incident-centrique
+# Fire-Viewer - backend incident-centrique
 
-Premier incrément fonctionnel du backend décrit dans la roadmap Fire-Viewer. Le dépôt livre une **vertical slice exécutable** autour de la phase 02, le contrat de manifeste de la phase 01, ainsi que les fondations utiles aux phases 06, 10, 11 et 14.
+Le dépôt livre le socle G1 exécutable du registre incident-centrique, les projections publiques et
+administratives, le registre de packages spatiaux et les adaptateurs PostgreSQL/PostGIS et Vercel
+Private Blob. L'état exact par rapport au cahier des charges complet est suivi dans
+[`../../docs/ADMIN_BACKEND_READINESS.md`](../../docs/ADMIN_BACKEND_READINESS.md).
 
 > Ce logiciel est un socle de développement et de démonstration. Il n'est pas certifié pour la conduite des secours, l'évacuation, la prévision de propagation ni la confirmation automatique d'un feu.
 
@@ -26,6 +29,11 @@ Premier incrément fonctionnel du backend décrit dans la roadmap Fire-Viewer. L
 - Sauvegarde SQLite locale validée et restauration non destructive vers une nouvelle cible,
   avec intégrité, clés étrangères, migrations, audit et triggers critiques contrôlés.
 - Dockerfile non-root et Compose local.
+- PostgreSQL/PostGIS pour le runtime hébergé, avec contrôle strict de la révision Alembic et des
+  index spatiaux dans `/readyz`.
+- Point d'entrée FastAPI pour Vercel et stockage privé local/Vercel Blob.
+- Session administrateur locale G1 avec cookie `HttpOnly`, CSRF en mémoire et limitation des
+  tentatives de connexion.
 
 ## Démarrage local
 
@@ -48,6 +56,23 @@ Points d'entrée :
 - OpenAPI : `http://localhost:8000/openapi.json`
 
 Le profil SQLite doit rester **mono-processus / mono-writer**. Ne lancez pas plusieurs workers Uvicorn sur le même fichier. Le passage à plusieurs instances exige PostgreSQL/PostGIS.
+
+### Compte administrateur unique
+
+Générez le hash avec `fire-viewer-hash-admin-password`, puis configurez uniquement dans
+le gestionnaire de secrets de l'environnement :
+
+```text
+FV_AUTH_MODE=local_admin
+FV_LOCAL_ADMIN_USERNAME=admin
+FV_LOCAL_ADMIN_PASSWORD_HASH=scrypt$...
+FV_PUBLIC_REPORT_HASH_SECRET=<secret aléatoire d'au moins 32 caractères>
+```
+
+Le mot de passe en clair ne doit jamais être commité. La récupération consiste à générer un
+nouveau hash, remplacer `FV_LOCAL_ADMIN_PASSWORD_HASH`, révoquer les sessions existantes et
+consigner l'opération. Une sauvegarde locale chiffrée ou protégée par les permissions du compte
+système peut conserver le mot de passe de secours hors du dépôt.
 
 ## Démarrage Docker
 
@@ -214,9 +239,13 @@ fichier ni téléchargement. Un asset GLB de démonstration vérifiable est repo
 
 - La géométrie d'ingestion est limitée à `Point` + incertitude horizontale.
 - Les fonctions de score sont des paramètres de prototype G1, pas des seuils opérationnels validés.
-- Aucun worker LiDAR, upload de preuve, Agent A/Agent B ni pipeline de publication GLB n'est inclus.
+- La préparation LiDAR reste volontairement locale ; le backend reçoit des packages déjà produits.
+- Le téléversement hébergé direct/multipart des gros packages n'est pas encore implémenté.
+- Le workflow complet contributions/médias/consentements n'est pas encore implémenté.
+- Aucun runner RunPod, registre SLM ou supervision IA de production n'est inclus.
 - Les tables `job` et `outbox_event` sont persistées, mais aucun runner/dispatcher n'est encore fourni.
-- Le schéma PostgreSQL/PostGIS cible est documenté; la migration automatisée depuis SQLite reste une phase dédiée.
+- Le schéma PostgreSQL/PostGIS est migré par Alembic ; l'import automatisé depuis une base SQLite
+  existante reste une phase dédiée.
 - L'authentification forte des opérateurs dépend de l'IdP OIDC raccordé par le déploiement.
 - Le rate limiting, le WAF et la protection de `/metrics` sont à appliquer au proxy/ingress.
 

@@ -20,6 +20,12 @@ from pyproj import Transformer, datadir, network
 LOCAL_FRAME = "ENU"
 VERTICAL_DATUM = "EPSG:4979"
 SOURCE_VERTICAL_DATUM = "NGF-IGN69"
+SPATIAL_PROFILE_VERSION = "2.0"
+PRODUCTION_HORIZONTAL_CRS = "EPSG:2154"
+PRODUCTION_VERTICAL_CRS = "EPSG:5720"
+PRODUCTION_GROUND_MODEL = "MNT_LIDAR_HD"
+PRODUCTION_GROUND_RESOLUTION_M = 0.5
+PRODUCTION_SURFACE_HEIGHT_REFERENCE = "MNS_RELATIVE_TO_MNT"
 VERTICAL_TRANSFORM_ID = "RAF20"
 RAF20_GRID_FILENAME = "fr_ign_RAF20.tif"
 RAF20_GRID_SHA256 = "dc0cc2a38f0ea1029fe72cca3b5b7ed6dfe7e1db2a8d8482b7326ce3d6f25605"
@@ -28,6 +34,10 @@ METERS_PER_UNITY_UNIT = 0.01
 UNITY_PROFILE = "unity-eun-100-v1"
 GLTF_TO_UNITY_PROFILE = "gltf-eun-negz-metric-v1"
 RAF20_DERIVATION_TOLERANCE_M = 0.001
+
+_WGS84_TO_LAMBERT93 = Transformer.from_crs(
+    "EPSG:4326", PRODUCTION_HORIZONTAL_CRS, always_xy=True
+)
 
 
 class SpatialProfileError(ValueError):
@@ -84,6 +94,16 @@ def validate_france_continentale_origin(
             "Corsica requires RAC23/NGF-IGN78."
         )
     return validated
+
+
+def wgs84_to_lambert93(longitude: float, latitude: float) -> tuple[float, float]:
+    """Return the metric production origin in Lambert-93 without network access."""
+
+    validate_france_continentale_origin((longitude, latitude, 0.0))
+    easting, northing = _WGS84_TO_LAMBERT93.transform(longitude, latitude)
+    if not (_is_finite(easting) and _is_finite(northing)):
+        raise SpatialProfileError("Lambert-93 production origin must be finite")
+    return float(easting), float(northing)
 
 
 def raf20_grid_path() -> Path:

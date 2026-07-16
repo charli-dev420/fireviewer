@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import csv
+from io import StringIO
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Header, Response
+from fastapi import APIRouter, Header, Request, Response
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from fire_viewer.api.dependencies import (
     FireIdDep,
@@ -19,14 +21,19 @@ from fire_viewer.domain.schemas import (
     DetectionRequest,
     DetectionResponse,
     IncidentPublicResponse,
+    PublicIncidentReportReceipt,
+    PublicIncidentReportRequest,
+    PublicIncidentView,
     ViewerManifest,
 )
 from fire_viewer.services.detection import process_detection
+from fire_viewer.services.public_incident_view import get_public_incident_view, submit_public_report
 from fire_viewer.services.queries import get_incident_public, get_viewer_manifest
 
 router = APIRouter(tags=["incidents"])
 
 _MANIFEST_CACHE_CONTROL = "public, max-age=30, must-revalidate"
+_PUBLIC_VIEW_CACHE_CONTROL = "public, max-age=30, must-revalidate"
 _TRACE_ID_HEADER: dict[str, Any] = {
     "description": "Trace identifier to include when reporting an error.",
     "schema": {"type": "string"},
@@ -99,10 +106,91 @@ def get_incident(
     fire_id: FireIdDep,
     response: Response,
     session: SessionDep,
+    settings: SettingsDep,
 ) -> IncidentPublicResponse:
-    result = get_incident_public(session, fire_id)
+    result = get_incident_public(session, fire_id, settings)
     response.headers["Cache-Control"] = "public, max-age=15, must-revalidate"
     return result
+
+
+@router.get("/{fire_id}/public-view", response_model=PublicIncidentView)
+def get_public_view(
+    fire_id: FireIdDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    if_none_match: Annotated[str | None, Header(alias="If-None-Match")] = None,
+) -> PublicIncidentView | Response:
+    view = get_public_incident_view(session, fire_id=fire_id, settings=settings)
+    payload = view.model_dump(mode="json", exclude_none=False)
+    etag = f'"{sha256_hex(payload)}"'
+    headers = {"ETag": etag, "Cache-Control": _PUBLIC_VIEW_CACHE_CONTROL}
+    if if_none_match == etag:
+        return Response(status_code=304, headers=headers)
+    return JSONResponse(content=jsonable_encoder(payload), headers=headers)
+
+
+@router.get("/{fire_id}/public-view/export.json")
+def export_public_view_json(
+    fire_id: FireIdDep,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> JSONResponse:
+    view = get_public_incident_view(session, fire_id=fire_id, settings=settings)
+    return JSONResponse(
+        content=jsonable_encoder(view.model_dump(mode="json", exclude_none=False)),
+        headers={
+            "Cache-Control": _PUBLIC_VIEW_CACHE_CONTROL,
+            "Content-Disposition": f'attachment; filename="{fire_id}-public-view.json"',
+        },
+    )
+
+
+@router.get("/{fire_id}/public-view/timeline.csv")
+def export_public_timeline_csv(
+    fire_id: FireIdDep,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> PlainTextResponse:
+    view = get_public_incident_view(session, fire_id=fire_id, settings=settings)
+    stream = StringIO(newline="")
+    writer = csv.writer(stream)
+    writer.writerow(["occurred_at", "kind", "label", "episode_id"])
+    for event in view.timeline:
+        writer.writerow(
+            [event.occurred_at.isoformat(), event.kind, event.label, event.episode_id or ""]
+        )
+    return PlainTextResponse(
+        stream.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Cache-Control": _PUBLIC_VIEW_CACHE_CONTROL,
+            "Content-Disposition": f'attachment; filename="{fire_id}-public-timeline.csv"',
+        },
+    )
+
+
+@router.post("/{fire_id}/reports", response_model=PublicIncidentReportReceipt, status_code=202)
+def create_public_report(
+    fire_id: FireIdDep,
+    payload: PublicIncidentReportRequest,
+    request: Request,
+    response: Response,
+    session: SessionDep,
+    settings: SettingsDep,
+    trace_id: TraceIdDep,
+) -> PublicIncidentReportReceipt:
+    # Do not trust forwarded headers unless a deployment explicitly adds a trusted proxy layer.
+    origin = request.client.host if request.client is not None else "unknown"
+    receipt = submit_public_report(
+        session,
+        fire_id=fire_id,
+        payload=payload,
+        origin=origin,
+        trace_id=trace_id,
+        settings=settings,
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return receipt
 
 
 @router.get(

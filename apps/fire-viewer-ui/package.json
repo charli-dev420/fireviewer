@@ -13,14 +13,14 @@
     "pack:spatial": "node tools/pack-spatial-release.mjs",
     "fetch:spatial": "node tools/fetch-spatial-release.mjs",
     "test:e2e": "npm run verify:spatial && playwright test",
-    "test:e2e:spatial": "npm run verify:spatial && playwright test e2e/spatial-map.spec.ts",
     "test:e2e:install": "playwright install chromium",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
-    "@giro3d/giro3d": "2.0.3",
-    "ol": "10.8.0",
-    "proj4": "2.19.0",
+    "@fontsource-variable/ibm-plex-sans": "^5.2.8",
+    "@fontsource-variable/source-serif-4": "^5.2.9",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@vercel/blob": "^2.6.1",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "three": "0.180.0"

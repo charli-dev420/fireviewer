@@ -174,6 +174,7 @@ def test_restore_rejects_weakened_audit_trigger_without_publishing_target(
     (
         ("episode_incident_immutable", "DROP TRIGGER episode_incident_immutable"),
         ("spatial_zone_zone_id_immutable", "DROP TRIGGER spatial_zone_zone_id_immutable"),
+        ("zone_publication_no_delete", "DROP TRIGGER zone_publication_no_delete"),
     ),
 )
 def test_restore_rejects_missing_current_sqlite_guard_without_publishing_target(
@@ -186,6 +187,25 @@ def test_restore_rejects_missing_current_sqlite_guard_without_publishing_target(
 
     target = tmp_path / "restored" / f"missing-{trigger_name}.db"
     with pytest.raises(SQLiteValidationError, match="missing_sqlite_invariant_trigger"):
+        restore_sqlite_backup(backup, target)
+    assert not target.exists()
+    assert not list(target.parent.glob("*.part"))
+
+
+def test_restore_rejects_weakened_admin_zone_guard_without_publishing_target(
+    client, settings, payload_factory, tmp_path
+) -> None:
+    backup = _create_audited_backup(client, settings, payload_factory, tmp_path)
+    with closing(sqlite3.connect(backup)) as connection:
+        connection.execute("DROP TRIGGER zone_publication_insert_valid")
+        connection.execute(
+            "CREATE TRIGGER zone_publication_insert_valid BEFORE INSERT ON zone_publication "
+            "WHEN 0 BEGIN SELECT RAISE(ABORT, 'zone publication must start as draft'); END"
+        )
+        connection.commit()
+
+    target = tmp_path / "restored" / "weakened-admin-zone-guard.db"
+    with pytest.raises(SQLiteValidationError, match="invalid_sqlite_invariant_trigger"):
         restore_sqlite_backup(backup, target)
     assert not target.exists()
     assert not list(target.parent.glob("*.part"))

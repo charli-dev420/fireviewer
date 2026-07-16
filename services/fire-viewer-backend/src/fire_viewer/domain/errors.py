@@ -82,3 +82,13 @@ class BadRequestError(DomainError):
             title="Bad request",
             detail=detail,
         )
+
+
+class PayloadTooLargeError(DomainError):
+    def __init__(self, detail: str) -> None:
+        super().__init__(
+            status_code=413,
+            code="payload_too_large",
+            title="Payload too large",
+            detail=detail,
+        )

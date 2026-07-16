@@ -25,6 +25,7 @@ export type IconName =
   | 'offline'
   | 'refresh'
   | 'search'
+  | 'send'
   | 'shield'
   | 'sparkles'
   | 'table'
@@ -205,6 +206,13 @@ export function Icon({ name, size = 20, ...props }: IconProps) {
         <svg {...common}>
           <circle cx="11" cy="11" r="7" />
           <path d="m20 20-4-4" />
+        </svg>
+      );
+    case 'send':
+      return (
+        <svg {...common}>
+          <path d="m21 3-7.2 18-3.8-8.2L3 9.1 21 3Z" />
+          <path d="m10 12.8 4.1-4.1" />
         </svg>
       );
     case 'shield':

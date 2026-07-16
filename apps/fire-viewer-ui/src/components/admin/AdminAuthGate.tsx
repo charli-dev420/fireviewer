@@ -1,65 +1,90 @@
-import { FormEvent, useMemo, useState, type ReactNode } from 'react';
-import {
-  buildAdminAuthorizationHeader,
-  clearAdminSession,
-  loadAdminSession,
-  saveAdminSession,
-  validateAdminToken,
-  type AdminSession,
-} from '../../lib/adminSession';
+import { FormEvent, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { loginAdmin, logoutAdmin, validateAdminSession, type AdminSession } from '../../lib/adminSession';
 
 interface AdminAuthGateProps {
   children: (session: AdminSession, onSignOut: () => void) => ReactNode;
 }
 
-function formatExpiration(expiresAt: string | null): string {
-  if (!expiresAt) return 'expiration non fournie';
-  return new Intl.DateTimeFormat('fr-FR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(new Date(expiresAt));
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
 }
 
 export function AdminAuthGate({ children }: AdminAuthGateProps) {
-  const initialSession = useMemo(() => loadAdminSession(), []);
-  const [session, setSession] = useState<AdminSession | null>(initialSession);
-  const [token, setToken] = useState('');
+  const [session, setSession] = useState<AdminSession | null>(null);
+  const [username, setUsername] = useState('admin');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const validationId = useRef(0);
+  const controllerRef = useRef<AbortController | null>(null);
 
-  const signOut = () => {
-    clearAdminSession();
+  const signOut = useCallback(() => {
+    validationId.current += 1;
+    controllerRef.current?.abort();
+    if (session) {
+      void logoutAdmin(session);
+    }
     setSession(null);
-    setToken('');
+    setPassword('');
     setError(null);
-  };
+    setChecking(false);
+  }, [session]);
+
+  const verify = useCallback(async (candidate?: { username: string; password: string }) => {
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    const currentValidationId = validationId.current + 1;
+    validationId.current = currentValidationId;
+    setChecking(true);
+    setError(null);
+
+    try {
+      const validation = candidate ? await loginAdmin(candidate.username, candidate.password, { signal: controller.signal }) : await validateAdminSession({ signal: controller.signal });
+      if (controller.signal.aborted || validationId.current !== currentValidationId) return;
+
+      if (!validation.ok) {
+        setSession(null);
+        setError(validation.reason);
+        return;
+      }
+
+      setSession(validation.session);
+      setPassword('');
+    } catch (caughtError) {
+      if (controller.signal.aborted || validationId.current !== currentValidationId || isAbortError(caughtError)) {
+        return;
+      }
+      setSession(null);
+      setError('La vérification de session a été interrompue.');
+    } finally {
+      if (validationId.current === currentValidationId) setChecking(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void verify();
+    return () => controllerRef.current?.abort();
+  }, [verify]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const validation = validateAdminToken(token);
-    if (!validation.ok) {
-      setError(validation.reason);
-      return;
-    }
-    saveAdminSession(validation.session);
-    setSession(validation.session);
-    setToken('');
-    setError(null);
+    void verify({ username, password });
   };
 
-  if (session) {
+  if (checking) {
     return (
-      <>
-        <div className="admin-auth-state" role="status">
-          <div>
-            <strong>Session administrateur active</strong>
-            <span>{session.subject} · {formatExpiration(session.expiresAt)}</span>
-          </div>
-          <code>{buildAdminAuthorizationHeader(session).slice(0, 18)}…</code>
-          <button type="button" className="button button--small" onClick={signOut}>Se déconnecter</button>
+      <main className="loading-screen" role="status" aria-live="polite">
+        <div>
+          <strong>Validation de la session administrateur…</strong>
+          <span>L’API vérifie les droits avant d’ouvrir l’espace privé.</span>
         </div>
-        {children(session, signOut)}
-      </>
+      </main>
     );
+  }
+
+  if (session) {
+    return children(session, signOut);
   }
 
   return (
@@ -68,20 +93,16 @@ export function AdminAuthGate({ children }: AdminAuthGateProps) {
         <span className="eyebrow">Accès privé</span>
         <h1 id="admin-login-title">Connexion administrateur requise</h1>
         <p>
-          Collez un bearer JWT contenant le rôle <code>administrator</code>. Le backend reste l’autorité :
-          chaque future requête privée devra envoyer ce jeton dans l’en-tête <code>Authorization</code>.
+          Utilisez le compte administrateur local. Le mot de passe n’est jamais conservé dans le navigateur.
         </p>
-        <label htmlFor="admin-token">Bearer JWT administrateur</label>
-        <textarea
-          id="admin-token"
-          value={token}
-          onChange={(event) => setToken(event.currentTarget.value)}
-          rows={5}
-          autoComplete="off"
-          spellCheck={false}
-        />
+        <label htmlFor="admin-username">Identifiant</label>
+        <input id="admin-username" value={username} onChange={(event) => setUsername(event.currentTarget.value)} autoComplete="username" disabled={checking} />
+        <label htmlFor="admin-password">Mot de passe</label>
+        <input id="admin-password" type="password" value={password} onChange={(event) => setPassword(event.currentTarget.value)} autoComplete="current-password" disabled={checking} />
         {error ? <p role="alert">{error}</p> : null}
-        <button type="submit" className="button button--primary">Ouvrir l’administration</button>
+        <button type="submit" className="button button--primary" disabled={checking}>
+          Ouvrir l’administration
+        </button>
       </form>
     </main>
   );

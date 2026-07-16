@@ -6,6 +6,7 @@ from sqlalchemy import engine_from_config, pool
 
 from fire_viewer.db import models  # noqa: F401
 from fire_viewer.db.base import Base
+from fire_viewer.db.engine import normalize_database_url
 
 config = context.config
 
@@ -18,7 +19,8 @@ target_metadata = Base.metadata
 def database_url() -> str:
     """Resolve the Alembic target with the same FV_ override as the app."""
 
-    return os.environ.get("FV_DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+    raw_url = os.environ.get("FV_DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+    return normalize_database_url(raw_url)
 
 
 def include_object(

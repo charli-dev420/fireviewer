@@ -188,12 +188,16 @@ export default async function globalSetup(_config: FullConfig): Promise<() => Pr
   await assertPortAvailable(5173, 'Vite E2E UI');
   const temporaryDirectory = await mkdtemp(join(tmpdir(), 'fire-viewer-e2e-'));
   const databasePath = join(temporaryDirectory, 'fire_viewer_e2e.sqlite');
+  const zoneUploadStorageDirectory = join(temporaryDirectory, 'zone_uploads');
   const databaseUrl = sqliteUrl(databasePath);
   const backendEnvironment: NodeJS.ProcessEnv = {
     ...process.env,
     FV_ENVIRONMENT: 'test',
     FV_AUTH_MODE: 'disabled',
     FV_DATABASE_URL: databaseUrl,
+    // Les archives E2E doivent rester dans le répertoire temporaire qui sera
+    // détruit à la fin du run, jamais dans data/ du dépôt développeur.
+    FV_ZONE_UPLOAD_STORAGE_DIR: zoneUploadStorageDirectory,
     FV_CORS_ORIGINS: JSON.stringify([UI_ORIGIN]),
     FV_TRUSTED_HOSTS: JSON.stringify(['localhost', '127.0.0.1']),
   };

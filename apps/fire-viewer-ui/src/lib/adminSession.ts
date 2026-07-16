@@ -1,134 +1,52 @@
-const ADMIN_SESSION_STORAGE_KEY = 'fire-viewer:admin-session:v1';
-const ADMIN_ROLE = 'administrator';
+export interface AdminSession { readonly csrfToken?: string; readonly token?: string; }
+export type AdminSessionValidation = { ok: true; session: AdminSession } | { ok: false; reason: string };
+export interface AdminSessionEnvironment { readonly VITE_API_BASE_URL?: unknown; }
+export interface AdminSessionValidationOptions { readonly environment?: AdminSessionEnvironment; readonly fetchImpl?: typeof fetch; readonly signal?: AbortSignal; }
 
-export interface AdminSession {
-  readonly token: string;
-  readonly subject: string;
-  readonly roles: string[];
-  readonly expiresAt: string | null;
+function environment(environment?: AdminSessionEnvironment): AdminSessionEnvironment { return environment ?? import.meta.env as AdminSessionEnvironment; }
+function isLoopback(host: string): boolean { return host === 'localhost' || host === '127.0.0.1' || host === '::1'; }
+export function getAdminApiOrigin(value?: AdminSessionEnvironment): string | null {
+  const raw = environment(value).VITE_API_BASE_URL;
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  try { const url = new URL(raw); return (url.protocol === 'https:' || (url.protocol === 'http:' && isLoopback(url.hostname))) && !url.username && !url.password && url.pathname === '/' ? url.origin : null; } catch { return null; }
 }
-
-export type AdminSessionValidation =
-  | { ok: true; session: AdminSession }
-  | { ok: false; reason: string };
-
-interface JwtPayload {
-  readonly sub?: unknown;
-  readonly name?: unknown;
-  readonly preferred_username?: unknown;
-  readonly email?: unknown;
-  readonly role?: unknown;
-  readonly roles?: unknown;
-  readonly scope?: unknown;
-  readonly exp?: unknown;
-}
-
-function safeSessionStorage(): Storage | null {
+export function buildAdminSessionUrl(apiOrigin: string): string { return `${apiOrigin}/api/v1/admin/session`; }
+export function normalizeAdminBearer(value: string): string | null { const token = value.replace(/^Bearer(?:\s+|$)/i, '').trim(); return token && !/\s/.test(token) ? token : null; }
+/** Deprecated compatibility exports. Local-admin sessions are cookies, never browser storage. */
+export function loadAdminSession(_storage?: Storage | null): AdminSession | null { return null; }
+export function saveAdminSession(_session: AdminSession, _storage?: Storage | null): void { /* no browser persistence */ }
+export function clearAdminSession(_storage?: Storage | null): void { /* no browser persistence */ }
+export function buildAdminAuthorizationHeader(session: AdminSession): string { return session.token ? `Bearer ${session.token}` : ''; }
+export async function validateAdminSession(options: AdminSessionValidationOptions = {}): Promise<AdminSessionValidation> {
+  const apiOrigin = getAdminApiOrigin(options.environment);
+  if (!apiOrigin) return { ok: false, reason: 'Connexion administrateur requise.' };
   try {
-    return window.sessionStorage;
-  } catch {
-    return null;
-  }
+    const response = await (options.fetchImpl ?? fetch)(buildAdminSessionUrl(apiOrigin), { method: 'GET', headers: { Accept: 'application/json' }, credentials: 'include', cache: 'no-store', signal: options.signal });
+    if (response.status !== 200) return { ok: false, reason: 'La session administrateur a expiré.' };
+    const payload: unknown = await response.json();
+    if (!payload || typeof payload !== 'object') return { ok: false, reason: 'La réponse de session n’est pas conforme.' };
+    const record = payload as { authenticated?: unknown; csrf_token?: unknown };
+    const keys = Object.keys(record);
+    if (
+      record.authenticated !== true
+      || keys.some((key) => key !== 'authenticated' && key !== 'csrf_token')
+      || (record.csrf_token !== undefined && record.csrf_token !== null && typeof record.csrf_token !== 'string')
+    ) return { ok: false, reason: 'La réponse de session n’est pas conforme.' };
+    const csrfToken = typeof record.csrf_token === 'string' && record.csrf_token ? record.csrf_token : undefined;
+    return { ok: true, session: csrfToken ? { csrfToken } : {} };
+  } catch (error) { if (error instanceof Error && error.name === 'AbortError') throw error; return { ok: false, reason: 'Le service d’administration est inaccessible.' }; }
 }
-
-function decodeBase64Url(value: string): string {
-  const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
-  const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
-  return atob(padded);
-}
-
-function parseJwtPayload(token: string): JwtPayload | null {
-  const [, payload] = token.split('.');
-  if (!payload) return null;
-
+export async function loginAdmin(username: string, password: string, options: AdminSessionValidationOptions = {}): Promise<AdminSessionValidation> {
+  const apiOrigin = getAdminApiOrigin(options.environment);
+  if (!apiOrigin) return { ok: false, reason: 'Administration non configurée.' };
   try {
-    const parsed: unknown = JSON.parse(decodeBase64Url(payload));
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-    return parsed as JwtPayload;
-  } catch {
-    return null;
-  }
+    const response = await (options.fetchImpl ?? fetch)(`${apiOrigin}/api/v1/admin/auth/login`, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ username, password }), signal: options.signal });
+    if (!response.ok) return { ok: false, reason: 'Identifiants administrateur refusés.' };
+    return validateAdminSession(options);
+  } catch (error) { if (error instanceof Error && error.name === 'AbortError') throw error; return { ok: false, reason: 'Le service d’administration est inaccessible.' }; }
 }
-
-function stringArray(value: unknown): string[] {
-  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string' && item.length > 0);
-  if (typeof value === 'string' && value.length > 0) return [value];
-  return [];
-}
-
-function extractRoles(payload: JwtPayload): string[] {
-  const roles = [
-    ...stringArray(payload.roles),
-    ...stringArray(payload.role),
-    ...(typeof payload.scope === 'string' ? payload.scope.split(/\s+/).filter(Boolean) : []),
-  ];
-  return Array.from(new Set(roles));
-}
-
-function extractSubject(payload: JwtPayload): string {
-  for (const candidate of [payload.name, payload.preferred_username, payload.email, payload.sub]) {
-    if (typeof candidate === 'string' && candidate.length > 0) return candidate;
-  }
-  return 'Administrateur authentifié';
-}
-
-function expiresAt(payload: JwtPayload): string | null {
-  return typeof payload.exp === 'number' && Number.isFinite(payload.exp)
-    ? new Date(payload.exp * 1000).toISOString()
-    : null;
-}
-
-export function validateAdminToken(token: string, now = new Date()): AdminSessionValidation {
-  const normalizedToken = token.trim();
-  if (!normalizedToken) return { ok: false, reason: 'Jeton bearer requis.' };
-
-  const payload = parseJwtPayload(normalizedToken);
-  if (!payload) return { ok: false, reason: 'Jeton JWT illisible.' };
-
-  if (typeof payload.exp === 'number' && Number.isFinite(payload.exp) && payload.exp * 1000 <= now.getTime()) {
-    return { ok: false, reason: 'Session expirée. Fournissez un nouveau jeton administrateur.' };
-  }
-
-  const roles = extractRoles(payload);
-  if (!roles.includes(ADMIN_ROLE)) {
-    return { ok: false, reason: 'Le jeton ne contient pas le rôle administrator.' };
-  }
-
-  return {
-    ok: true,
-    session: {
-      token: normalizedToken,
-      subject: extractSubject(payload),
-      roles,
-      expiresAt: expiresAt(payload),
-    },
-  };
-}
-
-export function loadAdminSession(storage = safeSessionStorage()): AdminSession | null {
-  const serialized = storage?.getItem(ADMIN_SESSION_STORAGE_KEY);
-  if (!serialized) return null;
-
-  try {
-    const candidate: unknown = JSON.parse(serialized);
-    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return null;
-    const token = (candidate as { token?: unknown }).token;
-    if (typeof token !== 'string') return null;
-    const validation = validateAdminToken(token);
-    return validation.ok ? validation.session : null;
-  } catch {
-    return null;
-  }
-}
-
-export function saveAdminSession(session: AdminSession, storage = safeSessionStorage()): void {
-  storage?.setItem(ADMIN_SESSION_STORAGE_KEY, JSON.stringify({ token: session.token }));
-}
-
-export function clearAdminSession(storage = safeSessionStorage()): void {
-  storage?.removeItem(ADMIN_SESSION_STORAGE_KEY);
-}
-
-export function buildAdminAuthorizationHeader(session: AdminSession): string {
-  return `Bearer ${session.token}`;
+export async function logoutAdmin(session: AdminSession, options: AdminSessionValidationOptions = {}): Promise<void> {
+  const apiOrigin = getAdminApiOrigin(options.environment);
+  if (!apiOrigin) return;
+  await fetch(`${apiOrigin}/api/v1/admin/auth/logout`, { method: 'POST', credentials: 'include', headers: session.csrfToken ? { 'X-CSRF-Token': session.csrfToken } : {} });
 }

@@ -80,7 +80,9 @@ def upgrade() -> None:
         sa.Column("verified_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("spatial_zone_revision_id", sa.Integer(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint(_sha256_hex_check("manifest_sha256"), name="ck_spatial_package_manifest_sha256"),
+        sa.CheckConstraint(
+            _sha256_hex_check("manifest_sha256"), name="ck_spatial_package_manifest_sha256"
+        ),
         sa.CheckConstraint("manifest_size_bytes > 0", name="ck_spatial_package_manifest_size"),
         sa.CheckConstraint("length(manifest_uri) > 0", name="ck_spatial_package_manifest_uri"),
         sa.CheckConstraint("length(storage_uri) > 0", name="ck_spatial_package_storage_uri"),
@@ -100,7 +102,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("package_id"),
     )
-    op.create_index(op.f("ix_spatial_package_package_id"), "spatial_package", ["package_id"], unique=True)
+    op.create_index(
+        op.f("ix_spatial_package_package_id"), "spatial_package", ["package_id"], unique=True
+    )
     op.create_index(
         op.f("ix_spatial_package_spatial_zone_revision_id"),
         "spatial_package",
@@ -113,7 +117,14 @@ def upgrade() -> None:
         sa.Column("spatial_package_id", sa.Integer(), nullable=False),
         sa.Column(
             "kind",
-            sa.Enum("COG", "PNG", "GLB", name="spatial_package_file_kind", native_enum=False, validate_strings=True),
+            sa.Enum(
+                "COG",
+                "PNG",
+                "GLB",
+                name="spatial_package_file_kind",
+                native_enum=False,
+                validate_strings=True,
+            ),
             nullable=False,
         ),
         sa.Column("uri", sa.String(length=2048), nullable=False),
@@ -149,7 +160,9 @@ def downgrade() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "sqlite":
         _drop_sqlite_triggers()
-    op.drop_index(op.f("ix_spatial_package_file_spatial_package_id"), table_name="spatial_package_file")
+    op.drop_index(
+        op.f("ix_spatial_package_file_spatial_package_id"), table_name="spatial_package_file"
+    )
     op.drop_table("spatial_package_file")
     op.drop_index(op.f("ix_spatial_package_spatial_zone_revision_id"), table_name="spatial_package")
     op.drop_index(op.f("ix_spatial_package_package_id"), table_name="spatial_package")

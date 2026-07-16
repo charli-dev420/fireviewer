@@ -43,6 +43,10 @@ def upsert_source(
             source_type=payload.type,
             trust=payload.trust,
             display_name=payload.display_name,
+            public_display_name=payload.public_display_name,
+            public_license=payload.public_license,
+            public_reference_url=payload.public_reference_url,
+            public_transformations=list(payload.public_transformations),
             credential_hash=credential_hash,
             enabled=payload.enabled,
         )
@@ -51,6 +55,10 @@ def upsert_source(
         source.source_type = payload.type
         source.trust = payload.trust
         source.display_name = payload.display_name
+        source.public_display_name = payload.public_display_name
+        source.public_license = payload.public_license
+        source.public_reference_url = payload.public_reference_url
+        source.public_transformations = list(payload.public_transformations)
         source.credential_hash = credential_hash
         source.enabled = payload.enabled
     session.flush()
@@ -74,6 +82,10 @@ def upsert_source(
         type=source.source_type,
         trust=source.trust,
         display_name=source.display_name,
+        public_display_name=source.public_display_name,
+        public_license=source.public_license,
+        public_reference_url=source.public_reference_url,
+        public_transformations=list(source.public_transformations),
         enabled=source.enabled,
         credential_configured=source.credential_hash is not None,
         created_at=source.created_at,

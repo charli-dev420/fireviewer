@@ -28,6 +28,10 @@ def settings(tmp_path: Path) -> Settings:
         trusted_hosts=["testserver", "localhost"],
         log_level="CRITICAL",
         max_clock_skew_seconds=300,
+        zone_upload_storage_dir=tmp_path / "zone_upload_storage",
+        zone_upload_max_bytes=2_097_152,
+        zone_upload_max_unpacked_bytes=4_194_304,
+        zone_upload_max_files=100,
     )
 
 
@@ -100,7 +104,8 @@ def payload_factory() -> Callable[..., dict[str, Any]]:
 @pytest.fixture
 def seed_incident(session: Session):
     from fire_viewer.db.models import Episode, FireIdCounter, IncidentSeries
-    from fire_viewer.domain.enums import IncidentStatus, PublicVisibility
+    from fire_viewer.domain.enums import IncidentStatus, VerificationState
+    from fire_viewer.domain.public_visibility import canonical_public_visibility
 
     def seed(
         *,
@@ -113,8 +118,14 @@ def seed_incident(session: Session):
         status: IncidentStatus = IncidentStatus.MONITORING,
         observed_at: datetime | None = None,
         ended_at: datetime | None = None,
+        verification_state: VerificationState | None = None,
     ) -> tuple[IncidentSeries, Episode]:
         observed = observed_at or (datetime.now(UTC) - timedelta(minutes=10))
+        effective_verification = verification_state or (
+            VerificationState.UNVERIFIED
+            if status in {IncidentStatus.CANDIDATE, IncidentStatus.UNDER_REVIEW}
+            else VerificationState.VERIFIED
+        )
         bbox = bbox_for_point(lon, lat, uncertainty_m)
         incident = IncidentSeries(
             fire_id=fire_id,
@@ -128,7 +139,7 @@ def seed_incident(session: Session):
             bbox_max_lon=bbox.max_lon,
             bbox_min_lat=bbox.min_lat,
             bbox_max_lat=bbox.max_lat,
-            public_visibility=PublicVisibility.PUBLIC,
+            public_visibility=canonical_public_visibility(status, effective_verification),
             version=1,
         )
         session.add(incident)
@@ -138,11 +149,18 @@ def seed_incident(session: Session):
             episode_id="E01",
             ordinal=1,
             status=status,
+            verification_state=effective_verification,
+            evidence_basis_at=(
+                observed if effective_verification == VerificationState.VERIFIED else None
+            ),
             review_required=status in {IncidentStatus.CANDIDATE, IncidentStatus.UNDER_REVIEW},
             is_current=True,
             confidence_policy="g1-default-v1",
             started_at=observed - timedelta(hours=1),
             last_observed_at=observed,
+            validated_at=(
+                observed if effective_verification == VerificationState.VERIFIED else None
+            ),
             ended_at=ended_at,
             version=1,
         )

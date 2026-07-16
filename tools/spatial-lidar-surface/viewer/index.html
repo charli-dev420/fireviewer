@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Validation LiDAR — Die g08</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+      * { box-sizing: border-box; }
+      html, body, #viewer { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #9fb3bf; }
+      canvas { display: block; }
+      .panel {
+        position: fixed; z-index: 2; top: 16px; left: 16px; width: min(390px, calc(100vw - 32px));
+        padding: 14px 16px; border: 1px solid rgba(255,255,255,.22); border-radius: 14px;
+        background: rgba(11, 18, 20, .82); box-shadow: 0 10px 35px rgba(0,0,0,.28);
+        backdrop-filter: blur(12px); color: #eff7f2;
+      }
+      h1 { margin: 0 0 5px; font-size: 16px; font-weight: 700; letter-spacing: .01em; }
+      p { margin: 3px 0; color: #bdd0c7; font-size: 12px; line-height: 1.45; }
+      .status { margin-top: 9px; color: #fff; font-variant-numeric: tabular-nums; }
+      .buttons { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 11px; }
+      button {
+        border: 1px solid rgba(255,255,255,.22); border-radius: 9px; padding: 7px 10px;
+        color: #f2f8f4; background: rgba(255,255,255,.08); cursor: pointer; font: inherit; font-size: 12px;
+      }
+      button:hover { background: rgba(255,255,255,.15); }
+      button[aria-pressed="false"] { color: #9caaa4; background: rgba(0,0,0,.15); }
+      .legend { display: flex; gap: 13px; margin-top: 9px; font-size: 11px; color: #9eb2aa; }
+      .dot { display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: #69a86b; }
+      .help {
+        position: fixed; right: 14px; bottom: 12px; z-index: 2; padding: 7px 10px; border-radius: 9px;
+        color: #e5eee9; background: rgba(11,18,20,.72); font-size: 11px; backdrop-filter: blur(8px);
+      }
+      .error { color: #ffb7ab; }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/node_modules/three/build/three.module.js",
+          "three/addons/": "/node_modules/three/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="viewer"></div>
+    <section class="panel" aria-live="polite">
+      <h1>Die g08 — production LiDAR exacte</h1>
+      <p>MNS 0,50 m texturé + retours LiDAR végétation classifiés, sans arbres de remplacement.</p>
+      <p id="status" class="status">Initialisation du moteur…</p>
+      <div class="buttons">
+        <button id="overview">Vue générale</button>
+        <button id="closeup">Vue proche</button>
+        <button id="surface-toggle" aria-pressed="true">Terrain + bâti</button>
+        <button id="splat-toggle" aria-pressed="true">Végétation LiDAR</button>
+      </div>
+      <div class="legend"><span><i class="dot"></i>points mesurés</span><span>altitudes NGF-IGN69</span></div>
+    </section>
+    <div class="help">Glisser : orbiter · clic droit : déplacer · molette : zoomer</div>
+    <script type="module" src="./viewer.js"></script>
+  </body>
+</html>

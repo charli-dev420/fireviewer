@@ -1,10 +1,16 @@
 # ADR-002 — Contrat spatial local ENU et Unity
 
-- **Statut** : accepté
+- **Statut** : amendé par l'ADR-003
 - **Date** : 12 juillet 2026
 - **Décideurs** : projet Fire Viewer
 
 ## Contexte
+
+> **Amendement du 15 juillet 2026** : l'ADR-003 rend l'origine de production
+> RGF93 / Lambert-93 (`EPSG:2154`) et NGF-IGN69 (`EPSG:5720`) normative, avec un
+> repère local métrique explicitement rattaché à cette origine. Les clauses ci-dessous
+> décrivent le profil spatial v1 observé ; un profil v2 doit porter l'amendement sans
+> modifier rétroactivement les snapshots v1.
 
 La roadmap demande un terrain local géoréférencé, avec une origine explicite, des unités
 contrôlées et une provenance reproductible. Le projet Unity de Die externe emploie une

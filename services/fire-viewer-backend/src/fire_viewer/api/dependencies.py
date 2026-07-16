@@ -86,8 +86,9 @@ def get_actor(
         HTTPAuthorizationCredentials | None,
         Security(bearer_scheme),
     ],
+    session: Annotated[Session, Depends(get_session)],
 ) -> Actor:
-    return actor_from_request(request, credentials)
+    return actor_from_request(request, credentials, session)
 
 
 SessionDep = Annotated[Session, Depends(get_session)]

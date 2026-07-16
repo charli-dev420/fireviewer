@@ -18,7 +18,13 @@ from fire_viewer.db.models import (
     Source,
     ZoneArchiveSnapshot,
 )
-from fire_viewer.domain.enums import IncidentStatus, PublicVisibility, SourceTrust, SourceType
+from fire_viewer.domain.enums import (
+    IncidentStatus,
+    PublicVisibility,
+    SourceTrust,
+    SourceType,
+    VerificationState,
+)
 from fire_viewer.domain.geospatial import BoundingBox, bbox_for_point
 from fire_viewer.domain.hashing import sha256_hex
 from fire_viewer.services.queries import get_viewer_manifest
@@ -210,6 +216,11 @@ def _validate_episodes(incident: IncidentSeries, mismatches: list[str]) -> None:
             "episode_id": expected.episode_id,
             "ordinal": expected.ordinal,
             "status": expected.status,
+            "verification_state": (
+                VerificationState.VERIFIED
+                if expected.validated_at is not None
+                else VerificationState.UNVERIFIED
+            ),
             "review_required": False,
             "is_current": expected.episode_id == DEMO_SEED.episodes[-1].episode_id,
             "confidence_policy": "g1-default-v1",
@@ -224,6 +235,7 @@ def _validate_episodes(incident: IncidentSeries, mismatches: list[str]) -> None:
         for field_name, expected_value in (
             ("started_at", expected.started_at),
             ("last_observed_at", expected.last_observed_at),
+            ("evidence_basis_at", expected.validated_at),
             ("validated_at", expected.validated_at),
             ("ended_at", expected.ended_at),
             ("created_at", DEMO_SEED.created_at),
@@ -370,6 +382,12 @@ def seed_demo(session: Session, settings: Settings) -> DemoSeedResult:
             episode_id=episode.episode_id,
             ordinal=episode.ordinal,
             status=episode.status,
+            verification_state=(
+                VerificationState.VERIFIED
+                if episode.validated_at is not None
+                else VerificationState.UNVERIFIED
+            ),
+            evidence_basis_at=episode.validated_at,
             review_required=False,
             is_current=episode.episode_id == current_episode_id,
             confidence_policy="g1-default-v1",

@@ -10,7 +10,7 @@ from fire_viewer.core.security import Actor
 from fire_viewer.core.time import utcnow
 from fire_viewer.db.models import Episode, IncidentSeries
 from fire_viewer.db.transactions import begin_write_transaction
-from fire_viewer.domain.enums import IncidentStatus
+from fire_viewer.domain.enums import IncidentStatus, VerificationState
 from fire_viewer.domain.errors import ConflictError, ForbiddenError, NotFoundError
 from fire_viewer.domain.hashing import sha256_hex
 from fire_viewer.domain.public_visibility import canonical_public_visibility
@@ -133,6 +133,8 @@ def transition_incident(
     episode.version += 1
 
     if payload.target_status == IncidentStatus.ACTIVE_CONFIRMED:
+        episode.verification_state = VerificationState.VERIFIED
+        episode.evidence_basis_at = now
         episode.validated_at = now
         episode.ended_at = None
         episode.review_required = False
@@ -147,10 +149,15 @@ def transition_incident(
         IncidentStatus.CLOSED,
         IncidentStatus.REJECTED,
     }:
+        if payload.target_status == IncidentStatus.REJECTED:
+            episode.verification_state = VerificationState.REJECTED
+            episode.evidence_basis_at = None
         episode.review_required = False
         episode.ended_at = now
 
-    incident.public_visibility = canonical_public_visibility(payload.target_status)
+    incident.public_visibility = canonical_public_visibility(
+        payload.target_status, episode.verification_state
+    )
     if payload.target_status == IncidentStatus.SUSPENDED:
         incident.public_note = payload.public_note or "Incident suspended pending review."
     elif payload.target_status in {
@@ -178,7 +185,9 @@ def transition_incident(
         before=before,
         after=after,
         payload={
-            "validation_basis": payload.validation_basis,
+            "validation_basis_hash": (
+                sha256_hex(payload.validation_basis) if payload.validation_basis else None
+            ),
             "public_note": payload.public_note,
         },
     )

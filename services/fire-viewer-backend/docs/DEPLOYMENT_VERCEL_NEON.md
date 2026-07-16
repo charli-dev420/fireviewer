@@ -1,0 +1,173 @@
+# Raccordement Vercel, Neon et Vercel Private Blob
+
+Ce guide raccorde le backend **G1**. Il ne certifie pas un usage opérationnel critique et ne
+remplace pas la fermeture des blocages G2 listés dans
+[`../../../docs/ADMIN_BACKEND_READINESS.md`](../../../docs/ADMIN_BACKEND_READINESS.md).
+
+## 1. Vérifier localement avec PostGIS
+
+Depuis `services/fire-viewer-backend` :
+
+```powershell
+docker compose up -d database
+$env:FV_DATABASE_URL='postgresql+psycopg://fire_viewer:fire_viewer_local_only@localhost:5432/fire_viewer'
+& .\.venv\Scripts\alembic.exe upgrade head
+& .\.venv\Scripts\uvicorn.exe fire_viewer.main:app --host 127.0.0.1 --port 8000
+```
+
+Dans un second terminal :
+
+```powershell
+curl.exe -i http://127.0.0.1:8000/readyz
+```
+
+Le JSON attendu contient :
+
+```json
+{
+  "status": "ready",
+  "database": "ok",
+  "schema_revision": "e6f3a1b8c420",
+  "spatial_index": "ok"
+}
+```
+
+Une migration absente, PostGIS absent ou un index spatial absent doit retourner `503`.
+
+## 2. Créer le projet Neon
+
+1. Créer un projet Neon et conserver la branche principale pour la production.
+2. Créer une branche `staging` issue de la branche principale.
+3. Dans **Connect**, copier la chaîne directe de la branche pour les migrations.
+4. Copier la chaîne poolée pour l'exécution Vercel si elle est proposée.
+5. Ne jamais placer ces chaînes dans Git ou dans une variable `VITE_*`.
+
+Neon associe chaque branche à un compute et fournit une chaîne de connexion par branche :
+[documentation Neon sur les computes et branches](https://neon.com/docs/manage/endpoints/).
+
+### Appliquer les migrations
+
+```powershell
+$env:FV_DATABASE_URL='postgresql+psycopg://USER:PASSWORD@HOST/DATABASE?sslmode=require'
+& .\.venv\Scripts\alembic.exe upgrade head
+```
+
+Contrôler ensuite dans l'éditeur SQL Neon :
+
+```sql
+SELECT version_num FROM alembic_version;
+SELECT extversion FROM pg_extension WHERE extname = 'postgis';
+SELECT indexname
+FROM pg_indexes
+WHERE indexname IN (
+  'ix_incident_series_reference_geog_gist',
+  'ix_incident_series_reference_geom_l93_gist',
+  'ix_observation_geometry_geog_gist',
+  'ix_observation_geometry_l93_gist'
+);
+```
+
+## 3. Créer le store Blob privé
+
+Dans le projet Vercel du backend :
+
+1. Ouvrir **Storage**.
+2. Choisir **Create Database**, puis **Blob**.
+3. Choisir impérativement l'accès **Private**.
+4. Connecter le store au projet backend.
+5. Vérifier la présence de `BLOB_READ_WRITE_TOKEN` dans les variables du projet si le runtime ne
+   fournit pas encore l'authentification OIDC Blob.
+
+La procédure et les versions minimales du SDK sont décrites dans la
+[documentation Vercel Private Blob](https://vercel.com/docs/vercel-blob/private-storage).
+
+## 4. Générer l'accès Admin G1
+
+```powershell
+& .\.venv\Scripts\fire-viewer-hash-admin-password.exe
+```
+
+La commande demande deux fois le mot de passe et affiche une valeur `scrypt$...`. Placer cette
+valeur dans `FV_LOCAL_ADMIN_PASSWORD_HASH`. Ne jamais stocker le mot de passe en clair.
+
+## 5. Variables du backend Vercel
+
+Définir séparément les valeurs **Preview** et **Production** :
+
+```text
+FV_ENVIRONMENT=production
+FV_DATABASE_URL=<connexion Neon poolée>
+FV_DATABASE_SCHEMA_REVISION=e6f3a1b8c420
+FV_DATABASE_POOL_SIZE=2
+FV_DATABASE_MAX_OVERFLOW=3
+FV_OBJECT_STORAGE_BACKEND=vercel_blob
+FV_OBJECT_STORAGE_PREFIX=firewarning
+FV_AUTH_MODE=local_admin
+FV_LOCAL_ADMIN_USERNAME=admin
+FV_LOCAL_ADMIN_PASSWORD_HASH=<scrypt$...>
+FV_PUBLIC_REPORT_HASH_SECRET=<secret aléatoire de 32 caractères minimum>
+FV_CORS_ORIGINS=["https://www.exemple.fr"]
+FV_TRUSTED_HOSTS=["api.exemple.fr","firewarning-api.vercel.app"]
+BLOB_READ_WRITE_TOKEN=<variable injectée par le store>
+```
+
+Le mode `local_admin` reste limité à G1. G2 exige OIDC, identités nominatives et MFA.
+
+## 6. Déployer le backend
+
+Configurer la racine du projet Vercel sur `services/fire-viewer-backend`. Le fichier
+`api/index.py` expose l'application FastAPI ASGI. Vercel détecte les dépendances via
+`pyproject.toml`, conformément à la
+[documentation du runtime Python](https://vercel.com/docs/functions/runtimes/python).
+
+Les migrations ne doivent pas être lancées au démarrage d'une Function. Les exécuter une seule
+fois avec la chaîne directe Neon avant le déploiement de l'API.
+
+Après le déploiement :
+
+```powershell
+curl.exe -i https://api.exemple.fr/healthz
+curl.exe -i https://api.exemple.fr/readyz
+```
+
+Ne connecter le frontend qu'après un `200` de `/readyz`.
+
+## 7. Connecter le frontend
+
+Dans le projet Vercel de `apps/fire-viewer-ui` :
+
+```text
+VITE_API_BASE_URL=https://api.exemple.fr
+```
+
+L'origine doit être HTTPS, sans chemin final. La même origine doit être présente dans
+`FV_CORS_ORIGINS` côté API. Les cookies Admin nécessitent des choix de domaine cohérents ; la
+configuration la plus simple est `www.exemple.fr` pour le site et `api.exemple.fr` pour l'API.
+
+## 8. Limite actuelle des gros packages
+
+Le formulaire Admin envoie encore l'archive `.tar.gz` à FastAPI. Cette voie est adaptée aux tests
+locaux mais pas aux gros packages 3D hébergés : le corps traverse la Function avant Blob.
+Vercel recommande les uploads client et Blob prend en charge le multipart pour les gros fichiers :
+[guide Blob SDK](https://vercel.com/docs/vercel-blob/using-blob-sdk).
+
+Avant un usage hébergé avec des packages réalistes, implémenter :
+
+1. création serveur d'un upload privé limité à un chemin et une taille ;
+2. upload multipart direct navigateur vers Blob ;
+3. finalisation serveur avec taille, SHA-256, type et identifiant d'objet ;
+4. validation de l'archive depuis la quarantaine ;
+5. promotion atomique vers le préfixe immuable de la révision ;
+6. expiration et purge des uploads abandonnés.
+
+## 9. Vérifications de raccordement
+
+- `/readyz` retourne la révision attendue et `spatial_index=ok`.
+- Une connexion Admin pose uniquement `fireviewer_admin` en `Secure; HttpOnly; SameSite=Strict`.
+- `/api/v1/admin/session` renvoie `csrf_token`; aucune valeur de session n'est dans le stockage du
+  navigateur.
+- Une mutation sans `X-CSRF-Token` retourne `403`.
+- Les réponses Admin portent `Cache-Control: no-store`.
+- Un asset privé ne peut pas être lu sans l'API ou un mécanisme signé autorisé.
+- Une nouvelle migration rend `/readyz` indisponible tant que
+  `FV_DATABASE_SCHEMA_REVISION` n'est pas synchronisée.

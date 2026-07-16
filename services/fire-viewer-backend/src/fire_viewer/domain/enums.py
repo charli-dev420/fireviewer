@@ -44,8 +44,15 @@ class MatchDecision(StrEnum):
 class VerificationState(StrEnum):
     UNVERIFIED = "UNVERIFIED"
     PENDING_REVIEW = "PENDING_REVIEW"
+    CORROBORATED = "CORROBORATED"
     VERIFIED = "VERIFIED"
     REJECTED = "REJECTED"
+
+
+class EvidenceSpatialMode(StrEnum):
+    WITHHELD = "WITHHELD"
+    GENERALIZED = "GENERALIZED"
+    EXACT = "EXACT"
 
 
 class AssetState(StrEnum):
@@ -83,9 +90,40 @@ class SpatialPackageFileKind(StrEnum):
     GLB = "GLB"
 
 
+class ZoneUploadState(StrEnum):
+    RECEIVED = "RECEIVED"
+    VALIDATING = "VALIDATING"
+    VALIDATED = "VALIDATED"
+    REJECTED = "REJECTED"
+
+
+class ZoneInformationState(StrEnum):
+    DRAFT = "DRAFT"
+    PENDING_REVIEW = "PENDING_REVIEW"
+    PUBLISHED = "PUBLISHED"
+    HIDDEN = "HIDDEN"
+    REJECTED = "REJECTED"
+
+
+class ZoneVisibility(StrEnum):
+    DRAFT = "DRAFT"
+    PUBLISHED = "PUBLISHED"
+    HIDDEN = "HIDDEN"
+    ARCHIVED = "ARCHIVED"
+
+
+class ZoneContributionState(StrEnum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
 class AssetLod(StrEnum):
     MOBILE = "mobile"
     DESKTOP = "desktop"
+    CLOSE = "close"
+    LOCAL = "local"
+    EXTENDED = "extended"
 
 
 class JobKind(StrEnum):
@@ -111,6 +149,20 @@ class ActorType(StrEnum):
     OPERATOR = "operator"
     SERVICE = "service"
     SYSTEM = "system"
+
+
+class PublicReportCategory(StrEnum):
+    INFORMATION_OBSOLETE = "information_obsolete"
+    LOCATION = "location"
+    SOURCE = "source"
+    PRIVACY = "privacy"
+    ACCESSIBILITY = "accessibility"
+
+
+class PublicReportState(StrEnum):
+    PENDING = "PENDING"
+    CORRECTED = "CORRECTED"
+    REJECTED = "REJECTED"
 
 
 class ReviewResolutionAction(StrEnum):

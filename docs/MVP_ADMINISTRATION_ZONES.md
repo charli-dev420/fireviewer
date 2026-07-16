@@ -7,17 +7,19 @@ contrôler, prévisualiser et publier une zone depuis son espace privé. Ajouter
 une zone ne doit jamais exiger de modifier le frontend, de déposer des fichiers
 dans le dépôt Git ou de remplacer une zone existante.
 
-La carte publique des feux ne commence qu'après cette fonction. La carte de
-zone G1 conserve son rôle de démonstration technique locale, avec une seule
-zone logique `DIE-PONTAIX-08@R1`; elle n'est pas encore un catalogue public
-administré.
+La consultation publique reste bornée à une zone explicitement choisie. Une
+zone publiée s'ouvre seulement à son adresse propre, par exemple
+`/zones/DIE-PONTAIX-08`. Il n'existe ni carte globale, ni catalogue public qui
+énumère les zones. La carte G1 conserve son rôle de démonstration technique
+locale, avec une seule zone logique `DIE-PONTAIX-08@R1`.
 
 Règle de priorité.
 
-MVP-4 précède MVP-6. Une carte publique ne listera que les zones publiées par
-un administrateur, jamais un paquet présent sur le disque, une release GitHub
-ou une révision incomplète. Le public reste sans connexion; l'administration
-est authentifiée et privée.
+MVP-4 précède toute ouverture publique. Une zone n'est accessible que depuis
+son adresse propre et après publication explicite par un administrateur,
+jamais parce qu'un paquet est présent sur le disque, une release GitHub ou une
+révision incomplète. Le public reste sans connexion; l'administration est
+authentifiée et privée.
 
 Invariants à préserver.
 
@@ -31,8 +33,8 @@ Invariants à préserver.
   provenance et contrat spatial ont été validés côté serveur.
 - Une zone ou révision non publiée n'est jamais visible ni récupérable par un
   parcours public.
-- Retirer une publication enlève la révision du catalogue public mais conserve
-  son historique, son audit et sa preuve de vérification.
+- Retirer une publication désactive son adresse publique sans modifier son
+  historique, son audit ni sa preuve de vérification.
 - Une zone, une révision, un paquet ou une publication ne sont pas supprimés
   destructivement dans le MVP. Les seules opérations sont l'archivage, le
   retrait, la révocation et la création d'une nouvelle révision.
@@ -84,7 +86,7 @@ Créer zone
   → vérifier hashes, chemins, contrat et provenance
   → prévisualiser dans l'espace privé
   → publier explicitement
-  → exposer la zone dans le catalogue public MVP-6
+  → ouvrir l'adresse publique propre à cette zone
 ```
 
 Pages administrateur requises.
@@ -97,20 +99,38 @@ Pages administrateur requises.
 /admin/publications
 ```
 
-Ces pages permettent de créer une identité logique, créer ou archiver une
-révision, déclarer les couvertures techniques, soumettre un paquet, consulter
-le rapport de contrôle, prévisualiser sans accès public, publier ou retirer une
-révision et consulter les incidents liés. La page d'incident de MVP-5 propose
-ensuite la republication explicite vers une révision compatible.
+Ces pages doivent permettre de créer une identité logique, créer ou archiver
+une révision, déclarer les couvertures techniques, soumettre un paquet,
+consulter le rapport de contrôle, prévisualiser sans accès public, publier ou
+retirer une révision et consulter les incidents liés. La page d'incident de
+MVP-5 propose ensuite la republication explicite vers une révision compatible.
+
+État de la première passe administrateur.
+
+VÉRIFIÉ le 14 juillet 2026 : le shell privé, les cinq routes prévues, la
+lecture des zones, des révisions et des métadonnées de prévisualisation sont
+présents. Les identifiants de zone suivent le contrat canonique en majuscules,
+par exemple `DIE-PONTAIX-08`, et les révisions transportent leur entier, par
+exemple `1`, affiché comme `R1`.
+
+NON VÉRIFIÉ comme fonction utilisateur complète : création, dépôt de paquet,
+contrôle métier, rendu privé et transition de publication depuis l'interface.
+Les endpoints de mutation restent volontairement `501` et les écrans le disent
+explicitement ; ils ne constituent pas encore MVP-4 achevé.
 
 Séparation des accès.
 
-MVP-1 rend le rôle `administrator` réellement exploitable dans l'interface. Le
-backend possède déjà une vérification JWT/OIDC et le contrôle de rôle côté API;
-l'écran de connexion, la gestion de session navigateur, la politique de rôles
-et l'isolement des assets privés restent à construire. Aucune route `/admin/*`,
-aucun manifeste de paquet non publié et aucune URL de prévisualisation ne doit
-être utilisable sans ce contrôle.
+Le shell navigateur traite le bearer comme opaque et consulte
+`GET /api/v1/admin/session` avant de monter toute page privée. Le serveur
+vérifie le JWT/OIDC et le rôle `administrator`; les réponses `/api/v1/admin/*`
+portent `Cache-Control: no-store`. Le bearer n'est transmis qu'à une origine
+HTTPS, ou à une boucle locale de développement, et les réponses de problème ne
+révèlent pas leur détail serveur dans l'interface.
+
+L'ouverture de session interactive auprès de l'émetteur OIDC, la politique de
+rôles complète, l'isolement de stockage des assets privés et les mutations
+transactionnelles restent à réaliser. Aucune URL de fichier privé n'est
+renvoyée par la prévisualisation actuelle.
 
 Persistance et coût.
 
@@ -130,7 +150,8 @@ Ordre MVP acté.
 4. MVP-3 — analyse, proposition de placement et revue humaine.
 5. MVP-4 — administration complète des zones et de leurs révisions.
 6. MVP-5 — association feu validé → zone/révision, publication contrôlée et archive PNG.
-7. MVP-6 — carte publique : zones et feux publiés.
+7. MVP-6 — pages publiques isolées : une zone publiée et les feux qui lui sont
+   explicitement liés.
 8. MVP-7 — météo publique, déploiement, sécurité et exploitation.
 
 Critères d'acceptation MVP-4.
@@ -143,7 +164,8 @@ Critères d'acceptation MVP-4.
   est refusé avant prévisualisation et publication.
 - Une prévisualisation privée ne crée aucune requête publique ni URL de GLB
   accessible anonymement.
-- Une zone non publiée, retirée ou archivée est absente du catalogue public.
+- Une zone non publiée, retirée ou archivée répond comme indisponible à son
+  adresse publique et n'est jamais énumérée par une route publique.
 - Une nouvelle révision ne déplace aucun incident existant; la republication
   MVP-5 est idempotente, auditée et explicite.
 - Les migrations, les permissions, les transitions de publication, les hashes,
@@ -152,7 +174,7 @@ Critères d'acceptation MVP-4.
 
 Limites conservées.
 
-La génération Unity, l'optimisation 3D, le chargement d'un GLB public, la carte
-publique multi-zones, la connexion automatique d'un incident et le déploiement
-ne font pas partie de cette passe documentaire. Aucun terrain réel, incident
-réel, donnée opérationnelle ou secret ne doit être ajouté pour la réaliser.
+La génération Unity, l'optimisation 3D, le chargement d'un GLB public, toute
+carte globale, la connexion automatique d'un incident et le déploiement ne
+font pas partie de cette passe documentaire. Aucun terrain réel, incident réel,
+donnée opérationnelle ou secret ne doit être ajouté pour la réaliser.

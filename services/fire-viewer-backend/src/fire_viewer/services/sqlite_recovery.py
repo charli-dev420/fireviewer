@@ -7,6 +7,7 @@ publishes a restore until the copy has passed the same integrity checks.
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 import json
 import os
@@ -21,7 +22,10 @@ from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 
-from fire_viewer.db.sqlite_invariants import SQLITE_CRITICAL_TRIGGERS
+from fire_viewer.db.sqlite_invariants import (
+    SQLITE_CRITICAL_TRIGGER_HASHES,
+    SQLITE_CRITICAL_TRIGGERS,
+)
 from fire_viewer.domain.hashing import sha256_hex
 
 REQUIRED_AUDIT_TRIGGERS = {
@@ -178,14 +182,22 @@ def _require_current_invariant_triggers(connection: sqlite3.Connection) -> None:
 
     try:
         rows = connection.execute(
-            "SELECT name FROM sqlite_master WHERE type = 'trigger'"
+            "SELECT name, sql FROM sqlite_master WHERE type = 'trigger'"
         ).fetchall()
     except sqlite3.Error as error:
         raise SQLiteValidationError("sqlite_invariant_trigger_unavailable") from error
 
-    present = {name for (name,) in rows}
+    triggers = {name: statement for name, statement in rows}
+    present = set(triggers)
     if SQLITE_CRITICAL_TRIGGERS - present:
         raise SQLiteValidationError("missing_sqlite_invariant_trigger")
+    for name, expected_hash in SQLITE_CRITICAL_TRIGGER_HASHES.items():
+        statement = triggers.get(name)
+        if not isinstance(statement, str):
+            raise SQLiteValidationError("invalid_sqlite_invariant_trigger")
+        actual_hash = hashlib.sha256(_normalise_sql(statement).encode("utf-8")).hexdigest()
+        if not hmac.compare_digest(actual_hash, expected_hash):
+            raise SQLiteValidationError("invalid_sqlite_invariant_trigger")
 
 
 def _decode_snapshot(value: object) -> object:

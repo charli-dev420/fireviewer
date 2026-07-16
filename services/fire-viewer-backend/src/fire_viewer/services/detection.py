@@ -40,6 +40,10 @@ from fire_viewer.services.common import (
     record_audit,
     source_snapshot,
 )
+from fire_viewer.services.evidence_policy import (
+    EvidencePolicyResult,
+    recalculate_episode_evidence,
+)
 from fire_viewer.services.idempotency import find_replay, store_response
 
 DETECTION_ENDPOINT = "POST /api/v1/incident/detect"
@@ -400,6 +404,54 @@ def process_detection(
     session.add(observation)
     session.flush()
 
+    evidence_result: EvidencePolicyResult | None = None
+    if attached_incident is not None and attached_episode is not None:
+        before_evidence = {
+            "incident": incident_snapshot(attached_incident),
+            "episode": episode_snapshot(attached_episode),
+        }
+        evidence_result = recalculate_episode_evidence(
+            session,
+            incident=attached_incident,
+            episode=attached_episode,
+            threshold=settings.corroboration_min_independent_proofs,
+            now=utcnow(),
+        )
+        if evidence_result.became_corroborated:
+            record_audit(
+                session,
+                actor_type=ActorType.SYSTEM,
+                actor_id="incident-service",
+                action="incident.corroborated",
+                target_type="episode",
+                target_id=f"{attached_incident.fire_id}/{attached_episode.episode_id}",
+                reason="Independent corroborating evidence threshold reached.",
+                trace_id=trace_id,
+                before=before_evidence,
+                after={
+                    "incident": incident_snapshot(attached_incident),
+                    "episode": episode_snapshot(attached_episode),
+                },
+                payload={
+                    "threshold": settings.corroboration_min_independent_proofs,
+                    "independent_proof_count": evidence_result.independent_proof_count,
+                    "observation_ids": list(evidence_result.selected_observation_ids),
+                },
+            )
+            emit_outbox(
+                session,
+                topic="incident.corroborated",
+                aggregate_type="incident_series",
+                aggregate_id=attached_incident.fire_id,
+                trace_id=trace_id,
+                idempotency_key=idempotency_key,
+                payload={
+                    "fire_id": attached_incident.fire_id,
+                    "episode_id": attached_episode.episode_id,
+                    "independent_proof_count": evidence_result.independent_proof_count,
+                },
+            )
+
     record_audit(
         session,
         actor_type=ActorType.PUBLIC_SOURCE,
@@ -458,7 +510,12 @@ def process_detection(
         factors=match.best.factors if match.best else {},
         distance_m=match.best.distance_m if match.best else None,
         review_reasons=list(match.review_reasons),
-        public_confirmation="pending",
+        public_confirmation=(
+            "corroborated"
+            if evidence_result is not None
+            and evidence_result.verification_state == VerificationState.CORROBORATED
+            else "pending"
+        ),
         policy_id=settings.matching_policy_id,
         trace_id=trace_id,
     )

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from fire_viewer.db.models import Episode, IncidentSeries
 from fire_viewer.domain.enums import PublicVisibility
-from fire_viewer.domain.geospatial import BoundingBox
+from fire_viewer.domain.geospatial import BoundingBox, haversine_m
 from fire_viewer.domain.matching import Candidate
 
 
@@ -57,6 +57,54 @@ def find_candidates(
                     "max_lon": bbox.max_lon,
                     "min_lat": bbox.min_lat,
                     "max_lat": bbox.max_lat,
+                    "tombstoned": PublicVisibility.TOMBSTONED.name,
+                    "fetch_limit": fetch_limit,
+                },
+            ).scalars()
+        )
+        if not ids:
+            return [], False
+        ordering = case(
+            {incident_id: index for index, incident_id in enumerate(ids)},
+            value=IncidentSeries.id,
+        )
+        rows = session.execute(
+            select(IncidentSeries, Episode)
+            .join(
+                Episode,
+                and_(Episode.incident_id == IncidentSeries.id, Episode.is_current.is_(True)),
+            )
+            .where(IncidentSeries.id.in_(ids))
+            .order_by(ordering)
+        ).all()
+        candidates = [_to_candidate(incident, episode) for incident, episode in rows]
+    elif bind.dialect.name == "postgresql":
+        longitude = (bbox.min_lon + bbox.max_lon) / 2
+        latitude = (bbox.min_lat + bbox.max_lat) / 2
+        radius_m = max(
+            haversine_m(longitude, latitude, bbox.min_lon, bbox.min_lat),
+            haversine_m(longitude, latitude, bbox.max_lon, bbox.max_lat),
+        )
+        ids = list(
+            session.execute(
+                text(
+                    """
+                    SELECT i.id
+                    FROM incident_series AS i
+                    WHERE ST_DWithin(
+                        i.reference_geog,
+                        ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326)::geography,
+                        :radius_m
+                    )
+                      AND i.public_visibility != :tombstoned
+                    ORDER BY i.updated_at DESC, i.fire_id ASC, i.id ASC
+                    LIMIT :fetch_limit
+                    """
+                ),
+                {
+                    "longitude": longitude,
+                    "latitude": latitude,
+                    "radius_m": radius_m,
                     "tombstoned": PublicVisibility.TOMBSTONED.name,
                     "fetch_limit": fetch_limit,
                 },

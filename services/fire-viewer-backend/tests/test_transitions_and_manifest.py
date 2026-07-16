@@ -1,6 +1,6 @@
 from sqlalchemy import select
 
-from fire_viewer.db.models import AuditEvent, Episode
+from fire_viewer.db.models import AuditEvent, Episode, IncidentSeries
 
 
 def _create_incident(client, payload_factory, key: str = "transition-create-0001") -> str:
@@ -11,6 +11,14 @@ def _create_incident(client, payload_factory, key: str = "transition-create-0001
     )
     assert response.status_code == 201
     return response.json()["fire_id"]
+
+
+def _current_episode_version(session, fire_id: str) -> int:
+    return session.execute(
+        select(Episode.version)
+        .join(IncidentSeries, IncidentSeries.id == Episode.incident_id)
+        .where(IncidentSeries.fire_id == fire_id, Episode.is_current.is_(True))
+    ).scalar_one()
 
 
 def test_candidate_location_is_withheld_until_human_confirmation(client, payload_factory) -> None:
@@ -32,7 +40,7 @@ def test_illegal_transition_returns_409_and_is_audited(client, session, payload_
         headers={"Idempotency-Key": "illegal-transition-0001"},
         json={
             "target_status": "EXTINGUISHED",
-            "expected_version": 1,
+            "expected_version": _current_episode_version(session, fire_id),
             "reason": "Attempt an intentionally illegal test transition.",
         },
     )
@@ -43,14 +51,14 @@ def test_illegal_transition_returns_409_and_is_audited(client, session, payload_
     assert audit.payload["cause"] == "illegal_transition"
 
 
-def test_active_confirmation_requires_validation_basis(client, payload_factory) -> None:
+def test_active_confirmation_requires_validation_basis(client, session, payload_factory) -> None:
     fire_id = _create_incident(client, payload_factory, "transition-create-0002")
     response = client.post(
         f"/api/v1/operator/incidents/{fire_id}/transitions",
         headers={"Idempotency-Key": "confirmation-no-basis-0001"},
         json={
             "target_status": "ACTIVE_CONFIRMED",
-            "expected_version": 1,
+            "expected_version": _current_episode_version(session, fire_id),
             "reason": "Confirm without basis for negative test coverage.",
         },
     )
@@ -62,9 +70,10 @@ def test_confirm_transition_is_idempotent_and_manifest_supports_etag(
     client, session, payload_factory
 ) -> None:
     fire_id = _create_incident(client, payload_factory, "transition-create-0003")
+    expected_version = _current_episode_version(session, fire_id)
     request = {
         "target_status": "ACTIVE_CONFIRMED",
-        "expected_version": 1,
+        "expected_version": expected_version,
         "reason": "Human validator confirmed the incident during a test.",
         "validation_basis": "Two authorized sources and operator review.",
     }
@@ -82,7 +91,7 @@ def test_confirm_transition_is_idempotent_and_manifest_supports_etag(
     assert first.json() == second.json()
     assert second.headers["Idempotent-Replay"] == "true"
     episode = session.execute(select(Episode).where(Episode.is_current.is_(True))).scalar_one()
-    assert episode.version == 2
+    assert episode.version == expected_version + 1
     audit = session.execute(
         select(AuditEvent).where(AuditEvent.action == "incident.status.changed")
     ).scalar_one()
@@ -101,14 +110,14 @@ def test_confirm_transition_is_idempotent_and_manifest_supports_etag(
     assert unchanged.status_code == 304
 
 
-def test_suspension_masks_location_and_asset(client, payload_factory) -> None:
+def test_suspension_masks_location_and_asset(client, session, payload_factory) -> None:
     fire_id = _create_incident(client, payload_factory, "transition-create-0004")
     response = client.post(
         f"/api/v1/operator/incidents/{fire_id}/transitions",
         headers={"Idempotency-Key": "suspension-transition-0001"},
         json={
             "target_status": "SUSPENDED",
-            "expected_version": 1,
+            "expected_version": _current_episode_version(session, fire_id),
             "reason": "Security review requires immediate public suspension.",
             "public_note": "Data temporarily withheld pending review.",
         },

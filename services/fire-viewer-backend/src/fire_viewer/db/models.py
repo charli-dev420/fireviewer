@@ -26,17 +26,24 @@ from fire_viewer.domain.enums import (
     ActorType,
     AssetLod,
     AssetState,
+    EvidenceSpatialMode,
     IncidentStatus,
     JobKind,
     JobState,
     MatchDecision,
+    PublicReportCategory,
+    PublicReportState,
     PublicVisibility,
     SourceTrust,
     SourceType,
     SpatialPackageFileKind,
     SpatialPackageState,
     VerificationState,
+    ZoneContributionState,
+    ZoneInformationState,
     ZonePublicationState,
+    ZoneUploadState,
+    ZoneVisibility,
 )
 
 
@@ -74,6 +81,10 @@ class Source(Base, TimestampMixin):
         enum_column(SourceTrust, name="source_trust"), nullable=False
     )
     display_name: Mapped[str | None] = mapped_column(String(255))
+    public_display_name: Mapped[str | None] = mapped_column(String(255))
+    public_license: Mapped[str | None] = mapped_column(String(255))
+    public_reference_url: Mapped[str | None] = mapped_column(String(2_048))
+    public_transformations: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     credential_hash: Mapped[str | None] = mapped_column(String(64))
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
@@ -128,6 +139,7 @@ class IncidentSeries(Base, TimestampMixin):
     archive_snapshot: Mapped[ZoneArchiveSnapshot | None] = relationship(
         back_populates="incident", uselist=False
     )
+    public_reports: Mapped[list[IncidentPublicReport]] = relationship(back_populates="incident")
 
     __table_args__ = (
         UniqueConstraint("territory_code", "sequence", name="uq_incident_territory_sequence"),
@@ -151,6 +163,16 @@ class Episode(Base, TimestampMixin):
     status: Mapped[IncidentStatus] = mapped_column(
         enum_column(IncidentStatus, name="incident_status"), nullable=False
     )
+    verification_state: Mapped[VerificationState] = mapped_column(
+        enum_column(VerificationState, name="episode_verification_state"),
+        nullable=False,
+        default=VerificationState.UNVERIFIED,
+    )
+    corroborating_source_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    evidence_basis_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    estimated_area_ha: Mapped[float | None] = mapped_column(Float)
+    evacuation_established: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    evacuation_basis: Mapped[str | None] = mapped_column(String(1_000))
     review_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_current: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     confidence_policy: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -173,6 +195,15 @@ class Episode(Base, TimestampMixin):
         UniqueConstraint("incident_id", "episode_id", name="uq_episode_public_id"),
         UniqueConstraint("incident_id", "ordinal", name="uq_episode_ordinal"),
         CheckConstraint("ordinal >= 1", name="ck_episode_ordinal"),
+        CheckConstraint("corroborating_source_count >= 0", name="ck_episode_corroboration_count"),
+        CheckConstraint(
+            "estimated_area_ha IS NULL OR estimated_area_ha >= 0",
+            name="ck_episode_estimated_area",
+        ),
+        CheckConstraint(
+            "evacuation_established = 0 OR evacuation_basis IS NOT NULL",
+            name="ck_episode_evacuation_basis",
+        ),
         CheckConstraint("version >= 1", name="ck_episode_version"),
         Index(
             "uq_episode_one_current",
@@ -192,6 +223,7 @@ class Observation(Base):
     source_id: Mapped[int] = mapped_column(
         ForeignKey("source.id", ondelete="RESTRICT"), nullable=False, index=True
     )
+
     observed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True
     )
@@ -212,6 +244,14 @@ class Observation(Base):
     verification_state: Mapped[VerificationState] = mapped_column(
         enum_column(VerificationState, name="verification_state"), nullable=False
     )
+    public_spatial_mode: Mapped[EvidenceSpatialMode] = mapped_column(
+        enum_column(EvidenceSpatialMode, name="evidence_spatial_mode"),
+        nullable=False,
+        default=EvidenceSpatialMode.WITHHELD,
+    )
+    raw_purge_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    raw_purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    raw_retention_hold_reason: Mapped[str | None] = mapped_column(String(500))
     attached_incident_id: Mapped[int | None] = mapped_column(
         ForeignKey("incident_series.id", ondelete="RESTRICT"), index=True
     )
@@ -271,6 +311,56 @@ class Observation(Base):
     )
 
 
+class IncidentPublicReport(Base):
+    """Anonymous, moderated public correction request. No network identity is persisted."""
+
+    __tablename__ = "incident_public_report"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    report_id: Mapped[str] = mapped_column(String(96), nullable=False, unique=True, index=True)
+    incident_id: Mapped[int] = mapped_column(
+        ForeignKey("incident_series.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    category: Mapped[PublicReportCategory] = mapped_column(
+        enum_column(PublicReportCategory, name="public_report_category"), nullable=False
+    )
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    origin_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    submitted_day: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    state: Mapped[PublicReportState] = mapped_column(
+        enum_column(PublicReportState, name="public_report_state"),
+        nullable=False,
+        default=PublicReportState.PENDING,
+        index=True,
+    )
+    closure_reason: Mapped[str | None] = mapped_column(String(500))
+    reviewed_by: Mapped[str | None] = mapped_column(String(255))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+    incident: Mapped[IncidentSeries] = relationship(back_populates="public_reports")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "incident_id",
+            "origin_fingerprint",
+            "content_hash",
+            "submitted_day",
+            name="uq_public_report_origin_content_day",
+        ),
+        CheckConstraint("version >= 1", name="ck_public_report_version"),
+        CheckConstraint(
+            sha256_hex_check("origin_fingerprint"), name="ck_public_report_origin_hash"
+        ),
+        CheckConstraint(sha256_hex_check("content_hash"), name="ck_public_report_content_hash"),
+        Index("ix_public_report_origin_day", "origin_fingerprint", "submitted_day"),
+    )
+
+
 class SpatialZone(Base, TimestampMixin):
     """Stable identity for a reusable, local rural 3D zone."""
 
@@ -284,6 +374,169 @@ class SpatialZone(Base, TimestampMixin):
         back_populates="zone", order_by="SpatialZoneRevision.revision"
     )
     publications: Mapped[list[ZonePublication]] = relationship(back_populates="zone")
+    profile: Mapped[ZoneProfile | None] = relationship(back_populates="zone", uselist=False)
+    uploads: Mapped[list[ZoneUpload]] = relationship(back_populates="zone")
+    information: Mapped[list[ZoneInformation]] = relationship(back_populates="zone")
+    contributions: Mapped[list[ZoneContribution]] = relationship(back_populates="zone")
+
+
+class ZoneProfile(Base, TimestampMixin):
+    """Editable MVP presentation and L93 envelope for one independently published zone."""
+
+    __tablename__ = "zone_profile"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    spatial_zone_id: Mapped[int] = mapped_column(
+        ForeignKey("spatial_zone.id", ondelete="RESTRICT"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    description: Mapped[str] = mapped_column(String(4_000), nullable=False)
+    visibility: Mapped[ZoneVisibility] = mapped_column(
+        enum_column(ZoneVisibility, name="zone_visibility"),
+        nullable=False,
+        default=ZoneVisibility.DRAFT,
+        index=True,
+    )
+    min_easting_l93: Mapped[float] = mapped_column(Float, nullable=False)
+    min_northing_l93: Mapped[float] = mapped_column(Float, nullable=False)
+    max_easting_l93: Mapped[float] = mapped_column(Float, nullable=False)
+    max_northing_l93: Mapped[float] = mapped_column(Float, nullable=False)
+
+    zone: Mapped[SpatialZone] = relationship(back_populates="profile")
+
+    __table_args__ = (
+        CheckConstraint(
+            "min_easting_l93 < max_easting_l93 AND min_northing_l93 < max_northing_l93",
+            name="ck_zone_profile_l93_bounds",
+        ),
+    )
+
+
+class ZoneUpload(Base):
+    """A locally stored, verified archive.  Only one validated upload can be active per zone."""
+
+    __tablename__ = "zone_upload"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    upload_id: Mapped[str] = mapped_column(String(96), nullable=False, unique=True, index=True)
+    spatial_zone_id: Mapped[int] = mapped_column(
+        ForeignKey("spatial_zone.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    package_id: Mapped[str] = mapped_column(String(96), nullable=False)
+    archive_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    archive_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    catalog_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    catalog_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    state: Mapped[ZoneUploadState] = mapped_column(
+        enum_column(ZoneUploadState, name="zone_upload_state"),
+        nullable=False,
+        default=ZoneUploadState.RECEIVED,
+        index=True,
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    validation_summary: Mapped[str] = mapped_column(String(1_000), nullable=False)
+    asset_catalog: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
+    # This is a server-controlled relative key, never an API value and never a client path.
+    storage_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+    zone: Mapped[SpatialZone] = relationship(back_populates="uploads")
+
+    __table_args__ = (
+        UniqueConstraint("spatial_zone_id", "revision", name="uq_zone_upload_revision"),
+        Index(
+            "uq_zone_upload_one_active",
+            "spatial_zone_id",
+            unique=True,
+            sqlite_where=text("is_active = 1"),
+            postgresql_where=text("is_active"),
+        ),
+        CheckConstraint(sha256_hex_check("archive_sha256"), name="ck_zone_upload_archive_sha256"),
+        CheckConstraint(sha256_hex_check("catalog_sha256"), name="ck_zone_upload_catalog_sha256"),
+        CheckConstraint("archive_size_bytes > 0", name="ck_zone_upload_archive_size"),
+        CheckConstraint("catalog_size_bytes > 0", name="ck_zone_upload_catalog_size"),
+        CheckConstraint("revision >= 1", name="ck_zone_upload_revision_positive"),
+        CheckConstraint(
+            "is_active = 0 OR state = 'VALIDATED'",
+            name="ck_zone_upload_active_requires_validated",
+        ),
+    )
+
+
+class ZoneInformation(Base, TimestampMixin):
+    """Reviewed, coordinate-bearing data shown only when its parent zone is public."""
+
+    __tablename__ = "zone_information"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    information_id: Mapped[str] = mapped_column(String(96), nullable=False, unique=True, index=True)
+    spatial_zone_id: Mapped[int] = mapped_column(
+        ForeignKey("spatial_zone.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(String(64), nullable=False)
+    easting_l93: Mapped[float] = mapped_column(Float, nullable=False)
+    northing_l93: Mapped[float] = mapped_column(Float, nullable=False)
+    state: Mapped[ZoneInformationState] = mapped_column(
+        enum_column(ZoneInformationState, name="zone_information_state"),
+        nullable=False,
+        default=ZoneInformationState.DRAFT,
+        index=True,
+    )
+    review_note: Mapped[str | None] = mapped_column(String(1_000))
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    zone: Mapped[SpatialZone] = relationship(back_populates="information")
+
+
+class ZoneContribution(Base):
+    """Untrusted public submission.  Pending rows are never returned by public reads."""
+
+    __tablename__ = "zone_contribution"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    contribution_id: Mapped[str] = mapped_column(
+        String(96), nullable=False, unique=True, index=True
+    )
+    spatial_zone_id: Mapped[int] = mapped_column(
+        ForeignKey("spatial_zone.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(String(64), nullable=False)
+    easting_l93: Mapped[float | None] = mapped_column(Float)
+    northing_l93: Mapped[float | None] = mapped_column(Float)
+    state: Mapped[ZoneContributionState] = mapped_column(
+        enum_column(ZoneContributionState, name="zone_contribution_state"),
+        nullable=False,
+        default=ZoneContributionState.PENDING,
+        index=True,
+    )
+    review_reason: Mapped[str | None] = mapped_column(String(1_000))
+    reviewed_by: Mapped[str | None] = mapped_column(String(255))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+    zone: Mapped[SpatialZone] = relationship(back_populates="contributions")
+
+    __table_args__ = (
+        CheckConstraint(
+            "(easting_l93 IS NULL AND northing_l93 IS NULL) "
+            "OR (easting_l93 IS NOT NULL AND northing_l93 IS NOT NULL)",
+            name="ck_zone_contribution_l93_pair",
+        ),
+    )
 
 
 class SpatialZoneRevision(Base):
@@ -301,6 +554,14 @@ class SpatialZoneRevision(Base):
         ForeignKey("spatial_zone.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    spatial_profile_version: Mapped[str] = mapped_column(String(16), nullable=False, default="1.0")
+    origin_easting_l93: Mapped[float | None] = mapped_column(Float)
+    origin_northing_l93: Mapped[float | None] = mapped_column(Float)
+    horizontal_crs: Mapped[str | None] = mapped_column(String(32))
+    vertical_crs: Mapped[str | None] = mapped_column(String(32))
+    ground_model: Mapped[str | None] = mapped_column(String(64))
+    ground_resolution_m: Mapped[float | None] = mapped_column(Float)
+    surface_height_reference: Mapped[str | None] = mapped_column(String(64))
     origin_lon: Mapped[float] = mapped_column(Float, nullable=False)
     origin_lat: Mapped[float] = mapped_column(Float, nullable=False)
     source_orthometric_height_m: Mapped[float] = mapped_column(Float, nullable=False)
@@ -355,6 +616,10 @@ class SpatialZoneRevision(Base):
     __table_args__ = (
         UniqueConstraint("spatial_zone_id", "revision", name="uq_spatial_zone_revision"),
         CheckConstraint("revision >= 1", name="ck_spatial_zone_revision_positive"),
+        CheckConstraint(
+            "ground_resolution_m IS NULL OR ground_resolution_m > 0",
+            name="ck_spatial_zone_ground_resolution",
+        ),
         CheckConstraint("origin_lon >= -5.5 AND origin_lon <= 10.0", name="ck_spatial_zone_lon"),
         CheckConstraint("origin_lat >= 42.0 AND origin_lat <= 51.5", name="ck_spatial_zone_lat"),
         CheckConstraint(
@@ -457,6 +722,7 @@ class SpatialPackage(Base):
         back_populates="package", cascade="all, delete-orphan"
     )
     zone_publications: Mapped[list[ZonePublication]] = relationship(back_populates="package")
+    manifest_revisions: Mapped[list[ManifestRevision]] = relationship(back_populates="package")
 
     __table_args__ = (
         CheckConstraint(
@@ -502,6 +768,7 @@ class SpatialPackageFile(Base):
     )
 
     package: Mapped[SpatialPackage] = relationship(back_populates="files")
+    model_assets: Mapped[list[ModelAsset]] = relationship(back_populates="spatial_package_file")
 
     __table_args__ = (
         UniqueConstraint("spatial_package_id", "kind", "uri", name="uq_spatial_package_file"),
@@ -623,6 +890,9 @@ class ModelAsset(Base):
     spatial_zone_revision_id: Mapped[int | None] = mapped_column(
         ForeignKey("spatial_zone_revision.id", ondelete="RESTRICT"), index=True
     )
+    spatial_package_file_id: Mapped[int | None] = mapped_column(
+        ForeignKey("spatial_package_file.id", ondelete="RESTRICT"), unique=True, index=True
+    )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     lod: Mapped[AssetLod] = mapped_column(enum_column(AssetLod, name="asset_lod"), nullable=False)
     state: Mapped[AssetState] = mapped_column(
@@ -635,12 +905,19 @@ class ModelAsset(Base):
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    purge_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    purge_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    retention_hold_reason: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
 
     spatial_zone_revision: Mapped[SpatialZoneRevision | None] = relationship(
         back_populates="assets"
+    )
+    spatial_package_file: Mapped[SpatialPackageFile | None] = relationship(
+        back_populates="model_assets"
     )
     manifest_revisions: Mapped[list[ManifestRevision]] = relationship(back_populates="asset")
     archive_snapshots: Mapped[list[ZoneArchiveSnapshot]] = relationship(back_populates="asset")
@@ -693,6 +970,8 @@ class Job(Base, TimestampMixin):
     last_error: Mapped[str | None] = mapped_column(Text)
     trace_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    cancel_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancel_reason: Mapped[str | None] = mapped_column(String(500))
 
     incident: Mapped[IncidentSeries] = relationship(back_populates="jobs")
     episode: Mapped[Episode] = relationship(back_populates="jobs")
@@ -701,6 +980,34 @@ class Job(Base, TimestampMixin):
         UniqueConstraint("kind", "idempotency_key", name="uq_job_kind_idempotency"),
         CheckConstraint("attempt >= 0", name="ck_job_attempt_nonnegative"),
         CheckConstraint("max_attempts >= 1", name="ck_job_max_attempts_positive"),
+    )
+
+
+class AdminLocalSession(Base, TimestampMixin):
+    """Opaque, revocable local-admin browser session. Only a SHA-256 digest is persisted."""
+
+    __tablename__ = "admin_local_session"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    csrf_token: Mapped[str] = mapped_column(String(128), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    idle_expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class AdminLoginAttempt(Base):
+    __tablename__ = "admin_login_attempt"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    origin_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    attempted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False, index=True
     )
 
 
@@ -718,6 +1025,9 @@ class ManifestRevision(Base):
     spatial_zone_revision_id: Mapped[int | None] = mapped_column(
         ForeignKey("spatial_zone_revision.id", ondelete="RESTRICT"), index=True
     )
+    spatial_package_id: Mapped[int | None] = mapped_column(
+        ForeignKey("spatial_package.id", ondelete="RESTRICT"), index=True
+    )
     revision: Mapped[int] = mapped_column(Integer, nullable=False)
     is_current: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     reason: Mapped[str] = mapped_column(String(500), nullable=False)
@@ -731,6 +1041,7 @@ class ManifestRevision(Base):
     spatial_zone_revision: Mapped[SpatialZoneRevision | None] = relationship(
         back_populates="manifest_revisions"
     )
+    package: Mapped[SpatialPackage | None] = relationship(back_populates="manifest_revisions")
     archive_snapshot: Mapped[ZoneArchiveSnapshot | None] = relationship(
         back_populates="manifest_revision", uselist=False
     )

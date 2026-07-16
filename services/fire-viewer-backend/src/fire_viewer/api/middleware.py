@@ -31,7 +31,11 @@ HTTP_DURATION = Histogram(
 
 
 class BodySizeLimitMiddleware:
-    def __init__(self, app: ASGIApp, max_body_bytes: int) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        max_body_bytes: int,
+    ) -> None:
         self.app = app
         self.max_body_bytes = max_body_bytes
 
@@ -42,9 +46,15 @@ class BodySizeLimitMiddleware:
 
         headers = Headers(scope=scope)
         content_length = headers.get("content-length")
-        if content_length and int(content_length) > self.max_body_bytes:
-            await self._reject(scope, send)
-            return
+        if content_length:
+            try:
+                declared_size = int(content_length)
+            except ValueError:
+                await self._reject(scope, send, self.max_body_bytes)
+                return
+            if declared_size > self.max_body_bytes:
+                await self._reject(scope, send, self.max_body_bytes)
+                return
 
         messages: list[Message] = []
         total = 0
@@ -56,7 +66,7 @@ class BodySizeLimitMiddleware:
             if message["type"] == "http.request":
                 total += len(message.get("body", b""))
                 if total > self.max_body_bytes:
-                    await self._reject(scope, send)
+                    await self._reject(scope, send, self.max_body_bytes)
                     return
                 if not message.get("more_body", False):
                     break
@@ -73,14 +83,14 @@ class BodySizeLimitMiddleware:
 
         await self.app(scope, replay_receive, send)
 
-    async def _reject(self, scope: Scope, send: Send) -> None:
+    async def _reject(self, scope: Scope, send: Send, limit: int) -> None:
         trace_id = trace_id_var.get() or new_trace_id()
         body = json.dumps(
             {
                 "type": "urn:fire-viewer:error:payload_too_large",
                 "title": "Payload too large",
                 "status": 413,
-                "detail": f"Request body exceeds {self.max_body_bytes} bytes.",
+                "detail": f"Request body exceeds {limit} bytes.",
                 "instance": scope.get("path", ""),
                 "trace_id": trace_id,
             },
@@ -132,6 +142,25 @@ class TraceMiddleware(BaseHTTPMiddleware):
                 },
             )
             trace_id_var.reset(token)
+
+
+class AdminNoStoreMiddleware(BaseHTTPMiddleware):
+    """Prevent private administration responses from entering browser or proxy caches."""
+
+    def __init__(self, app: ASGIApp, *, api_prefix: str) -> None:
+        super().__init__(app)
+        self.admin_prefixes = (f"{api_prefix.rstrip('/')}/admin", "/api/v2/admin")
+
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        response = await call_next(request)
+        path = request.url.path
+        if any(path == prefix or path.startswith(f"{prefix}/") for prefix in self.admin_prefixes):
+            response.headers["Cache-Control"] = "no-store"
+        return response
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

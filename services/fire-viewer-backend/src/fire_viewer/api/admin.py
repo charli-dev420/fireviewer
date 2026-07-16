@@ -1,46 +1,147 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal, NoReturn
+import hashlib
+from datetime import timedelta
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Path
+from fastapi import APIRouter, Cookie, Header, Path, Query, Request, Response
 from pydantic import Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from fire_viewer.api.dependencies import ActorDep, SessionDep
-from fire_viewer.core.security import Actor, require_role
-from fire_viewer.db.models import SpatialPackage, SpatialZone, SpatialZoneRevision
-from fire_viewer.domain.errors import DomainError, NotFoundError
-from fire_viewer.domain.schemas import StrictModel
+from fire_viewer.api.dependencies import (
+    ActorDep,
+    IdempotencyKeyDep,
+    SessionDep,
+    SettingsDep,
+    TraceIdDep,
+)
+from fire_viewer.core.security import Actor, new_local_session, require_role, verify_local_password
+from fire_viewer.core.time import utcnow
+from fire_viewer.db.models import (
+    AdminLocalSession,
+    AdminLoginAttempt,
+    SpatialPackage,
+    SpatialZone,
+    SpatialZoneRevision,
+    ZonePublication,
+)
+from fire_viewer.domain.enums import PublicReportState, ZonePublicationState
+from fire_viewer.domain.errors import (
+    ConflictError,
+    NotFoundError,
+    UnauthorizedError,
+)
+from fire_viewer.domain.schemas import (
+    AdminAuditListResponse,
+    AdminBlobUploadGrantRequest,
+    AdminBlobUploadGrantResponse,
+    AdminBlobUploadTokenRequest,
+    AdminBlobUploadTokenResponse,
+    AdminConfigurationResponse,
+    AdminIncidentDetail,
+    AdminIncidentListResponse,
+    AdminIncidentModelsPipelineResponse,
+    AdminIncidentObservationsResponse,
+    AdminIncidentSourcesMediaResponse,
+    AdminPublicationActionRequest,
+    AdminPublicationListResponse,
+    AdminPublicReportEnvelope,
+    AdminPublicReportListResponse,
+    AdminPublicReportReviewRequest,
+    AdminRolesResponse,
+    AdminSpatialPackageActionRequest,
+    AdminSpatialPackageFromBlobRequest,
+    AdminSpatialPackageImportEnvelope,
+    AdminSpatialPackagePublicationEnvelope,
+    AdminSpatialPackagePublicationRequest,
+    AdminSpatialPackagePublishRequest,
+    AdminSystemStatus,
+    AdminWorkQueueResponse,
+    AdminZoneCreateRequest,
+    AdminZoneDetailResponse,
+    AdminZoneEnvelope,
+    AdminZoneInformationCreateRequest,
+    AdminZoneInformationEnvelope,
+    AdminZoneInformationUpdateRequest,
+    AdminZoneListResponse,
+    AdminZoneRevisionCreateRequest,
+    AdminZoneRevisionEnvelope,
+    AdminZoneRevisionSummary,
+    AdminZoneUpdateRequest,
+    StrictModel,
+    ZoneVisibilityRequest,
+)
+from fire_viewer.services.admin_incidents import (
+    get_admin_incident,
+    get_admin_work_queue,
+    list_admin_incidents,
+)
+from fire_viewer.services.admin_incidents import (
+    get_admin_incident_models_pipeline as get_admin_incident_models_pipeline_service,
+)
+from fire_viewer.services.admin_incidents import (
+    get_admin_incident_observations as get_admin_incident_observations_service,
+)
+from fire_viewer.services.admin_incidents import (
+    get_admin_incident_sources_media as get_admin_incident_sources_media_service,
+)
+from fire_viewer.services.admin_observability import (
+    get_admin_roles,
+    get_safe_configuration,
+    get_system_status,
+    list_global_audit,
+)
+from fire_viewer.services.blob_uploads import (
+    ALLOWED_PACKAGE_CONTENT_TYPES,
+    create_blob_upload_grant,
+    issue_blob_client_token,
+)
+from fire_viewer.services.public_incident_view import list_public_reports, review_public_report
+from fire_viewer.services.spatial_package_blob_import import (
+    import_blob_package,
+    validate_blob_package,
+)
+from fire_viewer.services.spatial_package_import import create_spatial_revision
+from fire_viewer.services.spatial_package_publication import (
+    change_publication_state,
+    enable_spatial_package_preview,
+    list_publications,
+    publish_spatial_package,
+    validate_spatial_package,
+)
+from fire_viewer.services.zone_workflow import (
+    create_information,
+    create_zone,
+    get_admin_zone_detail,
+    list_admin_zones,
+    set_zone_visibility,
+    update_information,
+    update_zone,
+)
+from fire_viewer.storage import build_object_store
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
-ZoneIdPath = Annotated[str, Path(min_length=3, max_length=64, pattern=r"^[a-z0-9][a-z0-9-]*$")]
+ZoneIdPath = Annotated[str, Path(min_length=3, max_length=64, pattern=r"^[A-Z][A-Z0-9-]*$")]
 RevisionPath = Annotated[int, Path(ge=1)]
+InformationIdPath = Annotated[str, Path(min_length=3, max_length=96)]
+PublicReportIdPath = Annotated[str, Path(min_length=3, max_length=96)]
 
 
-class AdminZoneRevisionSummary(StrictModel):
-    revision: int
-    origin_wgs84: tuple[float, float, float]
-    local_frame: Literal["ENU"]
-    meters_per_unit: float
-    vertical_datum: str
-    bounds_m: dict[str, tuple[float, float]]
+class AdminSessionStatus(StrictModel):
+    authenticated: Literal[True] = True
+    csrf_token: str | None = None
 
 
-class AdminZoneSummary(StrictModel):
-    zone_id: str
-    label: str | None
-    revisions: list[AdminZoneRevisionSummary] = Field(default_factory=list)
+class AdminLoginRequest(StrictModel):
+    username: str = Field(min_length=1, max_length=128)
+    password: str = Field(min_length=1, max_length=1024)
 
 
-class AdminZoneListResponse(StrictModel):
-    zones: list[AdminZoneSummary]
-
-
-class AdminEndpointStatus(StrictModel):
-    status: Literal["not_implemented"]
-    detail: str
+class AdminAuthStatus(StrictModel):
+    mode: Literal["local_admin", "jwt", "disabled"]
+    authenticated: bool
 
 
 class AdminPrivatePreviewFile(StrictModel):
@@ -56,7 +157,11 @@ class AdminPrivatePreviewResponse(StrictModel):
     preview_scope: Literal["private-admin"]
     package_id: str | None
     package_state: str | None
+    publication_id: str | None
+    publication_state: str | None
+    publication_active: bool
     verification_report: dict[str, object]
+    preview_package_ids: list[str] = Field(default_factory=list)
     files: list[AdminPrivatePreviewFile] = Field(default_factory=list)
 
 
@@ -67,6 +172,19 @@ def _require_admin(actor: Actor) -> None:
 def _revision_summary(revision: SpatialZoneRevision) -> AdminZoneRevisionSummary:
     return AdminZoneRevisionSummary(
         revision=revision.revision,
+        spatial_profile_version=revision.spatial_profile_version,
+        origin_l93_ngf=(
+            revision.origin_easting_l93,
+            revision.origin_northing_l93,
+            revision.source_orthometric_height_m,
+        )
+        if revision.origin_easting_l93 is not None and revision.origin_northing_l93 is not None
+        else None,
+        horizontal_crs=revision.horizontal_crs,
+        vertical_crs=revision.vertical_crs,
+        ground_model=revision.ground_model,
+        ground_resolution_m=revision.ground_resolution_m,
+        surface_height_reference=revision.surface_height_reference,
         origin_wgs84=(
             revision.origin_lon,
             revision.origin_lat,
@@ -83,67 +201,467 @@ def _revision_summary(revision: SpatialZoneRevision) -> AdminZoneRevisionSummary
     )
 
 
-def _zone_summary(zone: SpatialZone) -> AdminZoneSummary:
-    return AdminZoneSummary(
-        zone_id=zone.zone_id,
-        label=zone.label,
-        revisions=[_revision_summary(revision) for revision in zone.revisions],
+def _set_mutation_headers(response: Response, *, replayed: bool) -> None:
+    response.headers["Idempotent-Replay"] = "true" if replayed else "false"
+    response.headers["Cache-Control"] = "no-store"
+
+
+def _set_admin_read_headers(response: Response) -> None:
+    response.headers["Cache-Control"] = "no-store"
+
+
+@router.get("/auth/status", response_model=AdminAuthStatus)
+def get_auth_status(
+    settings: SettingsDep, fireviewer_admin: Annotated[str | None, Cookie()] = None
+) -> AdminAuthStatus:
+    return AdminAuthStatus(
+        mode=settings.auth_mode,
+        authenticated=bool(fireviewer_admin) if settings.auth_mode == "local_admin" else False,
     )
 
 
-def _not_implemented(feature: str) -> NoReturn:
-    raise DomainError(
-        status_code=501,
-        code="admin_endpoint_not_implemented",
-        title="Administration endpoint not implemented",
-        detail=f"The admin endpoint for {feature} is reserved for the MVP administration workflow.",
+@router.post(
+    "/auth/login",
+    response_model=AdminSessionStatus,
+    response_model_exclude_none=True,
+)
+def login_local_admin(
+    payload: AdminLoginRequest,
+    request: Request,
+    response: Response,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> AdminSessionStatus:
+    if settings.auth_mode != "local_admin" or not settings.local_admin_password_hash:
+        raise NotFoundError("admin_auth", "local-login")
+    origin = request.client.host if request.client else "unknown"
+    origin_hash = hashlib.sha256(origin.encode()).hexdigest()
+    window = utcnow() - timedelta(minutes=15)
+    attempts = int(
+        session.scalar(
+            select(func.count())
+            .select_from(AdminLoginAttempt)
+            .where(
+                AdminLoginAttempt.origin_hash == origin_hash,
+                AdminLoginAttempt.attempted_at >= window,
+            )
+        )
+        or 0
     )
+    valid = payload.username == settings.local_admin_username and verify_local_password(
+        payload.password, settings.local_admin_password_hash
+    )
+    if attempts >= settings.local_admin_login_limit or not valid:
+        session.add(AdminLoginAttempt(origin_hash=origin_hash))
+        session.commit()
+        raise UnauthorizedError("Invalid administrator credentials.")
+    token, csrf = new_local_session(session, settings)
+    response.set_cookie(
+        "fireviewer_admin",
+        token,
+        httponly=True,
+        secure=settings.environment != "development",
+        samesite="strict",
+        path="/api/v1",
+    )
+    _set_admin_read_headers(response)
+    return AdminSessionStatus(csrf_token=csrf)
+
+
+@router.post("/auth/logout", status_code=204)
+def logout_local_admin(
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    fireviewer_admin: Annotated[str | None, Cookie()] = None,
+) -> Response:
+    _require_admin(actor)
+    if settings.auth_mode == "local_admin" and fireviewer_admin:
+        row = session.execute(
+            select(AdminLocalSession).where(
+                AdminLocalSession.session_hash
+                == hashlib.sha256(fireviewer_admin.encode()).hexdigest()
+            )
+        ).scalar_one_or_none()
+        if row and row.revoked_at is None:
+            row.revoked_at = utcnow()
+            session.commit()
+    response.delete_cookie("fireviewer_admin", path="/api/v1")
+    response.status_code = 204
+    _set_admin_read_headers(response)
+    return response
+
+
+@router.get(
+    "/session",
+    response_model=AdminSessionStatus,
+    response_model_exclude_none=True,
+)
+def get_admin_session(response: Response, actor: ActorDep) -> AdminSessionStatus:
+    _require_admin(actor)
+    _set_admin_read_headers(response)
+    return AdminSessionStatus(csrf_token=actor.csrf_token)
+
+
+@router.get("/audit", response_model=AdminAuditListResponse)
+def get_global_audit(
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    action: Annotated[str | None, Query(min_length=1, max_length=128)] = None,
+    target_id: Annotated[str | None, Query(min_length=1, max_length=128)] = None,
+) -> AdminAuditListResponse:
+    _require_admin(actor)
+    _set_admin_read_headers(response)
+    return list_global_audit(session, limit=limit, action=action, target_id=target_id)
+
+
+@router.get("/roles", response_model=AdminRolesResponse)
+def get_roles(response: Response, actor: ActorDep, settings: SettingsDep) -> AdminRolesResponse:
+    _require_admin(actor)
+    _set_admin_read_headers(response)
+    return get_admin_roles(actor, settings)
+
+
+@router.get("/system", response_model=AdminSystemStatus)
+def get_system(
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> AdminSystemStatus:
+    _require_admin(actor)
+    _set_admin_read_headers(response)
+    return get_system_status(session, settings)
+
+
+@router.get("/configuration", response_model=AdminConfigurationResponse)
+def get_configuration(
+    response: Response,
+    actor: ActorDep,
+    settings: SettingsDep,
+) -> AdminConfigurationResponse:
+    _require_admin(actor)
+    _set_admin_read_headers(response)
+    return get_safe_configuration(settings)
+
+
+@router.get("/incidents", response_model=AdminIncidentListResponse)
+def list_incidents(
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> AdminIncidentListResponse:
+    """Private operational inventory keyed by the stable fire_id, never by zone_id."""
+    _require_admin(actor)
+    _set_admin_read_headers(response)
+    return list_admin_incidents(session, settings=settings)
+
+
+@router.get("/work-queue", response_model=AdminWorkQueueResponse)
+def get_work_queue(
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+) -> AdminWorkQueueResponse:
+    _require_admin(actor)
+    _set_admin_read_headers(response)
+    return get_admin_work_queue(session)
+
+
+@router.get("/incidents/{fire_id}", response_model=AdminIncidentDetail)
+def get_incident(
+    fire_id: str,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> AdminIncidentDetail:
+    _require_admin(actor)
+    _set_admin_read_headers(response)
+    return get_admin_incident(session, fire_id=fire_id, settings=settings)
+
+
+@router.get(
+    "/incidents/{fire_id}/observations",
+    response_model=AdminIncidentObservationsResponse,
+)
+def get_incident_observations(
+    fire_id: str,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+) -> AdminIncidentObservationsResponse:
+    """Private review surface scoped to one permanent fire_id."""
+    _require_admin(actor)
+    _set_admin_read_headers(response)
+    return get_admin_incident_observations_service(session, fire_id=fire_id)
+
+
+@router.get(
+    "/incidents/{fire_id}/sources-media",
+    response_model=AdminIncidentSourcesMediaResponse,
+)
+def get_incident_sources_media(
+    fire_id: str,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+) -> AdminIncidentSourcesMediaResponse:
+    """Private source and evidence-metadata surface; never streams raw media."""
+    _require_admin(actor)
+    _set_admin_read_headers(response)
+    return get_admin_incident_sources_media_service(session, fire_id=fire_id)
+
+
+@router.get(
+    "/incidents/{fire_id}/models-pipeline",
+    response_model=AdminIncidentModelsPipelineResponse,
+)
+def get_incident_models_pipeline(
+    fire_id: str,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+) -> AdminIncidentModelsPipelineResponse:
+    """Private manifest, asset and job metadata for one incident dossier."""
+    _require_admin(actor)
+    _set_admin_read_headers(response)
+    return get_admin_incident_models_pipeline_service(session, fire_id=fire_id)
+
+
+@router.get("/reports", response_model=AdminPublicReportListResponse)
+def list_admin_public_reports(
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    state: Annotated[PublicReportState | None, Query()] = None,
+) -> AdminPublicReportListResponse:
+    _require_admin(actor)
+    _set_admin_read_headers(response)
+    return list_public_reports(session, state=state)
+
+
+@router.post("/reports/{report_id}/review", response_model=AdminPublicReportEnvelope)
+def review_admin_public_report(
+    report_id: PublicReportIdPath,
+    payload: AdminPublicReportReviewRequest,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    trace_id: TraceIdDep,
+    idempotency_key: IdempotencyKeyDep,
+) -> AdminPublicReportEnvelope:
+    _require_admin(actor)
+    # The report state machine is optimistic-concurrent; the header is still required so clients
+    # cannot accidentally repeat an administrative action after a transport failure.
+    _ = idempotency_key
+    result = review_public_report(
+        session,
+        report_id=report_id,
+        payload=payload,
+        actor=actor,
+        trace_id=trace_id,
+    )
+    _set_mutation_headers(response, replayed=False)
+    return result
 
 
 @router.get("/zones", response_model=AdminZoneListResponse)
-def list_zones(actor: ActorDep, session: SessionDep) -> AdminZoneListResponse:
+def list_zones(response: Response, actor: ActorDep, session: SessionDep) -> AdminZoneListResponse:
     _require_admin(actor)
-    zones = session.execute(
-        select(SpatialZone)
-        .options(selectinload(SpatialZone.revisions))
-        .order_by(SpatialZone.zone_id)
-    ).scalars().all()
-    return AdminZoneListResponse(zones=[_zone_summary(zone) for zone in zones])
+    _set_admin_read_headers(response)
+    return list_admin_zones(session)
 
 
-@router.post("/zones", response_model=AdminEndpointStatus, status_code=501)
-def create_zone(actor: ActorDep) -> AdminEndpointStatus:
+@router.post("/zones", response_model=AdminZoneEnvelope, status_code=201)
+def create_admin_zone(
+    payload: AdminZoneCreateRequest,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    trace_id: TraceIdDep,
+    idempotency_key: IdempotencyKeyDep,
+) -> AdminZoneEnvelope:
     _require_admin(actor)
-    _not_implemented("zone creation")
+    outcome = create_zone(
+        session,
+        payload=payload,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        trace_id=trace_id,
+        settings=settings,
+    )
+    response.status_code = 201
+    _set_mutation_headers(response, replayed=outcome.replayed)
+    return AdminZoneEnvelope.model_validate(outcome.response)
 
 
-@router.get("/zones/{zone_id}", response_model=AdminZoneSummary)
-def get_zone(zone_id: ZoneIdPath, actor: ActorDep, session: SessionDep) -> AdminZoneSummary:
+@router.get("/zones/{zone_id}", response_model=AdminZoneDetailResponse)
+def get_zone(
+    zone_id: ZoneIdPath,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+) -> AdminZoneDetailResponse:
     _require_admin(actor)
-    zone = session.execute(
-        select(SpatialZone)
-        .where(SpatialZone.zone_id == zone_id)
-        .options(selectinload(SpatialZone.revisions))
-    ).scalar_one_or_none()
-    if zone is None:
-        raise NotFoundError("spatial_zone", zone_id)
-    return _zone_summary(zone)
+    _set_admin_read_headers(response)
+    return get_admin_zone_detail(session, zone_id=zone_id)
 
 
-@router.post("/zones/{zone_id}/revisions", response_model=AdminEndpointStatus, status_code=501)
-def create_zone_revision(zone_id: ZoneIdPath, actor: ActorDep) -> AdminEndpointStatus:
+@router.patch("/zones/{zone_id}", response_model=AdminZoneEnvelope)
+def update_admin_zone(
+    zone_id: ZoneIdPath,
+    payload: AdminZoneUpdateRequest,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    trace_id: TraceIdDep,
+    idempotency_key: IdempotencyKeyDep,
+) -> AdminZoneEnvelope:
     _require_admin(actor)
-    _not_implemented(f"revision creation for zone {zone_id}")
+    outcome = update_zone(
+        session,
+        zone_id=zone_id,
+        payload=payload,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        trace_id=trace_id,
+        settings=settings,
+    )
+    _set_mutation_headers(response, replayed=outcome.replayed)
+    return AdminZoneEnvelope.model_validate(outcome.response)
+
+
+@router.post("/zones/{zone_id}/visibility", response_model=AdminZoneEnvelope)
+def set_admin_zone_visibility(
+    zone_id: ZoneIdPath,
+    payload: ZoneVisibilityRequest,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    trace_id: TraceIdDep,
+    idempotency_key: IdempotencyKeyDep,
+) -> AdminZoneEnvelope:
+    _require_admin(actor)
+    outcome = set_zone_visibility(
+        session,
+        zone_id=zone_id,
+        payload=payload,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        trace_id=trace_id,
+        settings=settings,
+    )
+    _set_mutation_headers(response, replayed=outcome.replayed)
+    return AdminZoneEnvelope.model_validate(outcome.response)
+
+
+@router.post(
+    "/zones/{zone_id}/information", response_model=AdminZoneInformationEnvelope, status_code=201
+)
+def create_admin_information(
+    zone_id: ZoneIdPath,
+    payload: AdminZoneInformationCreateRequest,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    trace_id: TraceIdDep,
+    idempotency_key: IdempotencyKeyDep,
+) -> AdminZoneInformationEnvelope:
+    _require_admin(actor)
+    outcome = create_information(
+        session,
+        zone_id=zone_id,
+        payload=payload,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        trace_id=trace_id,
+        settings=settings,
+    )
+    response.status_code = 201
+    _set_mutation_headers(response, replayed=outcome.replayed)
+    return AdminZoneInformationEnvelope.model_validate(outcome.response)
+
+
+@router.patch(
+    "/zones/{zone_id}/information/{information_id}",
+    response_model=AdminZoneInformationEnvelope,
+)
+def update_admin_information(
+    zone_id: ZoneIdPath,
+    information_id: InformationIdPath,
+    payload: AdminZoneInformationUpdateRequest,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    trace_id: TraceIdDep,
+    idempotency_key: IdempotencyKeyDep,
+) -> AdminZoneInformationEnvelope:
+    _require_admin(actor)
+    outcome = update_information(
+        session,
+        zone_id=zone_id,
+        information_id=information_id,
+        payload=payload,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        trace_id=trace_id,
+        settings=settings,
+    )
+    _set_mutation_headers(response, replayed=outcome.replayed)
+    return AdminZoneInformationEnvelope.model_validate(outcome.response)
+
+
+# Spatial revisions remain a technical registry. Package creation belongs to the
+# pipeline/import path, while validation, preview and publication are explicit admin actions.
+@router.post(
+    "/zones/{zone_id}/revisions",
+    response_model=AdminZoneRevisionEnvelope,
+    status_code=201,
+)
+def create_zone_revision(
+    zone_id: ZoneIdPath,
+    payload: AdminZoneRevisionCreateRequest,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    trace_id: TraceIdDep,
+    idempotency_key: IdempotencyKeyDep,
+) -> AdminZoneRevisionEnvelope:
+    _require_admin(actor)
+    outcome = create_spatial_revision(
+        session,
+        zone_id=zone_id,
+        payload=payload,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        trace_id=trace_id,
+        settings=settings,
+    )
+    _set_mutation_headers(response, replayed=outcome.replayed)
+    return AdminZoneRevisionEnvelope.model_validate(outcome.response)
 
 
 @router.get("/zones/{zone_id}/revisions/{revision}", response_model=AdminZoneRevisionSummary)
 def get_zone_revision(
     zone_id: ZoneIdPath,
     revision: RevisionPath,
+    response: Response,
     actor: ActorDep,
     session: SessionDep,
 ) -> AdminZoneRevisionSummary:
     _require_admin(actor)
+    _set_admin_read_headers(response)
     row = session.execute(
         select(SpatialZoneRevision)
         .join(SpatialZone)
@@ -155,33 +673,132 @@ def get_zone_revision(
 
 
 @router.post(
-    "/zones/{zone_id}/revisions/{revision}/packages",
-    response_model=AdminEndpointStatus,
-    status_code=501,
+    "/zones/{zone_id}/revisions/{revision}/packages/upload-grant",
+    response_model=AdminBlobUploadGrantResponse,
+    status_code=201,
 )
-def submit_zone_package(
+def grant_zone_package_upload(
     zone_id: ZoneIdPath,
     revision: RevisionPath,
+    payload: AdminBlobUploadGrantRequest,
     actor: ActorDep,
-) -> AdminEndpointStatus:
+    session: SessionDep,
+    settings: SettingsDep,
+) -> AdminBlobUploadGrantResponse:
     _require_admin(actor)
-    _not_implemented(f"package submission for zone {zone_id} revision {revision}")
+    revision_exists = session.execute(
+        select(SpatialZoneRevision.id)
+        .join(SpatialZone)
+        .where(SpatialZone.zone_id == zone_id, SpatialZoneRevision.revision == revision)
+    ).scalar_one_or_none()
+    if revision_exists is None:
+        raise NotFoundError("spatial_zone_revision", f"{zone_id}/revisions/{revision}")
+    if (
+        session.execute(
+            select(SpatialPackage.id).where(SpatialPackage.package_id == payload.package_id)
+        ).scalar_one_or_none()
+        is not None
+    ):
+        raise ConflictError(
+            "spatial_package_already_exists",
+            "The package identifier is already registered.",
+        )
+    grant = create_blob_upload_grant(payload=payload, actor=actor, settings=settings)
+    return AdminBlobUploadGrantResponse(
+        upload_id=grant.upload_id,
+        pathname_prefix=grant.pathname_prefix,
+        upload_grant=grant.token,
+        expires_at=grant.expires_at,
+        maximum_file_size_bytes=settings.zone_upload_max_bytes,
+        allowed_content_types=list(ALLOWED_PACKAGE_CONTENT_TYPES),
+    )
+
+
+@router.post("/blob-upload-token", response_model=AdminBlobUploadTokenResponse)
+def grant_blob_client_token(
+    payload: AdminBlobUploadTokenRequest,
+    settings: SettingsDep,
+    upload_grant: Annotated[
+        str, Header(alias="X-Blob-Upload-Grant", min_length=64, max_length=4096)
+    ],
+) -> AdminBlobUploadTokenResponse:
+    return AdminBlobUploadTokenResponse(
+        clientToken=issue_blob_client_token(
+            pathname=payload.payload.pathname,
+            client_payload=payload.payload.clientPayload,
+            upload_grant=upload_grant,
+            settings=settings,
+        )
+    )
+
+
+@router.post(
+    "/zones/{zone_id}/revisions/{revision}/packages/from-blob",
+    response_model=AdminSpatialPackageImportEnvelope,
+    status_code=201,
+)
+def finalize_zone_package_from_blob(
+    zone_id: ZoneIdPath,
+    revision: RevisionPath,
+    payload: AdminSpatialPackageFromBlobRequest,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    trace_id: TraceIdDep,
+    idempotency_key: IdempotencyKeyDep,
+) -> AdminSpatialPackageImportEnvelope:
+    _require_admin(actor)
+    validated = validate_blob_package(
+        zone_id=zone_id,
+        revision=revision,
+        payload=payload,
+        settings=settings,
+    )
+    outcome = import_blob_package(
+        session,
+        zone_id=zone_id,
+        revision=revision,
+        payload=payload,
+        validated=validated,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        trace_id=trace_id,
+        settings=settings,
+    )
+    response.status_code = 201
+    _set_mutation_headers(response, replayed=outcome.replayed)
+    return outcome.response
 
 
 @router.post(
     "/zones/{zone_id}/revisions/{revision}/validations",
-    response_model=AdminEndpointStatus,
-    status_code=501,
+    response_model=AdminSpatialPackagePublicationEnvelope,
 )
 def validate_zone_revision(
     zone_id: ZoneIdPath,
     revision: RevisionPath,
+    payload: AdminSpatialPackageActionRequest,
+    response: Response,
     actor: ActorDep,
-) -> AdminEndpointStatus:
+    session: SessionDep,
+    settings: SettingsDep,
+    trace_id: TraceIdDep,
+    idempotency_key: IdempotencyKeyDep,
+) -> AdminSpatialPackagePublicationEnvelope:
     _require_admin(actor)
-    _not_implemented(f"validation for zone {zone_id} revision {revision}")
-
-
+    outcome = validate_spatial_package(
+        session,
+        zone_id=zone_id,
+        revision=revision,
+        payload=payload,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        trace_id=trace_id,
+        settings=settings,
+    )
+    _set_mutation_headers(response, replayed=outcome.replayed)
+    return outcome.response
 
 
 @router.get(
@@ -191,10 +808,12 @@ def validate_zone_revision(
 def get_private_preview(
     zone_id: ZoneIdPath,
     revision: RevisionPath,
+    response: Response,
     actor: ActorDep,
     session: SessionDep,
 ) -> AdminPrivatePreviewResponse:
     _require_admin(actor)
+    _set_admin_read_headers(response)
     revision_row = session.execute(
         select(SpatialZoneRevision)
         .join(SpatialZone)
@@ -202,22 +821,38 @@ def get_private_preview(
     ).scalar_one_or_none()
     if revision_row is None:
         raise NotFoundError("spatial_zone_revision", f"{zone_id}/revisions/{revision}")
-
-    package = session.execute(
-        select(SpatialPackage)
-        .where(SpatialPackage.spatial_zone_revision_id == revision_row.id)
-        .options(selectinload(SpatialPackage.files))
-        .order_by(SpatialPackage.created_at.desc(), SpatialPackage.id.desc())
-        .limit(1)
-    ).scalar_one_or_none()
-
+    packages = list(
+        session.execute(
+            select(SpatialPackage)
+            .where(SpatialPackage.spatial_zone_revision_id == revision_row.id)
+            .options(selectinload(SpatialPackage.files))
+            .order_by(SpatialPackage.created_at.desc(), SpatialPackage.id.desc())
+        ).scalars()
+    )
+    package = packages[0] if packages else None
+    publication = (
+        session.execute(
+            select(ZonePublication)
+            .where(ZonePublication.spatial_package_id == package.id)
+            .order_by(ZonePublication.created_at.desc(), ZonePublication.id.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        if package
+        else None
+    )
     return AdminPrivatePreviewResponse(
         zone_id=zone_id,
         revision=revision,
         preview_scope="private-admin",
         package_id=package.package_id if package else None,
         package_state=str(package.state) if package else None,
+        publication_id=publication.publication_id if publication else None,
+        publication_state=str(publication.state) if publication else None,
+        publication_active=publication.is_active if publication else False,
         verification_report=package.verification_report if package else {},
+        preview_package_ids=[
+            item.package_id for item in packages if str(item.state) in {"PREVIEWABLE", "PUBLISHED"}
+        ],
         files=[
             AdminPrivatePreviewFile(
                 kind=str(file.kind),
@@ -230,27 +865,180 @@ def get_private_preview(
     )
 
 
+@router.get("/zones/{zone_id}/revisions/{revision}/preview/packages/{package_id}/png")
+def get_private_preview_png(
+    zone_id: ZoneIdPath,
+    revision: RevisionPath,
+    package_id: Annotated[str, Path(min_length=3, max_length=96)],
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> Response:
+    _require_admin(actor)
+    package = session.execute(
+        select(SpatialPackage)
+        .join(
+            SpatialZoneRevision,
+            SpatialPackage.spatial_zone_revision_id == SpatialZoneRevision.id,
+        )
+        .join(SpatialZone, SpatialZoneRevision.spatial_zone_id == SpatialZone.id)
+        .where(
+            SpatialZone.zone_id == zone_id,
+            SpatialZoneRevision.revision == revision,
+            SpatialPackage.package_id == package_id,
+        )
+        .options(selectinload(SpatialPackage.files))
+    ).scalar_one_or_none()
+    if package is None:
+        raise NotFoundError("spatial_package", package_id)
+    if str(package.state) not in {"PREVIEWABLE", "PUBLISHED"}:
+        raise ConflictError(
+            "spatial_package_preview_not_enabled",
+            "Private binary preview requires a previewable package.",
+        )
+    png = next((item for item in package.files if str(item.kind) == "PNG"), None)
+    if png is None:
+        raise NotFoundError("spatial_package_preview", package_id)
+    try:
+        content = build_object_store(settings).read_bytes(png.uri)
+    except RuntimeError as exc:
+        raise NotFoundError("spatial_package_preview", package_id) from exc
+    return Response(
+        content=content,
+        media_type="image/png",
+        headers={"Cache-Control": "private, no-store", "Content-Disposition": "inline"},
+    )
+
+
 @router.post(
     "/zones/{zone_id}/revisions/{revision}/preview",
-    response_model=AdminEndpointStatus,
-    status_code=501,
+    response_model=AdminSpatialPackagePublicationEnvelope,
 )
 def create_zone_preview(
     zone_id: ZoneIdPath,
     revision: RevisionPath,
+    payload: AdminSpatialPackageActionRequest,
+    response: Response,
     actor: ActorDep,
-) -> AdminEndpointStatus:
+    session: SessionDep,
+    settings: SettingsDep,
+    trace_id: TraceIdDep,
+    idempotency_key: IdempotencyKeyDep,
+) -> AdminSpatialPackagePublicationEnvelope:
     _require_admin(actor)
-    _not_implemented(f"private preview for zone {zone_id} revision {revision}")
+    outcome = enable_spatial_package_preview(
+        session,
+        zone_id=zone_id,
+        revision=revision,
+        payload=payload,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        trace_id=trace_id,
+        settings=settings,
+    )
+    _set_mutation_headers(response, replayed=outcome.replayed)
+    return outcome.response
 
 
-@router.get("/publications", response_model=AdminEndpointStatus, status_code=501)
-def list_publications(actor: ActorDep) -> AdminEndpointStatus:
+@router.get("/publications", response_model=AdminPublicationListResponse)
+def get_publications(
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    state: ZonePublicationState | None = None,
+) -> AdminPublicationListResponse:
     _require_admin(actor)
-    _not_implemented("publication listing")
+    _set_admin_read_headers(response)
+    return list_publications(session, state=state)
 
 
-@router.post("/publications", response_model=AdminEndpointStatus, status_code=501)
-def publish_revision(actor: ActorDep) -> AdminEndpointStatus:
+@router.post(
+    "/publications/{publication_id}/withdraw", response_model=AdminSpatialPackagePublicationEnvelope
+)
+def withdraw_publication(
+    publication_id: str,
+    payload: AdminPublicationActionRequest,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    trace_id: TraceIdDep,
+    idempotency_key: IdempotencyKeyDep,
+) -> AdminSpatialPackagePublicationEnvelope:
     _require_admin(actor)
-    _not_implemented("explicit publication")
+    outcome = change_publication_state(
+        session,
+        publication_id=publication_id,
+        target=ZonePublicationState.WITHDRAWN,
+        payload=payload,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        trace_id=trace_id,
+        settings=settings,
+    )
+    _set_mutation_headers(response, replayed=outcome.replayed)
+    return outcome.response
+
+
+@router.post(
+    "/publications/{publication_id}/restore", response_model=AdminSpatialPackagePublicationEnvelope
+)
+def restore_publication(
+    publication_id: str,
+    payload: AdminPublicationActionRequest,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    trace_id: TraceIdDep,
+    idempotency_key: IdempotencyKeyDep,
+) -> AdminSpatialPackagePublicationEnvelope:
+    _require_admin(actor)
+    outcome = change_publication_state(
+        session,
+        publication_id=publication_id,
+        target=ZonePublicationState.PUBLISHED,
+        payload=payload,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        trace_id=trace_id,
+        settings=settings,
+    )
+    _set_mutation_headers(response, replayed=outcome.replayed)
+    return outcome.response
+
+
+@router.post("/publications", response_model=AdminSpatialPackagePublicationEnvelope)
+def publish_revision(
+    payload: AdminSpatialPackagePublishRequest,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    trace_id: TraceIdDep,
+    idempotency_key: IdempotencyKeyDep,
+) -> AdminSpatialPackagePublicationEnvelope:
+    _require_admin(actor)
+    if settings.auth_mode == "local_admin":
+        password = payload.admin_password
+        if (
+            password is None
+            or not settings.local_admin_password_hash
+            or not verify_local_password(
+                password.get_secret_value(), settings.local_admin_password_hash
+            )
+        ):
+            raise UnauthorizedError("Administrator reauthentication is required.")
+    publication_payload = AdminSpatialPackagePublicationRequest.model_validate(
+        payload.model_dump(exclude={"admin_password"})
+    )
+    outcome = publish_spatial_package(
+        session,
+        payload=publication_payload,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        trace_id=trace_id,
+        settings=settings,
+    )
+    _set_mutation_headers(response, replayed=outcome.replayed)
+    return outcome.response

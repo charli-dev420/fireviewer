@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>QA surface LiDAR directe</title>
+  <style>
+    html,body,#view{width:100%;height:100%;margin:0;overflow:hidden;background:#b9cbd7}
+    #label{position:fixed;z-index:2;left:20px;top:18px;padding:10px 14px;border-radius:8px;background:#17242edb;color:white;font:600 14px system-ui}
+  </style>
+  <script type="importmap">{"imports":{"three":"/apps/fire-viewer-ui/node_modules/three/build/three.module.js"}}</script>
+</head>
+<body>
+  <div id="label">Surface LiDAR directe — MNS IGN 0,50 m — aucune géométrie ajoutée</div>
+  <div id="view"></div>
+  <script type="module">
+    import * as THREE from 'three';
+    import {GLTFLoader} from '/apps/fire-viewer-ui/node_modules/three/examples/jsm/loaders/GLTFLoader.js';
+    import {OrbitControls} from '/apps/fire-viewer-ui/node_modules/three/examples/jsm/controls/OrbitControls.js';
+    const query=new URLSearchParams(location.search);
+    const catalogUrl=query.get('catalog');
+    const requestedChunk=query.get('chunk');
+    const requestedTile=query.get('tile');
+    const lod=Number(query.get('lod')??0);
+    const catalog=await fetch(catalogUrl).then(response=>response.json());
+    const catalogTile=catalog.tiles
+      ? catalog.tiles.find(tile=>tile.tile_id===requestedTile)??catalog.tiles[0]
+      : null;
+    const sourceChunks=catalogTile?.chunks??catalog.chunks;
+    document.querySelector('#label').textContent=catalogTile
+      ? 'Socle lointain — MNT IGN 10 m — aucune géométrie ajoutée'
+      : 'Surface LiDAR directe — MNS IGN 0,50 m — aucune géométrie ajoutée';
+    const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+    renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+    renderer.setSize(innerWidth,innerHeight);
+    renderer.outputColorSpace=THREE.SRGBColorSpace;
+    renderer.toneMapping=THREE.NoToneMapping;
+    document.querySelector('#view').append(renderer.domElement);
+    const scene=new THREE.Scene();
+    scene.background=new THREE.Color(0xb9cbd7);
+    const camera=new THREE.PerspectiveCamera(43,innerWidth/innerHeight,0.2,3000);
+    const controls=new OrbitControls(camera,renderer.domElement);
+    controls.enableDamping=true;
+    scene.add(new THREE.HemisphereLight(0xeaf5ff,0x485341,1.15));
+    const sun=new THREE.DirectionalLight(0xfff0d0,1.6);sun.position.set(-300,650,220);scene.add(sun);
+    const tileBounds=sourceChunks.reduce((result,chunk)=>[
+      Math.min(result[0],chunk.bounds_l93_metres[0]),Math.min(result[1],chunk.bounds_l93_metres[1]),
+      Math.max(result[2],chunk.bounds_l93_metres[2]),Math.max(result[3],chunk.bounds_l93_metres[3])
+    ],[Infinity,Infinity,-Infinity,-Infinity]);
+    const chunks=requestedChunk?sourceChunks.filter(chunk=>chunk.chunk_id.endsWith(`-${requestedChunk}`)):sourceChunks;
+    const loader=new GLTFLoader();
+    await Promise.all(chunks.map(chunk=>new Promise((resolve,reject)=>{
+      const asset=chunk.asset??chunk.lods.find(item=>item.lod_level===lod)??chunk.lods[lod];
+      const base=new URL(catalogUrl,location.href);
+      const url=chunk.asset
+        ? new URL(asset.path,base).href
+        : new URL(`chunks/${chunk.chunk_id}/${asset.path}`,base).href;
+      loader.load(url,gltf=>{
+        gltf.scene.position.set(
+          chunk.bounds_l93_metres[0]-tileBounds[0],0,
+          -(chunk.bounds_l93_metres[1]-tileBounds[1])
+        );
+        gltf.scene.traverse(object=>{if(object.isMesh){object.material.roughness=0.82;object.material.metalness=0.0}});
+        scene.add(gltf.scene);resolve();
+      },undefined,reject);
+    })));
+    if(requestedChunk){
+      const chunk=chunks[0];
+      const cx=(chunk.bounds_l93_metres[0]+chunk.bounds_l93_metres[2])/2-tileBounds[0];
+      const cz=-((chunk.bounds_l93_metres[1]+chunk.bounds_l93_metres[3])/2-tileBounds[1]);
+      controls.target.set(cx,75,cz);camera.position.set(cx+230,230,cz+245);
+    }else{
+      controls.target.set(500,70,-500);camera.position.set(1180,720,520);
+    }
+    document.body.dataset.ready='true';
+    addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+    renderer.setAnimationLoop(()=>{controls.update();renderer.render(scene,camera)});
+  </script>
+</body>
+</html>

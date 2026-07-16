@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 
@@ -16,8 +17,8 @@ from fire_viewer.domain.enums import SpatialPackageFileKind, SpatialPackageState
 from fire_viewer.domain.spatial import RAF20_GRID_SHA256
 
 
-def seed_revision(session: Session) -> SpatialZoneRevision:
-    zone = SpatialZone(zone_id="admin-package-zone", label="Admin package zone")
+def seed_revision(session: Session, *, suffix: str = "") -> SpatialZoneRevision:
+    zone = SpatialZone(zone_id=f"admin-package-zone{suffix}", label="Admin package zone")
     session.add(zone)
     session.flush()
     revision = SpatialZoneRevision(
@@ -51,12 +52,10 @@ def test_admin_spatial_package_registry_tracks_manifest_files_report_and_revisio
         manifest_sha256="a" * 64,
         manifest_size_bytes=2_048,
         storage_uri="s3://fire-viewer-admin/packages/pkg-die-pontaix-r1-0001/",
-        state=SpatialPackageState.VERIFIED,
+        state=SpatialPackageState.DRAFT,
         provenance={"pipeline": "unity-export", "operator": "admin-ui-test"},
-        verification_report={"status": "passed", "checks": ["hashes", "spatial-contract"]},
+        verification_report={},
         created_by="admin-ui-test",
-        verified_at=datetime.now(UTC),
-        spatial_zone_revision_id=revision.id,
         files=[
             SpatialPackageFile(
                 kind=SpatialPackageFileKind.COG,
@@ -86,6 +85,12 @@ def test_admin_spatial_package_registry_tracks_manifest_files_report_and_revisio
     )
 
     session.add(package)
+    session.flush()
+    package.verification_report = {"status": "passed", "checks": ["hashes", "spatial-contract"]}
+    package.verified_at = datetime.now(UTC)
+    package.state = SpatialPackageState.VERIFIED
+    session.flush()
+    package.spatial_zone_revision_id = revision.id
     session.commit()
     session.refresh(revision)
 
@@ -148,3 +153,104 @@ def test_admin_spatial_package_files_are_immutable_in_sqlite(session: Session) -
     package.files[0].size_bytes = 2_048
     with pytest.raises(DBAPIError):
         session.commit()
+
+
+def test_admin_spatial_package_starts_draft_and_cannot_be_deleted(session: Session) -> None:
+    invalid_initial_state = SpatialPackage(
+        package_id="pkg-invalid-initial-state",
+        manifest_uri="s3://fire-viewer-admin/packages/pkg-invalid-initial-state/manifest.json",
+        manifest_sha256="2" * 64,
+        manifest_size_bytes=512,
+        storage_uri="s3://fire-viewer-admin/packages/pkg-invalid-initial-state/",
+        state=SpatialPackageState.VERIFIED,
+        provenance={},
+        verification_report={"status": "passed"},
+        created_by="admin-ui-test",
+        verified_at=datetime.now(UTC),
+    )
+    session.add(invalid_initial_state)
+    with pytest.raises(DBAPIError, match="spatial package must start as draft"):
+        session.commit()
+    session.rollback()
+
+    incomplete_verification = SpatialPackage(
+        package_id="pkg-incomplete-verification",
+        manifest_uri="s3://fire-viewer-admin/packages/pkg-incomplete-verification/manifest.json",
+        manifest_sha256="5" * 64,
+        manifest_size_bytes=512,
+        storage_uri="s3://fire-viewer-admin/packages/pkg-incomplete-verification/",
+        state=SpatialPackageState.DRAFT,
+        provenance={},
+        verification_report={},
+        created_by="admin-ui-test",
+    )
+    session.add(incomplete_verification)
+    session.flush()
+    incomplete_verification.verified_at = datetime.now(UTC)
+    incomplete_verification.state = SpatialPackageState.VERIFIED
+    with pytest.raises(DBAPIError, match="requires passed verification report"):
+        session.commit()
+    session.rollback()
+
+    package = SpatialPackage(
+        package_id="pkg-non-destructive",
+        manifest_uri="s3://fire-viewer-admin/packages/pkg-non-destructive/manifest.json",
+        manifest_sha256="3" * 64,
+        manifest_size_bytes=512,
+        storage_uri="s3://fire-viewer-admin/packages/pkg-non-destructive/",
+        state=SpatialPackageState.DRAFT,
+        provenance={},
+        verification_report={},
+        created_by="admin-ui-test",
+    )
+    session.add(package)
+    session.commit()
+
+    with pytest.raises(DBAPIError, match="spatial packages are non-destructive"):
+        session.execute(
+            text("DELETE FROM spatial_package WHERE id = :package_id"), {"package_id": package.id}
+        )
+    session.rollback()
+
+
+def test_admin_spatial_package_verification_link_and_state_are_guarded(session: Session) -> None:
+    first_revision = seed_revision(session, suffix="-first")
+    second_revision = seed_revision(session, suffix="-second")
+    package = SpatialPackage(
+        package_id="pkg-guarded-lifecycle",
+        manifest_uri="s3://fire-viewer-admin/packages/pkg-guarded-lifecycle/manifest.json",
+        manifest_sha256="4" * 64,
+        manifest_size_bytes=512,
+        storage_uri="s3://fire-viewer-admin/packages/pkg-guarded-lifecycle/",
+        state=SpatialPackageState.DRAFT,
+        provenance={},
+        verification_report={},
+        created_by="admin-ui-test",
+    )
+    session.add(package)
+    session.flush()
+    package.verification_report = {"status": "passed"}
+    package.verified_at = datetime.now(UTC)
+    package.state = SpatialPackageState.VERIFIED
+    session.flush()
+    package.spatial_zone_revision_id = first_revision.id
+    session.commit()
+
+    package.spatial_zone_revision_id = second_revision.id
+    with pytest.raises(DBAPIError, match="zone revision is immutable once attached"):
+        session.commit()
+    session.rollback()
+
+    package = session.get(SpatialPackage, package.id)
+    assert package is not None
+    package.verification_report = {"status": "tampered"}
+    with pytest.raises(DBAPIError, match="spatial package verification is immutable"):
+        session.commit()
+    session.rollback()
+
+    package = session.get(SpatialPackage, package.id)
+    assert package is not None
+    package.state = SpatialPackageState.PUBLISHED
+    with pytest.raises(DBAPIError, match="invalid spatial package transition"):
+        session.commit()
+    session.rollback()

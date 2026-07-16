@@ -5,6 +5,8 @@
 .env
 .env.*
 !.env.example
+.secrets/
+.vercel/
 *.pem
 *.key
 *.pfx
@@ -35,6 +37,14 @@
 **/.vite/
 **/*.tsbuildinfo
 
+# Sorties locales de travail, captures et pièces jointes Codex.
+/.artifacts/
+/.codex-remote-attachments/
+/output/
+
+# Aucun package Node n'existe à la racine : ce lockfile est un résidu local.
+/package-lock.json
+
 # Le catalogue et le manifeste du paquet spatial sont versionnés. Les 144
 # binaires sont distribués uniquement par la GitHub Release immuable G1.
 /apps/fire-viewer-ui/public/maps/fireviewer-die-pontaix-r1-v4/terrain/**
@@ -44,6 +54,7 @@
 **/[Ll]ibrary/
 **/[Tt]emp/
 **/[Oo]bj/
+**/[Bb]in/
 **/[Ll]ogs/
 **/[Uu]ser[Ss]ettings/
 **/[Bb]uild/

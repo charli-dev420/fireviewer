@@ -167,7 +167,7 @@ def test_review_attach_updates_only_the_episode_and_observation_audit(
         < episode_audit.after_snapshot["last_observed_at"]
     )
     session.expire_all()
-    assert session.get(Episode, episode.id).version == 2
+    assert session.get(Episode, episode.id).version == 3
 
     replay = client.post(
         f"/api/v1/operator/observations/{observation_id}/resolve",
@@ -283,6 +283,7 @@ def test_review_attach_to_closed_incident_audits_reactivation_aggregates(
         "episode.reactivation.previous_closed",
         "incident.reactivation.updated",
         "episode.reactivation.created",
+        "episode.evidence.verified",
         "observation.review.resolved",
     }
     session.expire_all()

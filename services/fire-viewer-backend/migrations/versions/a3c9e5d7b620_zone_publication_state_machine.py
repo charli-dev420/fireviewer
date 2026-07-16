@@ -67,7 +67,9 @@ def upgrade() -> None:
             "(is_active = 1 AND state = 'PUBLISHED') OR (is_active = 0 AND state != 'PUBLISHED')",
             name="ck_zone_publication_active_state",
         ),
-        sa.ForeignKeyConstraint(["spatial_package_id"], ["spatial_package.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(
+            ["spatial_package_id"], ["spatial_package.id"], ondelete="RESTRICT"
+        ),
         sa.ForeignKeyConstraint(["spatial_zone_id"], ["spatial_zone.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
             ["spatial_zone_revision_id"], ["spatial_zone_revision.id"], ondelete="RESTRICT"
@@ -83,9 +85,18 @@ def upgrade() -> None:
         sqlite_where=sa.text("is_active = 1"),
         postgresql_where=sa.text("is_active"),
     )
-    op.create_index(op.f("ix_zone_publication_publication_id"), "zone_publication", ["publication_id"], unique=True)
-    op.create_index(op.f("ix_zone_publication_spatial_package_id"), "zone_publication", ["spatial_package_id"])
-    op.create_index(op.f("ix_zone_publication_spatial_zone_id"), "zone_publication", ["spatial_zone_id"])
+    op.create_index(
+        op.f("ix_zone_publication_publication_id"),
+        "zone_publication",
+        ["publication_id"],
+        unique=True,
+    )
+    op.create_index(
+        op.f("ix_zone_publication_spatial_package_id"), "zone_publication", ["spatial_package_id"]
+    )
+    op.create_index(
+        op.f("ix_zone_publication_spatial_zone_id"), "zone_publication", ["spatial_zone_id"]
+    )
     op.create_index(
         op.f("ix_zone_publication_spatial_zone_revision_id"),
         "zone_publication",
@@ -110,7 +121,12 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("event_id"),
     )
-    op.create_index(op.f("ix_zone_publication_event_event_id"), "zone_publication_event", ["event_id"], unique=True)
+    op.create_index(
+        op.f("ix_zone_publication_event_event_id"),
+        "zone_publication_event",
+        ["event_id"],
+        unique=True,
+    )
     op.create_index(
         op.f("ix_zone_publication_event_zone_publication_id"),
         "zone_publication_event",
@@ -124,11 +140,15 @@ def downgrade() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "sqlite":
         _drop_sqlite_triggers()
-    op.drop_index(op.f("ix_zone_publication_event_zone_publication_id"), table_name="zone_publication_event")
+    op.drop_index(
+        op.f("ix_zone_publication_event_zone_publication_id"), table_name="zone_publication_event"
+    )
     op.drop_index(op.f("ix_zone_publication_event_event_id"), table_name="zone_publication_event")
     op.drop_table("zone_publication_event")
     op.drop_index(op.f("ix_zone_publication_state"), table_name="zone_publication")
-    op.drop_index(op.f("ix_zone_publication_spatial_zone_revision_id"), table_name="zone_publication")
+    op.drop_index(
+        op.f("ix_zone_publication_spatial_zone_revision_id"), table_name="zone_publication"
+    )
     op.drop_index(op.f("ix_zone_publication_spatial_zone_id"), table_name="zone_publication")
     op.drop_index(op.f("ix_zone_publication_spatial_package_id"), table_name="zone_publication")
     op.drop_index(op.f("ix_zone_publication_publication_id"), table_name="zone_publication")
