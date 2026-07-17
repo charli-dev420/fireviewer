@@ -246,23 +246,47 @@ function tileIntersectsCamera(
   ));
 }
 
-function nearestRoadPoint(target: Vector3, roads: readonly Mesh[], maximumDistance = Number.POSITIVE_INFINITY): Vector3 | null {
+interface RoadSnap { readonly point: Vector3; readonly direction: Vector3; }
+
+function roadDirection(mesh: Mesh, indexes: readonly number[]): Vector3 {
+  const positions = mesh.geometry.getAttribute('position') as BufferAttribute;
+  let best = new Vector3(0, 1, 0); let bestSquared = 0;
+  for (let left = 0; left < indexes.length; left += 1) for (let right = left + 1; right < indexes.length; right += 1) {
+    const dx = positions.getX(indexes[right]!) - positions.getX(indexes[left]!);
+    const dy = positions.getY(indexes[right]!) - positions.getY(indexes[left]!);
+    const squared = dx * dx + dy * dy;
+    if (squared > bestSquared) { bestSquared = squared; best = new Vector3(dx, dy, 0).normalize(); }
+  }
+  return best;
+}
+
+function nearestRoadPoint(target: Vector3, roads: readonly Mesh[], maximumDistance = Number.POSITIVE_INFINITY): RoadSnap | null {
   const visibleRoads = roads.filter((mesh) => mesh.parent?.visible);
   if (!visibleRoads.length) return null;
   const ray = new Raycaster(new Vector3(target.x, target.y, target.z + 10_000), new Vector3(0, 0, -1));
-  const direct = ray.intersectObjects(visibleRoads, false)[0]?.point;
-  if (direct) return direct;
+  const direct = ray.intersectObjects(visibleRoads, false)[0];
+  if (direct) {
+    const mesh = direct.object as Mesh; const face = direct.face;
+    return { point: direct.point, direction: face ? roadDirection(mesh, [face.a, face.b, face.c]) : new Vector3(0, 1, 0) };
+  }
   let bestSquared = maximumDistance * maximumDistance;
-  let best: Vector3 | null = null;
+  let best: { point: Vector3; mesh: Mesh; vertex: number } | null = null;
   for (const mesh of visibleRoads) {
     const positions = mesh.geometry.getAttribute('position') as BufferAttribute;
     for (let index = 0; index < positions.count; index += 1) {
       const dx = positions.getX(index) - target.x; const dy = positions.getY(index) - target.y;
       const squared = dx * dx + dy * dy;
-      if (squared < bestSquared) { bestSquared = squared; best = new Vector3(positions.getX(index), positions.getY(index), positions.getZ(index)); }
+      if (squared < bestSquared) { bestSquared = squared; best = { point: new Vector3(positions.getX(index), positions.getY(index), positions.getZ(index)), mesh, vertex: index }; }
     }
   }
-  return best;
+  if (!best) return null;
+  const index = best.mesh.geometry.index;
+  if (!index) return { point: best.point, direction: new Vector3(0, 1, 0) };
+  for (let offset = 0; offset < index.count; offset += 3) {
+    const triangle = [index.getX(offset), index.getX(offset + 1), index.getX(offset + 2)];
+    if (triangle.includes(best.vertex)) return { point: best.point, direction: roadDirection(best.mesh, triangle) };
+  }
+  return { point: best.point, direction: new Vector3(0, 1, 0) };
 }
 
 function overlayWorld(origin: UnityOrigin, point: readonly [number, number, number], lift = 2): Vector3 {
@@ -409,7 +433,8 @@ export function TiledSpatialScene3D({
       if (!instance) return false;
       const road = nearestRoadPoint(target, roadMeshes);
       if (!road) return false;
-      instance.view.camera.position.set(road.x, road.y, road.z + 1.7); fpsAnchoredToRoad = true; orientFps(); scheduleRefresh();
+      instance.view.camera.position.set(road.point.x, road.point.y, road.point.z + 1.7);
+      yaw = Math.atan2(road.direction.x, road.direction.y); fpsAnchoredToRoad = true; orientFps(); scheduleRefresh();
       return true;
     };
     const animate = (now = performance.now()) => {
@@ -444,7 +469,7 @@ export function TiledSpatialScene3D({
         if (pressed.has('KeyD')) movement.addScaledVector(right, speed);
         if (movement.lengthSq() > 0 && fpsAnchoredToRoad) {
           const road = nearestRoadPoint(instance.view.camera.position.clone().add(movement), roadMeshes, 35);
-          if (road) instance.view.camera.position.set(road.x, road.y, road.z + 1.7);
+          if (road) instance.view.camera.position.set(road.point.x, road.point.y, road.point.z + 1.7);
         }
         orientFps(); instance.notifyChange(instance.view.camera); scheduleRefresh();
       }
@@ -489,7 +514,7 @@ export function TiledSpatialScene3D({
         if (disposed) { disposeObject(far.root); return; }
         const farBounds = far.terrain.geometry.boundingBox;
         if (farBounds) terrainElevationRange = [farBounds.min.z, farBounds.max.z];
-        farRoot = far.root; terrainMeshes.push(far.terrain); await instance.add(farRoot);
+        farRoot = far.root; farRoot.position.z = -3; terrainMeshes.push(far.terrain); await instance.add(farRoot);
         const overlays = new Group(); overlays.name = 'admin-spatial-overlays'; await instance.add(overlays);
         const runtime: Runtime = { instance, controls, overlays, origin: catalog.origin_l93_m, catalog };
         runtimeRef.current = runtime; redrawOverlays(runtime, propsRef.current.overlayPoints, propsRef.current.overlayLines);
