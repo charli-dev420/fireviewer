@@ -67,6 +67,8 @@ PARAMETER["standard_parallel_1",49],PARAMETER["standard_parallel_2",44],PARAMETE
 PARAMETER["false_northing",6600000],UNIT["metre",1],AXIS["Easting",EAST],AXIS["Northing",NORTH],AUTHORITY["EPSG","2154"]]`;
 const WORLD_UP = new Vector3(0, 0, 1);
 const TREE_PALETTE = ['#274c2d', '#315c31', '#386534', '#1d442e', '#245037', '#2b5939'];
+const NEAR_DETAIL_DISTANCE_MULTIPLIER = 1.3;
+const DETAIL_LOAD_CONCURRENCY = 4;
 let lambert93: CoordinateSystem | null = null;
 
 function coordinateSystem(): CoordinateSystem {
@@ -214,6 +216,30 @@ function distanceToBounds(bounds: UnityBounds, east: number, north: number): num
   return Math.hypot(dx, dy);
 }
 
+function cameraGroundBounds(
+  camera: Instance['view']['camera'],
+  targetZ: number,
+  origin: UnityOrigin,
+  maximumDepth: number,
+): UnityBounds {
+  camera.updateMatrixWorld();
+  camera.updateProjectionMatrix();
+  const points = ([-1, 1] as const).flatMap((y) => ([-1, 1] as const).map((x) => {
+    const direction = new Vector3(x, y, 1).unproject(camera).sub(camera.position).normalize();
+    const planeDistance = (targetZ - camera.position.z) / direction.z;
+    const distance = Number.isFinite(planeDistance) && planeDistance > 0 ? Math.min(planeDistance, maximumDepth) : maximumDepth;
+    const point = camera.position.clone().addScaledVector(direction, distance);
+    return [point.x + origin[0], point.y + origin[1]] as const;
+  }));
+  const east = points.map((point) => point[0]);
+  const north = points.map((point) => point[1]);
+  return [Math.min(...east), Math.min(...north), Math.max(...east), Math.max(...north)];
+}
+
+function intersectsBounds(left: UnityBounds, right: UnityBounds): boolean {
+  return left[0] <= right[2] && left[2] >= right[0] && left[1] <= right[3] && left[3] >= right[1];
+}
+
 function overlayWorld(origin: UnityOrigin, point: readonly [number, number, number], lift = 2): Vector3 {
   void origin;
   return new Vector3(point[0], point[2], point[1] + lift);
@@ -297,7 +323,7 @@ export function TiledSpatialScene3D({
     };
     const fillDetailCapacity = () => {
       if (!catalog || !instance || !controls || disposed) return;
-      let capacity = 2 - pending.size;
+      let capacity = DETAIL_LOAD_CONCURRENCY - pending.size;
       for (const tile of desiredTiles) {
         if (capacity <= 0) break;
         if (details.has(tile.id) || pending.has(tile.id) || failed.has(tile.id)) continue;
@@ -317,11 +343,17 @@ export function TiledSpatialScene3D({
       const distance = instance.view.camera.position.distanceTo(controls.target);
       const absoluteEast = east + catalog.origin_l93_m[0];
       const absoluteNorth = north + catalog.origin_l93_m[1];
-      desiredTiles = distance > 3_000 ? [] : catalog.tiles
+      const nearDetailDistance = catalog.lod_policy.detail.publish_distance_m * NEAR_DETAIL_DISTANCE_MULTIPLIER;
+      const visibleBounds = cameraGroundBounds(
+        instance.view.camera,
+        controls.target.z,
+        catalog.origin_l93_m,
+        nearDetailDistance + catalog.lod_policy.detail.preload_radius_m,
+      );
+      desiredTiles = distance > nearDetailDistance ? [] : catalog.tiles
+        .filter((tile) => intersectsBounds(tile.bounds_l93_m, visibleBounds))
         .map((tile) => ({ tile, distance: distanceToBounds(tile.bounds_l93_m, absoluteEast, absoluteNorth) }))
-        .filter((entry) => entry.distance <= catalog!.lod_policy.detail.preload_radius_m)
         .sort((left, right) => left.distance - right.distance || left.tile.id.localeCompare(right.tile.id))
-        .slice(0, catalog.lod_policy.detail.maximum_resident_tile_count)
         .map((entry) => entry.tile);
       desiredIds = new Set(desiredTiles.map((tile) => tile.id)); publish();
       for (const [id, root] of details) if (!desiredIds.has(id)) {
@@ -350,7 +382,7 @@ export function TiledSpatialScene3D({
       const requested = propsRef.current.cameraMode;
       if (requested !== mode) {
         mode = requested;
-        if (mode === 'fps' && instance) { const direction = instance.view.camera.getWorldDirection(new Vector3()); yaw = Math.atan2(direction.x, direction.y); pitch = Math.asin(direction.z); }
+        if (mode === 'fps' && instance) { host.focus({ preventScroll: true }); const direction = instance.view.camera.getWorldDirection(new Vector3()); yaw = Math.atan2(direction.x, direction.y); pitch = Math.asin(direction.z); }
         else if (document.pointerLockElement) document.exitPointerLock();
       }
       if (controls) controls.enabled = mode === 'orbit';
@@ -386,7 +418,7 @@ export function TiledSpatialScene3D({
         if (hit) propsRef.current.onPick([hit.point.x - catalog.origin_l93_m[0], hit.point.z - catalog.origin_l93_m[2], hit.point.y - catalog.origin_l93_m[1]]);
       } else if (propsRef.current.cameraMode === 'fps' && movement <= 5) void instance.domElement.requestPointerLock();
     };
-    host.addEventListener('keydown', keyDown); host.addEventListener('keyup', keyUp); document.addEventListener('mousemove', mouseMove); animate();
+    window.addEventListener('keydown', keyDown); window.addEventListener('keyup', keyUp); document.addEventListener('mousemove', mouseMove); animate();
 
     const mount = async () => {
       try {
@@ -395,7 +427,7 @@ export function TiledSpatialScene3D({
         catalog = parseUnitySpatialCatalog(await response.json());
         instance = new Instance({ target: host, crs: coordinateSystem(), backgroundColor: '#102429' });
         instance.view.camera.up.copy(WORLD_UP);
-        controls = new MapControls(instance.view.camera, instance.domElement); controls.enableDamping = true; controls.dampingFactor = 0.12; controls.screenSpacePanning = false; controls.minDistance = 40;
+        controls = new MapControls(instance.view.camera, instance.domElement); controls.enableDamping = true; controls.dampingFactor = 0.12; controls.screenSpacePanning = false; controls.minDistance = 5; controls.zoomSpeed = 1.35;
         instance.view.setControls(controls); controls.addEventListener('change', scheduleRefresh);
         instance.domElement.addEventListener('pointerdown', pointerDownHandler); instance.domElement.addEventListener('pointerup', pointerUpHandler);
         const far = await buildTile(source, catalog.lod_policy.far.terrain, catalog.lod_policy.far.imagery, catalog.origin_l93_m, abortController.signal, true);
@@ -415,7 +447,7 @@ export function TiledSpatialScene3D({
     return () => {
       disposed = true; abortController.abort(); runtimeRef.current = null; cancelAnimationFrame(animationFrame); if (refreshTimer !== null) window.clearTimeout(refreshTimer);
       if (document.pointerLockElement === instance?.domElement) document.exitPointerLock();
-      host.removeEventListener('keydown', keyDown); host.removeEventListener('keyup', keyUp); document.removeEventListener('mousemove', mouseMove);
+      window.removeEventListener('keydown', keyDown); window.removeEventListener('keyup', keyUp); document.removeEventListener('mousemove', mouseMove);
       if (controls) controls.removeEventListener('change', scheduleRefresh);
       if (instance) { instance.domElement.removeEventListener('pointerdown', pointerDownHandler); instance.domElement.removeEventListener('pointerup', pointerUpHandler); }
       controls?.dispose(); for (const root of details.values()) disposeObject(root); if (farRoot) disposeObject(farRoot); instance?.dispose();
