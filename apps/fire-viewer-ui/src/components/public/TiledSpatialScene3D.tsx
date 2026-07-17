@@ -311,7 +311,7 @@ export function TiledSpatialScene3D({
           if (disposed || !desiredIds.has(tile.id) || !instance) { disposeObject(root); return; }
           root.visible = false; await instance.add(root); details.set(tile.id, root); terrainMeshes.push(terrain); publish();
         }).catch((error: unknown) => { if (!disposed && !abortController.signal.aborted) { console.error(error); failed.add(tile.id); } }).finally(() => {
-          pending.delete(tile.id); if (!disposed) { updateState(); window.setTimeout(() => selectDetails(east, north), 0); }
+          pending.delete(tile.id); if (!disposed) { updateState(); window.setTimeout(scheduleRefresh, 0); }
         });
         pending.set(tile.id, loading);
       }
