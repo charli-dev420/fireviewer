@@ -10,6 +10,9 @@ const PACKAGE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{2,95}$/;
 const SHA256_RE = /^[a-f0-9]{64}$/;
 const ASSET_PREFIXES = ['assets/', 'terrain/', 'vectors/'] as const;
 const REQUIRED_PATHS = ['package-manifest.json', 'catalog.json'] as const;
+const DEFAULT_UPLOAD_CONCURRENCY = 6;
+const DEFAULT_UPLOAD_ATTEMPTS = 3;
+const DEFAULT_RETRY_DELAY_MS = 400;
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
   '.json': 'application/json',
   '.jpg': 'image/jpeg',
@@ -268,6 +271,25 @@ function defaultUploader(pathname: string, file: File, options: BlobUploadOption
   return upload(pathname, file, options);
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'erreur réseau inconnue';
+}
+
+async function retryDelay(delayMs: number, attempt: number, signal?: AbortSignal): Promise<void> {
+  if (delayMs <= 0) return;
+  await new Promise<void>((resolve, reject) => {
+    const timeout = window.setTimeout(resolve, delayMs * attempt);
+    signal?.addEventListener('abort', () => {
+      window.clearTimeout(timeout);
+      reject(new DOMException('Upload annulé.', 'AbortError'));
+    }, { once: true });
+  });
+}
+
 export async function uploadPreparedSpatialPackage(
   api: AdminApiClient,
   zoneId: string,
@@ -276,7 +298,13 @@ export async function uploadPreparedSpatialPackage(
   reason: string,
   idempotencyKey: string,
   onProgress: (progress: SpatialPackageUploadProgress) => void,
-  options: { readonly signal?: AbortSignal; readonly uploader?: BlobUploader } = {},
+  options: {
+    readonly signal?: AbortSignal;
+    readonly uploader?: BlobUploader;
+    readonly concurrency?: number;
+    readonly uploadAttempts?: number;
+    readonly retryDelayMs?: number;
+  } = {},
 ): Promise<AdminSpatialPackageImport> {
   const grant: AdminBlobUploadGrant = await api.createSpatialPackageUploadGrant(
     zoneId,
@@ -289,42 +317,105 @@ export async function uploadPreparedSpatialPackage(
     { signal: options.signal },
   );
   const uploader = options.uploader ?? defaultUploader;
-  const uploaded: AdminBlobObjectReference[] = [];
-  let completedBytes = 0;
-  for (const [index, item] of prepared.files.entries()) {
+  const concurrency = Math.max(1, Math.min(8, Math.trunc(options.concurrency ?? DEFAULT_UPLOAD_CONCURRENCY)));
+  const uploadAttempts = Math.max(1, Math.min(5, Math.trunc(options.uploadAttempts ?? DEFAULT_UPLOAD_ATTEMPTS)));
+  const retryDelayMs = Math.max(0, Math.trunc(options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS));
+  const uploaded = new Array<AdminBlobObjectReference | undefined>(prepared.files.length);
+  const inFlightBytes = new Array<number>(prepared.files.length).fill(0);
+  let uploadedBytes = 0;
+  let completedCount = 0;
+  let nextIndex = 0;
+  let terminalError: unknown = null;
+
+  const emitProgress = (index: number, path: string): void => {
+    const boundedBytes = Math.min(prepared.totalSizeBytes, uploadedBytes);
+    onProgress({
+      phase: 'uploading',
+      fileIndex: completedCount,
+      fileCount: prepared.files.length,
+      currentPath: path,
+      uploadedBytes: boundedBytes,
+      totalSizeBytes: prepared.totalSizeBytes,
+      percentage: Math.round((boundedBytes / prepared.totalSizeBytes) * 100),
+    });
+  };
+
+  const uploadOne = async (index: number): Promise<void> => {
+    const item = prepared.files[index]!;
     const pathname = `${grant.pathname_prefix}/${item.path}`;
-    const result = await uploader(pathname, item.file, {
-      access: 'private',
-      handleUploadUrl: api.getBlobUploadTokenUrl(),
-      headers: { 'X-Blob-Upload-Grant': grant.upload_grant },
-      clientPayload: prepared.packageId,
-      contentType: item.contentType,
-      multipart: true,
-      abortSignal: options.signal,
-      onUploadProgress: ({ loaded }) => {
-        const uploadedBytes = Math.min(prepared.totalSizeBytes, completedBytes + loaded);
-        onProgress({
-          phase: 'uploading',
-          fileIndex: index + 1,
-          fileCount: prepared.files.length,
-          currentPath: item.path,
-          uploadedBytes,
-          totalSizeBytes: prepared.totalSizeBytes,
-          percentage: Math.round((uploadedBytes / prepared.totalSizeBytes) * 100),
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= uploadAttempts; attempt += 1) {
+      if (options.signal?.aborted) throw new DOMException('Upload annulé.', 'AbortError');
+      if (inFlightBytes[index]) {
+        uploadedBytes -= inFlightBytes[index]!;
+        inFlightBytes[index] = 0;
+        emitProgress(index, item.path);
+      }
+      try {
+        const result = await uploader(pathname, item.file, {
+          access: 'private',
+          handleUploadUrl: api.getBlobUploadTokenUrl(),
+          headers: { 'X-Blob-Upload-Grant': grant.upload_grant },
+          clientPayload: prepared.packageId,
+          contentType: item.contentType,
+          multipart: true,
+          abortSignal: options.signal,
+          onUploadProgress: ({ loaded }) => {
+            const boundedLoaded = Math.max(0, Math.min(item.file.size, loaded));
+            uploadedBytes += boundedLoaded - inFlightBytes[index]!;
+            inFlightBytes[index] = boundedLoaded;
+            emitProgress(index, item.path);
+          },
         });
-      },
-    });
-    if (result.pathname !== pathname || result.contentType !== item.contentType) {
-      throw new Error(`Vercel Blob a retourné des métadonnées inattendues pour ${item.path}.`);
+        if (result.pathname !== pathname || result.contentType !== item.contentType) {
+          throw new Error(`Vercel Blob a retourné des métadonnées inattendues pour ${item.path}.`);
+        }
+        uploadedBytes += item.file.size - inFlightBytes[index]!;
+        inFlightBytes[index] = item.file.size;
+        uploaded[index] = {
+          path: item.path,
+          pathname: result.pathname,
+          size_bytes: item.file.size,
+          content_type: item.contentType,
+        };
+        completedCount += 1;
+        emitProgress(index, item.path);
+        return;
+      } catch (error) {
+        lastError = error;
+        if (isAbortError(error) || attempt === uploadAttempts) break;
+        await retryDelay(retryDelayMs, attempt, options.signal);
+      }
     }
-    completedBytes += item.file.size;
-    uploaded.push({
-      path: item.path,
-      pathname: result.pathname,
-      size_bytes: item.file.size,
-      content_type: item.contentType,
-    });
-  }
+    if (isAbortError(lastError)) throw lastError;
+    throw new Error(
+      `Échec de l’envoi de ${item.path} après ${uploadAttempts} tentatives : ${errorMessage(lastError)}.`,
+      { cause: lastError },
+    );
+  };
+
+  const worker = async (): Promise<void> => {
+    while (terminalError === null) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= prepared.files.length) return;
+      try {
+        await uploadOne(index);
+      } catch (error) {
+        terminalError = error;
+      }
+    }
+  };
+
+  await Promise.all(Array.from(
+    { length: Math.min(concurrency, prepared.files.length) },
+    () => worker(),
+  ));
+  if (terminalError !== null) throw terminalError;
+  const finalizedObjects = uploaded.map((item, index) => {
+    if (!item) throw new Error(`Objet uploadé manquant : ${prepared.files[index]!.path}.`);
+    return item;
+  });
   onProgress({
     phase: 'finalizing',
     fileIndex: prepared.files.length,
@@ -341,7 +432,7 @@ export async function uploadPreparedSpatialPackage(
       upload_id: grant.upload_id,
       package_id: prepared.packageId,
       reason,
-      objects: uploaded,
+      objects: finalizedObjects,
     },
     { idempotencyKey, signal: options.signal },
   );

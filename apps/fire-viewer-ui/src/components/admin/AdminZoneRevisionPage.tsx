@@ -137,27 +137,8 @@ export function AdminZoneRevisionPage({
       </AdminPageHeader>
 
       <section className="admin-section">
-        <h3 id="admin-zone-revision-title">Profil spatial {item.spatial_profile_version}</h3>
-        <dl className="manifest-data-list">
-          <div><dt>Production horizontale</dt><dd>{item.horizontal_crs ?? 'Profil historique non renseigné'}</dd></div>
-          <div><dt>Production verticale</dt><dd>{item.vertical_crs ?? 'Profil historique non renseigné'}</dd></div>
-          <div><dt>Origine Lambert-93 / NGF</dt><dd>{item.origin_l93_ngf ? item.origin_l93_ngf.map((value) => value.toFixed(3)).join(', ') : 'Non disponible sur cette révision historique'}</dd></div>
-          <div><dt>Terrain de référence</dt><dd>{item.ground_model ? `${item.ground_model} · ${item.ground_resolution_m ?? '—'} m` : 'Non renseigné'}</dd></div>
-          <div><dt>Référence des hauteurs de surface</dt><dd>{item.surface_height_reference ?? 'Non renseignée'}</dd></div>
-          <div><dt>Origine d’échange WGS84</dt><dd>{item.origin_wgs84.map((value) => value.toFixed(6)).join(', ')}</dd></div>
-          <div><dt>Cadre d’affichage</dt><dd>{item.local_frame} · {item.meters_per_unit} m / unité · {item.vertical_datum}</dd></div>
-          <div><dt>Est local</dt><dd>{range(item.bounds_m.east)}</dd></div>
-          <div><dt>Nord local</dt><dd>{range(item.bounds_m.north)}</dd></div>
-          <div><dt>Vertical local</dt><dd>{range(item.bounds_m.up)}</dd></div>
-        </dl>
-      </section>
-
-      <section className="admin-section">
-        <h3>Importer le package correspondant</h3>
-        <p>
-          Choisissez directement le dossier produit localement. Le navigateur vérifie le manifeste,
-          le catalogue, les chemins et les tailles avant d’envoyer les fichiers dans le stockage Blob privé.
-        </p>
+        <h3 id="admin-zone-revision-title">Importer la carte 3D</h3>
+        <p>Choisissez le dossier exporté, vérifiez le résumé, puis lancez l’envoi.</p>
         <form className="admin-form-card admin-form-card--narrow" onSubmit={(event) => void importPackage(event)}>
           <label className="admin-file-field" htmlFor="admin-package-folder">
             <span>Choisir le dossier du package</span>
@@ -172,21 +153,23 @@ export function AdminZoneRevisionPage({
               onChange={(event) => void choosePackage(event)}
               disabled={importing}
             />
-            <small>Chrome et Edge conservent les chemins du dossier. Les fichiers ne transitent pas par l’API.</small>
+            <small>Le dossier est contrôlé localement avant l’envoi.</small>
           </label>
-          <label className="admin-file-field" htmlFor="admin-package-files">
-            <span>Sélection multiple de repli</span>
-            <input
-              id="admin-package-files"
-              aria-label="Sélectionner tous les fichiers du package"
-              type="file"
-              accept=".json,.png,.tif,.tiff,.glb,application/json,image/png,image/tiff,model/gltf-binary"
-              multiple
-              onChange={(event) => void choosePackage(event)}
-              disabled={importing}
-            />
-            <small>Utilisez ce choix seulement si le navigateur ne propose pas la sélection de dossier.</small>
-          </label>
+          <details>
+            <summary>Sélection de repli</summary>
+            <label className="admin-file-field" htmlFor="admin-package-files">
+              <span>Sélectionner tous les fichiers</span>
+              <input
+                id="admin-package-files"
+                aria-label="Sélectionner tous les fichiers du package"
+                type="file"
+                accept=".json,.jpg,.jpeg,.png,.tif,.tiff,.glb,.fwtile,.fwterrain,application/json,image/jpeg,image/png,image/tiff,model/gltf-binary"
+                multiple
+                onChange={(event) => void choosePackage(event)}
+                disabled={importing}
+              />
+            </label>
+          </details>
 
           {prepared ? (
             <dl className="admin-package-summary">
@@ -229,8 +212,8 @@ export function AdminZoneRevisionPage({
       </section>
 
       <section className="admin-section">
-        <h3>Valider un package importé</h3>
-        <p>Cette étape contrôle les métadonnées enregistrées puis rattache définitivement le package à cette révision.</p>
+        <h3>Valider la carte importée</h3>
+        <p>Le package est rattaché à cette révision après validation.</p>
         <form className="admin-form-card admin-form-card--narrow" onSubmit={(event) => void validatePackage(event)}>
           <label>
             Identifiant du package
@@ -248,6 +231,22 @@ export function AdminZoneRevisionPage({
         </form>
         {message ? <p role="status">{message}</p> : null}
       </section>
+
+      <details className="admin-section">
+        <summary>Profil spatial {item.spatial_profile_version} · détails avancés</summary>
+        <dl className="manifest-data-list">
+          <div><dt>Production horizontale</dt><dd>{item.horizontal_crs ?? 'Profil historique non renseigné'}</dd></div>
+          <div><dt>Production verticale</dt><dd>{item.vertical_crs ?? 'Profil historique non renseigné'}</dd></div>
+          <div><dt>Origine Lambert-93 / NGF</dt><dd>{item.origin_l93_ngf ? item.origin_l93_ngf.map((value) => value.toFixed(3)).join(', ') : 'Non disponible sur cette révision historique'}</dd></div>
+          <div><dt>Terrain de référence</dt><dd>{item.ground_model ? `${item.ground_model} · ${item.ground_resolution_m ?? '—'} m` : 'Non renseigné'}</dd></div>
+          <div><dt>Référence des hauteurs de surface</dt><dd>{item.surface_height_reference ?? 'Non renseignée'}</dd></div>
+          <div><dt>Origine d’échange WGS84</dt><dd>{item.origin_wgs84.map((value) => value.toFixed(6)).join(', ')}</dd></div>
+          <div><dt>Cadre d’affichage</dt><dd>{item.local_frame} · {item.meters_per_unit} m / unité · {item.vertical_datum}</dd></div>
+          <div><dt>Est local</dt><dd>{range(item.bounds_m.east)}</dd></div>
+          <div><dt>Nord local</dt><dd>{range(item.bounds_m.north)}</dd></div>
+          <div><dt>Vertical local</dt><dd>{range(item.bounds_m.up)}</dd></div>
+        </dl>
+      </details>
     </section>
   );
 }

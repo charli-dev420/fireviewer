@@ -189,4 +189,97 @@ describe('envoi direct vers Vercel Blob', () => {
     );
     expect(progress.mock.calls.at(-1)?.[0]).toMatchObject({ phase: 'finalizing', percentage: 100 });
   });
+
+  it('borne la concurrence, réessaie un fichier en échec et conserve l’ordre de finalisation', async () => {
+    const files = Array.from({ length: 9 }, (_, index) => ({
+      path: `assets/tile-${index}.fwtile`,
+      file: new File([`tile-${index}`], `tile-${index}.fwtile`),
+      contentType: 'application/vnd.fireviewer.tile',
+    }));
+    const prepared: PreparedSpatialPackage = {
+      packageId: 'pkg-concurrent-r2',
+      assetCount: files.length,
+      files,
+      totalSizeBytes: files.reduce((total, item) => total + item.file.size, 0),
+    };
+    let active = 0;
+    let maximumActive = 0;
+    const attempts = new Map<string, number>();
+    const uploader = vi.fn(async (pathname: string, file: File, options: Parameters<BlobUploader>[2]) => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      const attempt = (attempts.get(pathname) ?? 0) + 1;
+      attempts.set(pathname, attempt);
+      await new Promise((resolve) => setTimeout(resolve, pathname.endsWith('tile-0.fwtile') ? 8 : 2));
+      active -= 1;
+      if (pathname.endsWith('tile-4.fwtile') && attempt === 1) throw new Error('coupure transitoire');
+      options.onUploadProgress({ loaded: file.size, total: file.size, percentage: 100 });
+      return { pathname, contentType: options.contentType };
+    });
+    const finalize = vi.fn().mockResolvedValue({ package_id: prepared.packageId, object_count: files.length });
+    const api = {
+      createSpatialPackageUploadGrant: vi.fn().mockResolvedValue({
+        upload_id: UPLOAD_ID,
+        pathname_prefix: `packages/${UPLOAD_ID}`,
+        upload_grant: 'grant-signe',
+        expires_at: '2026-07-14T11:00:00Z',
+        maximum_file_size_bytes: 5_000_000_000,
+        allowed_content_types: ['application/vnd.fireviewer.tile'],
+      }),
+      getBlobUploadTokenUrl: () => 'https://api.example.test/api/v1/admin/blob-upload-token',
+      finalizeSpatialPackageFromBlob: finalize,
+    } as unknown as AdminApiClient;
+
+    await uploadPreparedSpatialPackage(
+      api,
+      ZONE_ID,
+      REVISION,
+      prepared,
+      'Import concurrent contrôlé.',
+      'idempotency-concurrent',
+      vi.fn(),
+      { uploader, concurrency: 3, uploadAttempts: 2, retryDelayMs: 0 },
+    );
+
+    expect(maximumActive).toBe(3);
+    expect(attempts.get(`packages/${UPLOAD_ID}/assets/tile-4.fwtile`)).toBe(2);
+    expect(finalize.mock.calls[0]?.[2].objects.map((item: { path: string }) => item.path))
+      .toEqual(files.map((item) => item.path));
+  });
+
+  it('arrête le lot avec le chemin en erreur après épuisement des tentatives', async () => {
+    const prepared: PreparedSpatialPackage = {
+      packageId: 'pkg-failure-r2',
+      assetCount: 1,
+      files: [{
+        path: 'assets/broken.fwtile',
+        file: new File(['broken'], 'broken.fwtile'),
+        contentType: 'application/vnd.fireviewer.tile',
+      }],
+      totalSizeBytes: 6,
+    };
+    const api = {
+      createSpatialPackageUploadGrant: vi.fn().mockResolvedValue({
+        upload_id: UPLOAD_ID,
+        pathname_prefix: `packages/${UPLOAD_ID}`,
+        upload_grant: 'grant-signe',
+      }),
+      getBlobUploadTokenUrl: () => 'https://api.example.test/api/v1/admin/blob-upload-token',
+      finalizeSpatialPackageFromBlob: vi.fn(),
+    } as unknown as AdminApiClient;
+    const uploader = vi.fn().mockRejectedValue(new Error('réseau indisponible'));
+
+    await expect(uploadPreparedSpatialPackage(
+      api,
+      ZONE_ID,
+      REVISION,
+      prepared,
+      'Import en échec contrôlé.',
+      'idempotency-failure',
+      vi.fn(),
+      { uploader, concurrency: 2, uploadAttempts: 3, retryDelayMs: 0 },
+    )).rejects.toThrow('assets/broken.fwtile après 3 tentatives');
+    expect(uploader).toHaveBeenCalledTimes(3);
+    expect(api.finalizeSpatialPackageFromBlob).not.toHaveBeenCalled();
+  });
 });
