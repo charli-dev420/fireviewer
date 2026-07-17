@@ -110,6 +110,7 @@ from fire_viewer.services.blob_uploads import (
     create_blob_upload_grant,
     issue_blob_client_token,
 )
+from fire_viewer.services.common import record_operator_audit
 from fire_viewer.services.incident_spatial_review import (
     create_zone_revision as create_active_zone_revision_service,
 )
@@ -122,6 +123,7 @@ from fire_viewer.services.incident_spatial_review import (
     review_zone_revision,
 )
 from fire_viewer.services.public_incident_view import list_public_reports, review_public_report
+from fire_viewer.services.schema_maintenance import upgrade_unity_schema
 from fire_viewer.services.spatial_package_blob_import import (
     import_blob_package,
     validate_blob_package,
@@ -166,6 +168,17 @@ class AdminLoginRequest(StrictModel):
 class AdminAuthStatus(StrictModel):
     mode: Literal["local_admin", "jwt", "disabled"]
     authenticated: bool
+
+
+class AdminSchemaUpgradeRequest(StrictModel):
+    reason: str = Field(min_length=10, max_length=500)
+
+
+class AdminSchemaUpgradeResponse(StrictModel):
+    previous_revision: str
+    current_revision: str
+    applied: bool
+    trace_id: str
 
 
 class AdminPrivatePreviewFile(StrictModel):
@@ -359,6 +372,41 @@ def get_system(
     _require_admin(actor)
     _set_admin_read_headers(response)
     return get_system_status(session, settings)
+
+
+@router.post("/system/schema-upgrade", response_model=AdminSchemaUpgradeResponse)
+def upgrade_database_schema(
+    payload: AdminSchemaUpgradeRequest,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    trace_id: TraceIdDep,
+    _idempotency_key: IdempotencyKeyDep,
+) -> AdminSchemaUpgradeResponse:
+    """Apply the single approved e6 -> d7 production migration chain."""
+
+    _require_admin(actor)
+    outcome = upgrade_unity_schema(session)
+    if outcome.applied:
+        record_operator_audit(
+            session,
+            actor=actor,
+            action="database.schema_upgraded",
+            target_type="database_schema",
+            target_id=outcome.current_revision,
+            reason=payload.reason,
+            trace_id=trace_id,
+            before={"revision": outcome.previous_revision},
+            after={"revision": outcome.current_revision},
+        )
+        session.commit()
+    _set_mutation_headers(response, replayed=not outcome.applied)
+    return AdminSchemaUpgradeResponse(
+        previous_revision=outcome.previous_revision,
+        current_revision=outcome.current_revision,
+        applied=outcome.applied,
+        trace_id=trace_id,
+    )
 
 
 @router.get("/configuration", response_model=AdminConfigurationResponse)

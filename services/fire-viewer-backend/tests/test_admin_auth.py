@@ -124,6 +124,14 @@ def test_local_admin_session_returns_in_memory_csrf_and_protects_logout(tmp_path
             csrf = login.json()["csrf_token"]
             session_status = client.get("/api/v1/admin/session")
             dashboard = client.get("/api/v2/admin/dashboard")
+            schema_upgrade = client.post(
+                "/api/v1/admin/system/schema-upgrade",
+                json={"reason": "Vérification idempotente du schéma déjà courant."},
+                headers={
+                    "X-CSRF-Token": csrf,
+                    "Idempotency-Key": "schema-upgrade-idempotent-test",
+                },
+            )
             rejected_logout = client.post("/api/v1/admin/auth/logout")
             logout = client.post(
                 "/api/v1/admin/auth/logout",
@@ -141,6 +149,10 @@ def test_local_admin_session_returns_in_memory_csrf_and_protects_logout(tmp_path
     assert "fireviewer_csrf" not in login.headers["set-cookie"]
     assert session_status.json() == {"authenticated": True, "csrf_token": csrf}
     assert dashboard.status_code == 200, dashboard.text
+    assert schema_upgrade.status_code == 200, schema_upgrade.text
+    assert schema_upgrade.json()["current_revision"] == "d7c5e3a1b920"
+    assert schema_upgrade.json()["applied"] is False
+    assert schema_upgrade.headers["Idempotent-Replay"] == "true"
     assert rejected_logout.status_code == 403
     assert logout.status_code == 204
     assert expired.status_code == 401
