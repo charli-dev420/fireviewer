@@ -1250,6 +1250,22 @@ export class AdminApiClient {
     return endpoint(this.origin, '/blob-upload-token');
   }
 
+  async refreshAdminSession(options: AdminRequestOptions = {}): Promise<void> {
+    const payload = await this.request('/session', { method: 'GET' }, options);
+    if (
+      !isRecord(payload)
+      || payload.authenticated !== true
+      || Object.keys(payload).some((key) => key !== 'authenticated' && key !== 'csrf_token')
+      || (
+        payload.csrf_token !== undefined
+        && payload.csrf_token !== null
+        && typeof payload.csrf_token !== 'string'
+      )
+    ) {
+      throw new AdminApiError('parse', 'La confirmation de session administrateur est invalide.');
+    }
+  }
+
   async createSpatialPackageUploadGrant(
     zoneId: string,
     revision: number,

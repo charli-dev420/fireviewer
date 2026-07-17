@@ -95,6 +95,26 @@ describe('client API d’administration', () => {
     expect(client.getBlobUploadTokenUrl()).toBe(`${API_ORIGIN}/api/v1/admin/blob-upload-token`);
   });
 
+  it('rafraîchit explicitement la session pendant un envoi Blob long', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response({
+      authenticated: true,
+      csrf_token: 'csrf-session-active',
+    }));
+    const client = new AdminApiClient({ session: SESSION, fetchImpl: fetchMock });
+
+    await expect(client.refreshAdminSession()).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${API_ORIGIN}/api/v1/admin/session`,
+      expect.objectContaining({
+        method: 'GET',
+        cache: 'no-store',
+        credentials: 'include',
+      }),
+    );
+  });
+
   it('finalise uniquement des références Blob JSON, sans corps binaire', async () => {
     vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response({

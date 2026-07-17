@@ -438,6 +438,29 @@ describe('Routage administrateur privé', () => {
     expect(screen.queryByText('La carte ne consulte ni Cesium')).not.toBeInTheDocument();
   });
 
+  it('conserve la même session pendant la navigation interne admin', async () => {
+    const user = userEvent.setup();
+    setAdminSessionCookie();
+    window.history.replaceState({}, '', '/admin/incidents');
+    const fetchMock = vi.mocked(globalThis.fetch);
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Incidents' })).toBeVisible();
+    const sessionCallsBefore = fetchMock.mock.calls.filter(
+      ([input]) => String(input).endsWith('/api/v1/admin/session'),
+    ).length;
+    await user.click(screen.getByRole('link', { name: 'Modèles et zones' }));
+
+    expect(await screen.findByRole('heading', { name: 'Zones administrées' })).toBeVisible();
+    expect(window.location.pathname).toBe('/admin/zones');
+    const sessionCallsAfter = fetchMock.mock.calls.filter(
+      ([input]) => String(input).endsWith('/api/v1/admin/session'),
+    ).length;
+    expect(sessionCallsAfter).toBe(sessionCallsBefore);
+    expect(screen.queryByText('Validation de la session administrateur…')).not.toBeInTheDocument();
+  });
+
   it('ne conserve aucune route vers l’ancien téléversement d’archive', async () => {
     setAdminSessionCookie();
     window.history.replaceState({}, '', '/admin/zones/ALPES-TEST/uploads');

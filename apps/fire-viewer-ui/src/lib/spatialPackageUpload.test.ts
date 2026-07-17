@@ -146,6 +146,7 @@ describe('envoi direct vers Vercel Blob', () => {
         allowed_content_types: ['application/json', 'model/gltf-binary'],
       }),
       getBlobUploadTokenUrl: () => 'https://api.example.test/api/v1/admin/blob-upload-token',
+      refreshAdminSession: vi.fn().mockResolvedValue(undefined),
       finalizeSpatialPackageFromBlob: finalize,
     } as unknown as AdminApiClient;
     const uploader = vi.fn(async (pathname: string, file: File, options: Parameters<BlobUploader>[2]) => {
@@ -190,6 +191,59 @@ describe('envoi direct vers Vercel Blob', () => {
     expect(progress.mock.calls.at(-1)?.[0]).toMatchObject({ phase: 'finalizing', percentage: 100 });
   });
 
+  it('maintient la session admin active pendant un transfert long et avant la finalisation', async () => {
+    const files = Array.from({ length: 3 }, (_, index) => ({
+      path: `assets/tile-${index}.fwtile`,
+      file: new File([`tile-${index}`], `tile-${index}.fwtile`),
+      contentType: 'application/vnd.fireviewer.tile',
+    }));
+    const prepared: PreparedSpatialPackage = {
+      packageId: 'pkg-session-r2',
+      assetCount: files.length,
+      files,
+      totalSizeBytes: files.reduce((total, item) => total + item.file.size, 0),
+    };
+    const refreshAdminSession = vi.fn().mockResolvedValue(undefined);
+    const finalize = vi.fn().mockResolvedValue({
+      package_id: prepared.packageId,
+      object_count: files.length,
+    });
+    const api = {
+      createSpatialPackageUploadGrant: vi.fn().mockResolvedValue({
+        upload_id: UPLOAD_ID,
+        pathname_prefix: `packages/${UPLOAD_ID}`,
+        upload_grant: 'grant-signe',
+      }),
+      getBlobUploadTokenUrl: () => 'https://api.example.test/api/v1/admin/blob-upload-token',
+      refreshAdminSession,
+      finalizeSpatialPackageFromBlob: finalize,
+    } as unknown as AdminApiClient;
+    const uploader = vi.fn(async (
+      pathname: string,
+      file: File,
+      options: Parameters<BlobUploader>[2],
+    ) => {
+      await new Promise((resolve) => setTimeout(resolve, 2));
+      options.onUploadProgress({ loaded: file.size, total: file.size, percentage: 100 });
+      return { pathname, contentType: options.contentType };
+    });
+
+    await uploadPreparedSpatialPackage(
+      api,
+      ZONE_ID,
+      REVISION,
+      prepared,
+      'Import long avec maintien de session.',
+      'idempotency-session',
+      vi.fn(),
+      { uploader, concurrency: 1, sessionKeepAliveIntervalMs: 1 },
+    );
+
+    expect(refreshAdminSession.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(refreshAdminSession.mock.invocationCallOrder[0])
+      .toBeLessThan(finalize.mock.invocationCallOrder[0]!);
+  });
+
   it('borne la concurrence, réessaie un fichier en échec et conserve l’ordre de finalisation', async () => {
     const files = Array.from({ length: 9 }, (_, index) => ({
       path: `assets/tile-${index}.fwtile`,
@@ -227,6 +281,7 @@ describe('envoi direct vers Vercel Blob', () => {
         allowed_content_types: ['application/vnd.fireviewer.tile'],
       }),
       getBlobUploadTokenUrl: () => 'https://api.example.test/api/v1/admin/blob-upload-token',
+      refreshAdminSession: vi.fn().mockResolvedValue(undefined),
       finalizeSpatialPackageFromBlob: finalize,
     } as unknown as AdminApiClient;
 
@@ -265,6 +320,7 @@ describe('envoi direct vers Vercel Blob', () => {
         upload_grant: 'grant-signe',
       }),
       getBlobUploadTokenUrl: () => 'https://api.example.test/api/v1/admin/blob-upload-token',
+      refreshAdminSession: vi.fn().mockResolvedValue(undefined),
       finalizeSpatialPackageFromBlob: vi.fn(),
     } as unknown as AdminApiClient;
     const uploader = vi.fn().mockRejectedValue(new Error('réseau indisponible'));
@@ -304,6 +360,7 @@ describe('envoi direct vers Vercel Blob', () => {
         upload_grant: 'grant-signe',
       }),
       getBlobUploadTokenUrl: () => 'https://api.example.test/api/v1/admin/blob-upload-token',
+      refreshAdminSession: vi.fn().mockResolvedValue(undefined),
       finalizeSpatialPackageFromBlob: finalize,
     } as unknown as AdminApiClient;
     const uploader = vi.fn(async (pathname: string, _file: File, options: Parameters<BlobUploader>[2]) => ({

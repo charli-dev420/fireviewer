@@ -1,4 +1,4 @@
-import { FormEvent, useState, type ReactNode } from 'react';
+import { FormEvent, MouseEvent, useState, type ReactNode } from 'react';
 import { FireWarningBrand } from '../public/FireWarningPublicShell';
 import { PublicIcon } from '../public/PublicIcon';
 import {
@@ -21,6 +21,12 @@ const GROUP_LABELS: Readonly<Record<AdminOperationDefinition['group'], string>> 
   governance: 'Gouvernance',
 };
 
+function navigateWithinAdmin(destination: string): void {
+  const url = new URL(destination, window.location.href);
+  window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
 function AdminNavigationLink({ item, active }: { readonly item: AdminOperationDefinition; readonly active: boolean }) {
   return (
     <a className="admin-operation-shell__nav-link" href={item.href} aria-current={active ? 'page' : undefined}>
@@ -37,6 +43,29 @@ export function AdminShell({ children, onSignOut }: AdminShellProps) {
   const [search, setSearch] = useState('');
   const operations = [...ADMIN_OPERATIONS, ...ADMIN_ZONE_TOOLS];
 
+  const followAdminLink = (event: MouseEvent<HTMLDivElement>) => {
+    if (
+      event.defaultPrevented
+      || event.button !== 0
+      || event.altKey
+      || event.ctrlKey
+      || event.metaKey
+      || event.shiftKey
+      || !(event.target instanceof Element)
+    ) return;
+    const anchor = event.target.closest('a[href]');
+    if (!(anchor instanceof HTMLAnchorElement) || anchor.target || anchor.hasAttribute('download')) return;
+    const url = new URL(anchor.href, window.location.href);
+    if (url.origin !== window.location.origin || !/^\/admin(?:\/|$)/.test(url.pathname)) return;
+    if (
+      url.pathname === window.location.pathname
+      && url.search === window.location.search
+      && url.hash
+    ) return;
+    event.preventDefault();
+    navigateWithinAdmin(url.href);
+  };
+
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const value = search.trim().toUpperCase();
@@ -44,11 +73,14 @@ export function AdminShell({ children, onSignOut }: AdminShellProps) {
     const destination = /^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(value)
       ? `/admin/incidents/${encodeURIComponent(value)}`
       : `/admin/incidents?q=${encodeURIComponent(search.trim())}`;
-    window.location.assign(destination);
+    navigateWithinAdmin(destination);
   };
 
   return (
-    <div className={`admin-operation-shell ${activePath === '/admin/carte-operationnelle' ? 'admin-operation-shell--map' : ''}`}>
+    <div
+      className={`admin-operation-shell ${activePath === '/admin/carte-operationnelle' ? 'admin-operation-shell--map' : ''}`}
+      onClick={followAdminLink}
+    >
       <a className="skip-link" href="#admin-main-content">Aller au contenu administrateur</a>
       <header className="admin-operation-shell__topbar">
         <button className="admin-operation-shell__menu" type="button" aria-label="Ouvrir la navigation administrateur" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>

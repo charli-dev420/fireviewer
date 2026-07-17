@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AdminShell } from './AdminShell';
 import { ADMIN_OPERATIONS } from './operations/adminOperations';
 
@@ -28,5 +29,19 @@ describe('AdminShell', () => {
 
   it('n expose pas de surface placeholder', () => {
     expect(ADMIN_OPERATIONS.some(({ availability }) => availability === 'not_available')).toBe(false);
+  });
+
+  it('navigue entre les pages admin sans recharger le document', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, '', '/admin');
+    const navigation = vi.fn();
+    window.addEventListener('popstate', navigation, { once: true });
+    render(<AdminShell><p>Contenu de test</p></AdminShell>);
+
+    await user.click(screen.getByRole('link', { name: 'Modèles et zones' }));
+
+    expect(window.location.pathname).toBe('/admin/zones');
+    expect(navigation).toHaveBeenCalledOnce();
+    expect(screen.getByText('Contenu de test')).toBeVisible();
   });
 });

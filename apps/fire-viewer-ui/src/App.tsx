@@ -281,7 +281,12 @@ function PublicPage({ section }: { readonly section: Extract<ReturnType<typeof r
 }
 
 export default function App({ refreshIntervalMs }: AppProps) {
-  const route = resolveAppRoute();
+  const [route, setRoute] = useState(() => resolveAppRoute());
+  useEffect(() => {
+    const updateRoute = () => setRoute(resolveAppRoute());
+    window.addEventListener('popstate', updateRoute);
+    return () => window.removeEventListener('popstate', updateRoute);
+  }, []);
   if (route.kind === 'admin') {
     return <Suspense fallback={<div className="admin-route-loading" role="status">Chargement de l’administration…</div>}><AdminApp route={route.adminRoute} /></Suspense>;
   }

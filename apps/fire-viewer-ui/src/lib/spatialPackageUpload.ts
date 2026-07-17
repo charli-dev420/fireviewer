@@ -15,6 +15,7 @@ const DEFAULT_UPLOAD_ATTEMPTS = 3;
 const DEFAULT_RETRY_DELAY_MS = 400;
 const DEFAULT_FINALIZATION_ATTEMPTS = 4;
 const DEFAULT_FINALIZATION_RETRY_DELAY_MS = 2_000;
+const DEFAULT_SESSION_KEEP_ALIVE_INTERVAL_MS = 5 * 60 * 1_000;
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
   '.json': 'application/json',
   '.jpg': 'image/jpeg',
@@ -308,6 +309,7 @@ export async function uploadPreparedSpatialPackage(
     readonly retryDelayMs?: number;
     readonly finalizationAttempts?: number;
     readonly finalizationRetryDelayMs?: number;
+    readonly sessionKeepAliveIntervalMs?: number;
   } = {},
 ): Promise<AdminSpatialPackageImport> {
   const grant: AdminBlobUploadGrant = await api.createSpatialPackageUploadGrant(
@@ -332,6 +334,28 @@ export async function uploadPreparedSpatialPackage(
     0,
     Math.trunc(options.finalizationRetryDelayMs ?? DEFAULT_FINALIZATION_RETRY_DELAY_MS),
   );
+  const sessionKeepAliveIntervalMs = Math.max(
+    1,
+    Math.min(
+      10 * 60 * 1_000,
+      Math.trunc(
+        options.sessionKeepAliveIntervalMs ?? DEFAULT_SESSION_KEEP_ALIVE_INTERVAL_MS,
+      ),
+    ),
+  );
+  let nextSessionKeepAliveAt = Date.now() + sessionKeepAliveIntervalMs;
+  let sessionKeepAlivePromise: Promise<void> | null = null;
+  const keepAdminSessionAlive = async (force = false): Promise<void> => {
+    if (!force && Date.now() < nextSessionKeepAliveAt) return;
+    if (!sessionKeepAlivePromise) {
+      nextSessionKeepAliveAt = Date.now() + sessionKeepAliveIntervalMs;
+      sessionKeepAlivePromise = api.refreshAdminSession({ signal: options.signal })
+        .finally(() => {
+          sessionKeepAlivePromise = null;
+        });
+    }
+    await sessionKeepAlivePromise;
+  };
   const uploaded = new Array<AdminBlobObjectReference | undefined>(prepared.files.length);
   const inFlightBytes = new Array<number>(prepared.files.length).fill(0);
   let uploadedBytes = 0;
@@ -392,12 +416,16 @@ export async function uploadPreparedSpatialPackage(
         };
         completedCount += 1;
         emitProgress(index, item.path);
-        return;
+        break;
       } catch (error) {
         lastError = error;
         if (isAbortError(error) || attempt === uploadAttempts) break;
         await retryDelay(retryDelayMs, attempt, options.signal);
       }
+    }
+    if (uploaded[index]) {
+      await keepAdminSessionAlive();
+      return;
     }
     if (isAbortError(lastError)) throw lastError;
     throw new Error(
@@ -424,6 +452,7 @@ export async function uploadPreparedSpatialPackage(
     () => worker(),
   ));
   if (terminalError !== null) throw terminalError;
+  await keepAdminSessionAlive(true);
   const finalizedObjects = uploaded.map((item, index) => {
     if (!item) throw new Error(`Objet uploadé manquant : ${prepared.files[index]!.path}.`);
     return item;
