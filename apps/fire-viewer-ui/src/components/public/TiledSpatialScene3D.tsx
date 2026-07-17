@@ -340,7 +340,6 @@ export function TiledSpatialScene3D({
     };
     const selectDetails = (east: number, north: number) => {
       if (!catalog || !instance || !controls || disposed) return;
-      const distance = instance.view.camera.position.distanceTo(controls.target);
       const absoluteEast = east + catalog.origin_l93_m[0];
       const absoluteNorth = north + catalog.origin_l93_m[1];
       const nearDetailDistance = catalog.lod_policy.detail.publish_distance_m * NEAR_DETAIL_DISTANCE_MULTIPLIER;
@@ -350,9 +349,10 @@ export function TiledSpatialScene3D({
         catalog.origin_l93_m,
         nearDetailDistance + catalog.lod_policy.detail.preload_radius_m,
       );
-      desiredTiles = distance > nearDetailDistance ? [] : catalog.tiles
+      desiredTiles = catalog.tiles
         .filter((tile) => intersectsBounds(tile.bounds_l93_m, visibleBounds))
         .map((tile) => ({ tile, distance: distanceToBounds(tile.bounds_l93_m, absoluteEast, absoluteNorth) }))
+        .filter((entry) => entry.distance <= nearDetailDistance)
         .sort((left, right) => left.distance - right.distance || left.tile.id.localeCompare(right.tile.id))
         .map((entry) => entry.tile);
       desiredIds = new Set(desiredTiles.map((tile) => tile.id)); publish();
