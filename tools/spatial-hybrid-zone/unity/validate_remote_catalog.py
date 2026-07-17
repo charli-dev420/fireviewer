@@ -108,6 +108,9 @@ def validate(artifact_root: Path, output_root: Path) -> dict[str, Any]:
         raise FWTileError("catalog does not preserve the 600 m publish distance")
     if float(detail_policy.get("preload_radius_m", -1)) != 750.0:
         raise FWTileError("catalog does not preserve the 750 m preload radius")
+    near_disabled = detail_policy.get("near_disabled")
+    if not isinstance(near_disabled, bool):
+        raise FWTileError("catalog does not declare the near LOD policy")
 
     receipt_paths = sorted((output_root / "receipts").glob("x*_s*.json"))
     receipt_ids: set[str] = set()
@@ -128,6 +131,11 @@ def validate(artifact_root: Path, output_root: Path) -> dict[str, Any]:
     for tile in tiles:
         payload_asset = tile.get("payload", {})
         imagery_asset = tile.get("imagery", {})
+        imagery_resolution = float(imagery_asset.get("resolution_m", 0))
+        if near_disabled and imagery_resolution < 0.5:
+            raise FWTileError(
+                f"near imagery remains published while near LOD is disabled: {tile.get('id')}"
+            )
         payload_path = _asset_path(output_root, payload_asset)
         imagery_path = _asset_path(output_root, imagery_asset)
         referenced_paths.update((payload_path, imagery_path))
@@ -179,6 +187,7 @@ def validate(artifact_root: Path, output_root: Path) -> dict[str, Any]:
         "detail_tile_count": len(tiles),
         "receipt_count": len(receipt_paths),
         "maximum_resident_tile_count": maximum_resident,
+        "near_lod_disabled": near_disabled,
         "tree_instance_count": tree_instances,
         "tree_encoding_tile_counts": dict(sorted(tree_encodings.items())),
         "detail_payload_bytes": _distribution(payload_bytes),

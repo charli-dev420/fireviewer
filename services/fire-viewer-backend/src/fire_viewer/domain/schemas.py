@@ -28,6 +28,7 @@ from fire_viewer.domain.enums import (
     ReviewResolutionAction,
     SourceTrust,
     SourceType,
+    SpatialPackageFileKind,
     SpatialPackageState,
     VerificationState,
     ZoneContributionState,
@@ -211,6 +212,22 @@ class ManifestAsset(StrictModel):
     lod: AssetLod
 
 
+class ManifestSpatialSceneFile(StrictModel):
+    file_id: int = Field(ge=1)
+    path: str = Field(min_length=1, max_length=500)
+    kind: SpatialPackageFileKind
+    url: str = Field(min_length=1, max_length=1_000)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    size_bytes: int = Field(gt=0)
+    media_type: str = Field(min_length=1, max_length=100)
+
+
+class ManifestSpatialScene(StrictModel):
+    package_id: str = Field(min_length=3, max_length=96)
+    catalog_url: str = Field(min_length=1, max_length=1_000)
+    files: list[ManifestSpatialSceneFile] = Field(min_length=1, max_length=2_000)
+
+
 class ManifestFrame(StrictModel):
     origin_wgs84: tuple[ManifestLongitude, ManifestLatitude, ManifestEllipsoidHeight]
     local_frame: Literal["ENU"]
@@ -238,6 +255,7 @@ class ViewerManifest(StrictModel):
     status: ManifestStatus
     location: PointGeometryInput | None
     asset: ManifestAsset | None = None
+    scene: ManifestSpatialScene | None = None
     frame: ManifestFrame | None = None
     freshness: ManifestFreshness
     model_state: Literal["available", "not_available", "withheld"]
@@ -246,19 +264,24 @@ class ViewerManifest(StrictModel):
     @model_validator(mode="after")
     def validate_public_projection(self) -> ViewerManifest:
         if self.model_state == "available" and (
-            self.location is None or self.asset is None or self.frame is None
+            self.location is None
+            or self.frame is None
+            or (self.asset is None and self.scene is None)
         ):
-            raise ValueError("available manifests require location, asset, and frame")
+            raise ValueError("available manifests require location, frame, and an asset or scene")
         if self.model_state == "available" and self.status.code not in VIEWER_ASSET_STATUSES:
             raise ValueError("available manifests require an active public lifecycle status")
         if self.model_state == "not_available" and (
-            self.location is None or self.asset is not None or self.frame is not None
+            self.location is None
+            or self.asset is not None
+            or self.scene is not None
+            or self.frame is not None
         ):
             raise ValueError("not_available manifests require location without asset or frame")
         if self.model_state == "not_available" and self.status.code not in PUBLIC_LOCATION_STATUSES:
             raise ValueError("not_available manifests require a public lifecycle status")
         if self.model_state == "withheld" and any(
-            value is not None for value in (self.location, self.asset, self.frame)
+            value is not None for value in (self.location, self.asset, self.scene, self.frame)
         ):
             raise ValueError("withheld manifests must not include location, asset, or frame")
         if self.model_state == "withheld" and self.status.code not in WITHHELD_MANIFEST_STATUSES:
@@ -833,8 +856,8 @@ class AdminIncidentRepresentationAttachResponse(StrictModel):
     episode_id: str
     package_id: str
     manifest_revision: int = Field(ge=1)
-    primary_asset_id: str
-    model_asset_ids: list[str] = Field(min_length=1, max_length=5)
+    primary_asset_id: str | None = None
+    model_asset_ids: list[str] = Field(default_factory=list, max_length=5)
     incident_version: int = Field(ge=1)
     trace_id: str
 

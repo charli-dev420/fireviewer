@@ -35,6 +35,17 @@ def _safe_key(key: str) -> str:
     return path.as_posix()
 
 
+def _content_type(path: Path) -> str:
+    explicit = {
+        ".glb": "model/gltf-binary",
+        ".fwtile": "application/vnd.fireviewer.tile",
+        ".fwterrain": "application/vnd.fireviewer.terrain",
+    }
+    return explicit.get(path.suffix.casefold()) or mimetypes.guess_type(path.name)[0] or (
+        "application/octet-stream"
+    )
+
+
 class ObjectStore(Protocol):
     def pathname_for(self, key: str) -> str: ...
 
@@ -92,11 +103,7 @@ class LocalObjectStore:
         path = self._path_for(pathname)
         if not path.is_file():
             raise ObjectStorageError("Object not found.")
-        content_type = (
-            "model/gltf-binary"
-            if path.suffix.casefold() == ".glb"
-            else mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-        )
+        content_type = _content_type(path)
         return ObjectMetadata(
             pathname=pathname,
             size_bytes=path.stat().st_size,
@@ -125,7 +132,7 @@ class VercelBlobObjectStore:
             for source in sorted(path for path in source_dir.rglob("*") if path.is_file()):
                 relative = source.relative_to(source_dir).as_posix()
                 object_key = f"{base_key}/{relative}"
-                content_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"
+                content_type = _content_type(source)
                 result = self.client.upload_file(
                     source,
                     object_key,

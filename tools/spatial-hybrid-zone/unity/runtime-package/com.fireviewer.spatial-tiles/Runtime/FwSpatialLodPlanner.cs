@@ -197,9 +197,12 @@ namespace FireViewer.SpatialTiles
         public const double MidMaximumMetres = 3000d;
 
         public static string ClassifyBand(double viewDistanceMetres)
+            => ClassifyBand(viewDistanceMetres, false);
+
+        public static string ClassifyBand(double viewDistanceMetres, bool nearDisabled)
         {
             if (!IsFinite(viewDistanceMetres) || viewDistanceMetres < 0d) throw new ArgumentException("View distance is invalid.");
-            if (viewDistanceMetres <= NearMaximumMetres) return "near";
+            if (!nearDisabled && viewDistanceMetres <= NearMaximumMetres) return "near";
             if (viewDistanceMetres <= MidMaximumMetres) return "mid";
             return "far";
         }
@@ -222,7 +225,7 @@ namespace FireViewer.SpatialTiles
             if (!IsFinite(easting) || !IsFinite(northing)) throw new ArgumentException("Lambert-93 focus is not finite.");
             int budget = Math.Min(AbsoluteMaximumResidentTiles, Math.Min(runtimeBudget, catalog.lod_policy.detail.maximum_resident_tile_count));
             if (budget <= 0) return new FwTileSelectionPlan(Array.Empty<FwCatalogTile>(), "Resident tile budget is zero.");
-            string band = ClassifyBand(viewDistanceMetres);
+            string band = ClassifyBand(viewDistanceMetres, catalog.lod_policy.detail.near_disabled);
             if (string.Equals(band, "far", StringComparison.Ordinal))
                 return new FwTileSelectionPlan(Array.Empty<FwCatalogTile>(), string.Empty);
             double radiusSquared = catalog.lod_policy.detail.preload_radius_m * catalog.lod_policy.detail.preload_radius_m;

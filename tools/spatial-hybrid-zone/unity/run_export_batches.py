@@ -50,6 +50,7 @@ def _arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--far-imagery-resolution-m", type=float, default=2.0)
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=4)
+    parser.add_argument("--disable-near-lod", action="store_true")
     return parser.parse_args(argv)
 
 
@@ -183,6 +184,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--far-imagery-resolution-m",
         str(arguments.far_imagery_resolution_m),
     ]
+    if arguments.disable_near_lod:
+        exporter_arguments.append("--disable-near-lod")
     for option, value in (
         ("--global-vector-package", arguments.global_vector_package),
         ("--far-terrain", arguments.far_terrain),

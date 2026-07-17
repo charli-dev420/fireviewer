@@ -76,6 +76,20 @@ def _profiles(files: list[SpatialPackageFile]) -> dict[str, SpatialPackageFile]:
     return result
 
 
+def _is_tiled_scene(files: list[SpatialPackageFile]) -> bool:
+    kinds = {item.kind for item in files}
+    if {
+        SpatialPackageFileKind.FWTILE,
+        SpatialPackageFileKind.FWTERRAIN,
+    }.issubset(kinds):
+        return True
+    glb_files = [item for item in files if item.kind == SpatialPackageFileKind.GLB]
+    return len(glb_files) > 5 or any(
+        str(item.provenance.get("catalog_path", "")).startswith("vectors/")
+        for item in glb_files
+    )
+
+
 def attach_incident_package(
     session: Session,
     *,
@@ -150,14 +164,17 @@ def attach_incident_package(
             "spatial_package_has_no_revision",
             "The package is not bound to a spatial zone revision.",
         )
-    profiles = _profiles(package.files)
-    primary_profile = payload.primary_profile
-    if primary_profile not in profiles:
-        primary_profile = next(
-            profile
-            for profile in ("local", "close", "extended", "mobile", "desktop")
-            if profile in profiles
-        )
+    tiled_scene = _is_tiled_scene(package.files)
+    profiles = {} if tiled_scene else _profiles(package.files)
+    primary_profile: str | None = None
+    if profiles:
+        primary_profile = payload.primary_profile
+        if primary_profile not in profiles:
+            primary_profile = next(
+                profile
+                for profile in ("local", "close", "extended", "mobile", "desktop")
+                if profile in profiles
+            )
 
     now = utcnow()
     asset_state = (
@@ -232,11 +249,11 @@ def attach_incident_package(
         ).scalar_one()
         or 0
     ) + 1
-    primary_asset = assets[primary_profile]
+    primary_asset = assets[primary_profile] if primary_profile is not None else None
     manifest = ManifestRevision(
         incident_id=incident.id,
         episode_id=episode.id,
-        asset_id=primary_asset.id,
+        asset_id=primary_asset.id if primary_asset is not None else None,
         spatial_zone_revision_id=package.spatial_zone_revision_id,
         spatial_package_id=package.id,
         revision=revision_number,
@@ -253,7 +270,7 @@ def attach_incident_package(
         episode_id=episode.episode_id,
         package_id=package.package_id,
         manifest_revision=manifest.revision,
-        primary_asset_id=primary_asset.asset_id,
+        primary_asset_id=primary_asset.asset_id if primary_asset is not None else None,
         model_asset_ids=[assets[key].asset_id for key in sorted(assets)],
         incident_version=incident.version,
         trace_id=trace_id,
@@ -271,7 +288,11 @@ def attach_incident_package(
             "current_manifest_revisions": [item.revision for item in current_manifests],
         },
         after=response.model_dump(mode="json"),
-        payload={"profiles": sorted(assets), "primary_profile": primary_profile},
+        payload={
+            "profiles": sorted(assets),
+            "primary_profile": primary_profile,
+            "scene_kind": "tiled" if tiled_scene else "single_asset",
+        },
     )
     store_response(
         session,

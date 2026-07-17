@@ -1,143 +1,96 @@
-# Plan de suite — Fire Viewer
+# Plan de suite priorisé
 
-État de référence.
+**Référence :** état du 17 juillet 2026.
+Le runbook G1 et le registre historique restent utiles pour reproduire les anciennes preuves, mais
+ce document décrit désormais le travail restant sur l’architecture Vercel + Neon + Blob actuelle.
 
-Le projet vise un vertical slice G1 local, contrôlé et sans coût récurrent. Il
-utilise des outils libres, SQLite local, des fichiers statiques du même domaine
-et les dépendances versionnées dans le dépôt. Ce plan ne constitue ni une mise
-en production, ni une autorisation d'usage opérationnel.
+## P0 — Promouvoir le schéma courant sans casser la production
 
-Règle de bascule G1.
+1. Geler le diff des migrations `f3b8c1d7a920` et `a4e9c2f7d610`.
+2. Appliquer Alembic sur une branche Neon de staging avec la chaîne directe.
+3. Déployer une preview backend avec `FV_DATABASE_SCHEMA_REVISION=a4e9c2f7d610`.
+4. Vérifier `/readyz`, les quatre index PostGIS, les sessions Admin et les routes v1/v2.
+5. Exécuter la suite backend complète sans timeout et archiver le résultat.
+6. Promouvoir production seulement après rollback de migration testé sur staging.
 
-La documentation ne suffit pas à déclarer G1 terminé. Le périmètre technique
-local devient VÉRIFIÉ lorsque les contrôles ci-dessous ont été exécutés dans le
-même arbre de travail et que leurs résultats sont consignés dans le registre.
-Le gate de livraison devient VÉRIFIÉ uniquement lorsque la même révision Git
-contient FV-006 à FV-010, le contrat du paquet spatial et son verrou de release,
-et que le runbook est rejoué depuis un checkout propre :
+**Gate :** aucune divergence entre code, `alembic_version`, OpenAPI et variables Vercel.
 
-- backend : migration vierge, second `upgrade`, seed exécuté deux fois,
-  `make quality`, sauvegarde et restauration SQLite vers une cible neuve ;
-- interface : `npm ci`, `npm run fetch:spatial`, `npm run check`,
-  `npm run test`, `npm run test:spatial`, `npm run verify:spatial`,
-  `npm run build` et la recette E2E déclarée ;
-- carte : une seule zone publique `DIE-PONTAIX-08@R1`, lecture du catalogue,
-  contrôle des hashes de paquet, route `/zones/die-pontaix` dans un navigateur
-  WebGL, recentrage et vue d'ensemble sans chargement de GLB détaillé ;
-- release : la GitHub Release associée au tag `spatial-die-pontaix-r1-v4`,
-  l'archive,
-  `SHA256SUMS`, l'attribution IGN et le verrou versionné concordent ; le tag
-  source `spatial-die-pontaix-r1-v4-fix1` stabilise le checkout Windows ;
-- runbook : exercice sur un checkout propre, sans réutiliser une base ou un
-  build existant.
+## P0 — Recette réelle des packages 3D
 
-VÉRIFIÉ le 14 juillet 2026 : le correctif de reproductibilité a été fusionné
-dans `main` par la PR #10, au commit `6ae41d3fc6e5c9be9c9b3050902c593c6f0a196f`.
-Le tag source `spatial-die-pontaix-r1-v4-fix1` reste le repère de la recette
-historique ; la release binaire associée reste `spatial-die-pontaix-r1-v4`.
-Sa cohérence est VÉRIFIÉE par le verrou et les hashes ; son verrouillage
-technique GitHub reste NON VÉRIFIÉ (`immutable: false` lors du contrôle).
+1. Sélectionner le dossier local complet avec `package-manifest.json` et `catalog.json`.
+2. Importer les 417 Mo directement vers Vercel Private Blob depuis l’Admin.
+3. Vérifier la progression, une reprise après coupure et l’absence de binaire dans FastAPI.
+4. Finaliser, prévisualiser les trois distances, publier, retirer puis restaurer.
+5. Vérifier l’immuabilité des chemins, tailles, types et SHA-256 enregistrés.
 
-Un échec conserve le gate au statut BLOQUÉ, avec l'erreur et la voie de reprise
-dans le registre. Aucun résultat historique n'est réinterprété ici comme une
-exécution nouvelle.
+**Gate :** un package incomplet n’existe pas en base et aucun objet privé n’est exposé publiquement.
 
-Suivi d'exécution.
+## P0 — Stabiliser la chaîne média agentique
 
-| ID | Objet | État documentaire actuel | Preuve attendue pour le gate |
-| --- | --- | --- | --- |
-| FV-001 | dépôt, licences et exclusions | historique versionné | état Git et documentation contrôlés |
-| FV-002 | contrôles de baseline | historique versionné | commandes officielles rejouées |
-| FV-003 | contrat public `ViewerManifest` v2 | historique versionné | schéma, OpenAPI et parseurs cohérents |
-| FV-004 | contrat spatial ENU, glTF et Unity | historique versionné | transformations et révisions de zone contrôlées |
-| FV-005 | seed fictif et matrice de visibilité | historique versionné | second seed sans écriture et projections sûres |
-| FV-006 | UI connectée au manifeste public | historique versionné | cache, ETag/304, CORS local et parcours API |
-| FV-007 | intégrité SQLite | VÉRIFIÉ le 14 juillet 2026 | 87/87 tests, 88,06 % de couverture, Ruff, mypy, migrations, compilation et restauration SQLite fraîche |
-| FV-008 | paquet spatial réel Die–Pontaix | VÉRIFIÉ le 14 juillet 2026 | catalogue `1.1`, zone unique, 144 binaires invariants, provenance et release contrôlées |
-| FV-009 | bridge web Giro3D | VÉRIFIÉ le 14 juillet 2026 | vue d'ensemble, recentrage, chargement conditionnel et fallback DOM par E2E bureau et émulation mobile |
-| FV-010 | runbook G1 | VÉRIFIÉ le 14 juillet 2026 | release v4, tag source correctif et exercice complet dans un checkout propre |
+1. Maintenir Ruff, mypy et tests verts dans l'environnement reproductible livré.
+2. Construire et inspecter l’image GPU publique sans poids, dataset, cache ni secret.
+3. Provisionner Whisper, Florence, Qwen runtime et RoMa/DINOv2 aux révisions/empreintes exactes sur
+   le volume RunPod ; RT-DETR attend toujours son checkpoint privé validé.
+4. Déployer le dispatcher CPU durable hors Vercel Functions.
+5. Exécuter dix cycles de benchmark, y compris cold start, timeout, annulation et résultat partiel.
 
-FV-008 — paquet spatial réel, versionné et same-origin.
+**Gate :** aucune sortie GPU ne modifie un incident ; toute sortie crée au maximum une tâche de revue
+humaine privée.
 
-Cette passe remplace le scénario historique d'un GLB fictif unique. Le
-catalogue `1.1` déclare une seule zone publique `DIE-PONTAIX-08@R1`, emprise
-Lambert-93 `[876000, 6403000, 892000, 6413000]`. Deux emprises techniques de
-couverture, `[876000, 6403000, 884000, 6411000]` et
-`[884000, 6405000, 892000, 6413000]`, décrivent les secteurs LiDAR disponibles
-sans devenir des zones visibles. Les huit tuiles COG, huit aperçus couleur PNG
-et 128 GLB détaillés du bâti, des routes, chemins, lisières et arbres restent
-bit à bit inchangés.
+## P0 — Qualifier les deux corpus de grounding spatial
 
-Le dépôt suit sous
-`apps/fire-viewer-ui/public/maps/fireviewer-die-pontaix-r1-v4/` le catalogue et
-le manifeste seulement ; les répertoires binaires `terrain/` et `vectors/` sont
-ignorés. Le verrou de release et le manifeste IGN sont suivis sous
-`contracts/spatial/releases/`. La GitHub Release
-`spatial-die-pontaix-r1-v4` distribue l'archive
-`fireviewer-die-pontaix-r1-v4.tar.gz`, `SHA256SUMS` et l'attribution IGN.
-`npm run fetch:spatial` vérifie l'archive avant extraction, refuse les chemins
-hostiles et n'installe les binaires qu'après contrôle. `npm run build:spatial`
-dépend de `npm run verify:spatial` ; un build de recette sans paquet vérifié
-échoue. `npm run build` reste déployable sans les binaires locaux, qui sont
-importés séparément dans le stockage Blob privé.
+1. Conserver `fire-pointing-v0.1.0` comme manifeste de références, sans recopier FASDD, Pyro-SDIS ou
+   Wikimedia.
+2. Faire annoter et double-valider des points `fire_base`, `smoke_column_base` et des abstentions ;
+   les centres bas de boîtes actuels restent des pré-annotations faibles.
+3. Conserver l'audit passé des 264 poses historiques AerialExtreMatch.
+4. Conserver les 126 paires ODM rurales/montagneuses ajoutées ; le corpus total contient 390 paires
+   et 14 groupes spatiaux sans fuite.
+5. Exécuter le benchmark complet AerialExtreMatch-RoMa : le probe mono-échantillon traverse le
+   runtime sous budget mais échoue à 1 220,68 m, donc aucune promotion n'est autorisée.
+6. Constituer deux lots critiques hors entraînement, un par famille.
+7. Maintenir la denylist des incidents actifs ; Die–Pontaix reste uniquement une zone d'inférence
+   privée et ne peut fournir aucun dérivé de train/validation.
 
-Le paquet est un contenu de zone, pas un manifeste d'incident. Il ne doit pas
-ajouter implicitement une position, un feu ou un asset au contrat
-`ViewerManifest` v2. Tout rattachement incident → révision de zone reste une
-passe distincte, revue et archivée par PNG immuable.
+**Gate :** Qwen pointing reste en attente et exige les points humains ; RoMa doit passer le benchmark
+complet puis le lot critique double-validé. Le fait que le corpus cross-view soit `training_ready`
+n'autorise ni fine-tuning ni déploiement tant que la baseline officielle n'est pas qualifiée.
 
-FV-009 — bridge web Giro3D.
+## P1 — Compléter l’Admin utile
 
-Unity reste l'outil d'authoring et d'export spatial. Le runtime public choisi
-est Giro3D dans l'interface web, sans build Unity WebGL ni pont JavaScript/C#.
-Le bridge doit :
+- rendre les files assignables avec lease, reprise et libération ;
+- terminer les mutations du dossier incident et des zones depuis la carte nationale interne ;
+- raccorder la revue des contributions, médias, consentements et retraits ;
+- rendre publication, kill switch et restauration explicites avec réauthentification ;
+- simplifier les écrans rôles/profil tant que le produit conserve un seul administrateur ;
+- ajouter les états vide, erreur, hors ligne et conflit concurrent sur chaque parcours critique.
 
-- lire un catalogue strict et refuser les chemins sortant du paquet ;
-- conserver le pont glTF local `(E, U, -N)` vers la scène Giro3D
-  `(E, N, U)` ;
-- afficher le relief et l'aperçu couleur à toute distance ;
-- charger les GLB détaillés seulement autour de la caméra, puis les libérer
-  hors de la distance configurée ;
-- présenter `Zone Die–Pontaix` comme unique choix public et proposer
-  `Recentrer la zone` pour revenir à l'emprise complète ;
-- rester indépendant de `ViewerManifest` et de toute donnée d'incident ;
-- conserver un résumé DOM explicite lorsque WebGL est indisponible, sans
-  prétendre fournir le rendu 3D.
+## P1 — Fiabiliser l’hébergement
 
-Ce choix maintient le coût d'exécution au niveau d'un site statique et évite de
-maintenir deux viewers publics. Il ne modifie pas le contrat spatial Unity :
-Unity reste à 100 unités par mètre, alors que les COG et GLB restent métriques.
+- sauvegarde Neon planifiée et restauration exercée ;
+- test multi-instance PostgreSQL/PostGIS ;
+- alertes sur readiness, erreurs API, échecs Blob et dead letters ;
+- rotation des secrets et procédure documentée de récupération du compte Admin ;
+- politique de rétention et purge physique des médias retirés ;
+- budgets de taille, temps, mémoire et coût suivis par environnement.
 
-FV-010 — runbook G1.
+## P1 — Recette publique
 
-Le runbook de démarrage, arrêt, migration, seed, récupération du paquet,
-carte, sauvegarde, restauration et rollback est
-[docs/RUNBOOK_G1.md](RUNBOOK_G1.md). Il est délibérément exécutable sans
-service cloud de runtime, Cesium, API cartographique externe ni dépendance
-propriétaire. GitHub Releases sert uniquement à la récupération du paquet au
-build, jamais aux requêtes de la carte publique.
+- vérifier toutes les routes desktop et mobile ;
+- terminer WCAG 2.2 AA sur les parcours accueil, incidents, fiche et signalement ;
+- tester réseau lent, offline, absence WebGL et reprise de téléchargement ;
+- valider le contenu avec des spécialistes incendie/gestion de crise ;
+- mesurer le bundle et découper le chunk principal actuellement supérieur à 500 kB minifié.
 
-Suite après G1.
+## Hors périmètre actuel
 
-1. Pour une nouvelle carte, créer une nouvelle release et un nouveau catalogue ;
-   ne jamais remplacer `DIE-PONTAIX-08@R1` ni son archive.
-2. Ajouter un registre de zones en base lorsqu'il faudra publier des zones
-   supplémentaires dynamiquement ; G1 reste statique et sans lien incident →
-   carte.
-3. Mesurer le chargement, la mémoire WebGL et la bande passante avant toute
-   compression destructrice ou tout déploiement.
-4. Ajouter une publication explicite de révision spatiale vers un incident,
-   avec revue humaine et archive PNG immuable, sans enrichir le manifeste public
-   par défaut.
-5. Préparer G2 : threat model, RBAC, minimisation des données, tests E2E
-   mesurés, restauration, cache et monitoring.
+- automatiser la préparation LiDAR complète dans le cloud ;
+- carte nationale publique ;
+- publication autonome d’une sortie IA ;
+- prévision de propagation ou consigne d’évacuation ;
+- multi-administrateur, RBAC nominatif et MFA avant qu’un second opérateur soit réellement requis ;
+- certification ou promesse de disponibilité opérationnelle.
 
-Ce qui reste hors périmètre.
-
-- carte nationale, Cesium ou fond cartographique externe ;
-- incident réel, position opérationnelle sensible, preuve brute ou donnée de
-  secours ;
-- promesse de disponibilité, de prévision ou de confirmation automatique ;
-- plusieurs writers Uvicorn sur la même SQLite ;
-- déploiement public et coûts de diffusion : NON VÉRIFIÉ tant qu'une mesure
-  d'hébergement et de trafic n'a pas été réalisée.
+Les changements de statut doivent être reportés dans
+[ADMIN_BACKEND_READINESS.md](ADMIN_BACKEND_READINESS.md) avec la commande et l’environnement qui les
+prouvent.

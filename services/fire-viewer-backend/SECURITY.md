@@ -1,46 +1,54 @@
-# Politique de sécurité
+# Politique de sécurité du backend
 
-Ne publiez pas de vulnérabilité exploitable dans une issue publique. Utilisez le canal privé du mainteneur ou de l'organisation qui déploie cette copie.
+Ne publiez pas de vulnérabilité exploitable dans une issue publique. Utilisez le canal privé du
+mainteneur ou de l'organisation qui déploie cette copie. Un rapport peut contenir le commit,
+l'environnement, l'impact, les préconditions et un `trace_id`, mais aucune donnée personnelle,
+preuve brute, URL signée ou valeur de secret.
 
-Inclure : version/commit, environnement, endpoint, impact, préconditions, `trace_id` et reproduction minimale sans donnée personnelle.
+## Modèle d'authentification actuel
 
-## Barrières déjà présentes
+Le déploiement initial utilise un compte administrateur unique avec session `HttpOnly`, protection
+CSRF et réauthentification pour les actions irréversibles. Le mot de passe n'est jamais stocké en
+clair dans le dépôt : seul un hash `scrypt` doit être injecté par le gestionnaire de secrets du
+déploiement.
 
-- validation `extra=forbid` et taille de corps limitée;
-- aucune récupération d'URL fournie par le contenu dans ce service;
-- confiance des sources administrée côté serveur;
-- credential d'ingestion obligatoire pour toute source de confiance, hashé en base et vérifié avant replay idempotent;
-- JWT OIDC en staging/production;
-- RBAC serveur pour validation et suspension;
-- séries non confirmées en visibilité `LIMITED`;
-- observations non vérifiées sans effet sur la fraîcheur publique;
-- journal append-only avec snapshots/hashes avant et après;
-- hashes de preuve et d'asset;
-- headers CSP, HSTS en production, Referrer-Policy et Permissions-Policy;
-- logs sans corps de requête, token, secret ni preuve brute;
-- suspension conservant l'audit;
-- backup SQLite publié atomiquement seulement après `integrity_check`.
+Le mode OIDC/JWT existe dans le code pour une évolution multi-utilisateur, mais il n'est pas une
+preuve qu'un fournisseur d'identité, une MFA ou des rôles nominatifs sont raccordés au déploiement
+actuel. Ces capacités doivent être validées séparément avant d'ajouter un second administrateur.
 
-## Secrets de source
+## Barrières implémentées
 
-- Générer au moins 32 caractères aléatoires avec un CSPRNG.
-- Stocker le secret dans un secret manager; ne jamais le committer.
-- Utiliser `X-Source-Token` uniquement entre services sur HTTPS.
-- Ne jamais placer ce token dans le shell web, Unity, un manifeste, une URL, un log ou un outil d'analytics.
-- Une rotation s'effectue en réappelant `PUT /operator/sources/{source_id}` avec un nouvel `ingest_token`.
-- Le service ne renvoie jamais le token et n'en conserve que le hash.
+- validation stricte des schémas et limite de taille des corps reçus par FastAPI ;
+- confiance des sources administrée côté serveur et secrets d'ingestion stockés sous forme de hash ;
+- états publics conservateurs et validation humaine avant publication ;
+- journal d'audit append-only avec snapshots et hashes avant/après ;
+- headers de sécurité, logs structurés sans corps ni secret et réponses Admin `no-store` ;
+- suspension d'un incident sans effacement de son audit ;
+- contrôle de révision Alembic et des index spatiaux dans la readiness ;
+- sauvegarde/restauration SQLite locale non destructive pour le développement.
+
+## Upload de packages privés
+
+Les packages 3D sont envoyés directement du navigateur vers Vercel Blob privé. Les binaires ne
+traversent pas FastAPI. L'API autorise un préfixe d'upload limité, puis finalise uniquement les
+métadonnées après contrôle de présence, taille et type des objets. Les SHA-256 du pipeline local
+sont enregistrés, mais ne sont pas recalculés par une Function Vercel sur les gros fichiers.
+
+Ce mécanisme ne doit pas être décrit comme entièrement éprouvé en production tant que l'import
+réel du package de référence n'a pas été exécuté de bout en bout.
 
 ## Configuration obligatoire hors développement
 
-- `FV_AUTH_MODE=jwt`;
-- issuer, audience et JWKS OIDC;
-- liste explicite `FV_TRUSTED_HOSTS`;
-- origines CORS minimales;
-- HTTPS terminé par un proxy de confiance;
-- secret manager et rotation des comptes de service;
-- rate limiting et limites de connexion au niveau de l'ingress;
-- accès à `/metrics` restreint au réseau de monitoring;
-- sauvegarde testée par restauration;
-- un seul writer tant que SQLite est utilisé.
+- `FV_AUTH_MODE=local_admin` avec hash robuste et secret de rapport distinct pour le déploiement
+  mono-administrateur, ou OIDC/JWT entièrement raccordé pour un déploiement multi-utilisateur ;
+- liste explicite `FV_TRUSTED_HOSTS`, origines CORS minimales et HTTPS ;
+- secrets dans le gestionnaire du fournisseur, jamais dans Git ou le bundle frontend ;
+- rate limiting et restriction de `/metrics` au niveau de l'ingress ;
+- PostgreSQL/PostGIS pour plusieurs instances ; SQLite reste mono-writer ;
+- sauvegarde réellement restaurée et contrôlée avant toute promesse de reprise.
 
-Ce dépôt ne contient pas de mécanisme d'upload de fichiers ni de fetch d'URL. Ces composants devront être isolés, plafonnés, scannés et protégés contre SSRF avant ajout.
+## Secrets de source
+
+Générer les secrets avec un CSPRNG, les stocker côté serveur et les faire tourner sans les placer
+dans une URL, un manifeste, un log, Unity ou le frontend. `X-Source-Token` est réservé aux échanges
+serveur-à-serveur sur HTTPS ; l'API n'en conserve que le hash et ne le renvoie jamais.

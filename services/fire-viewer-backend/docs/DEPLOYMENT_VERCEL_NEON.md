@@ -27,7 +27,7 @@ Le JSON attendu contient :
 {
   "status": "ready",
   "database": "ok",
-  "schema_revision": "e6f3a1b8c420",
+  "schema_revision": "d2a6e8f1b430",
   "spatial_index": "ok"
 }
 ```
@@ -97,7 +97,7 @@ Définir séparément les valeurs **Preview** et **Production** :
 ```text
 FV_ENVIRONMENT=production
 FV_DATABASE_URL=<connexion Neon poolée>
-FV_DATABASE_SCHEMA_REVISION=e6f3a1b8c420
+FV_DATABASE_SCHEMA_REVISION=d2a6e8f1b430
 FV_DATABASE_POOL_SIZE=2
 FV_DATABASE_MAX_OVERFLOW=3
 FV_OBJECT_STORAGE_BACKEND=vercel_blob
@@ -109,6 +109,8 @@ FV_PUBLIC_REPORT_HASH_SECRET=<secret aléatoire de 32 caractères minimum>
 FV_CORS_ORIGINS=["https://www.exemple.fr"]
 FV_TRUSTED_HOSTS=["api.exemple.fr","firewarning-api.vercel.app"]
 BLOB_READ_WRITE_TOKEN=<variable injectée par le store>
+FV_AGENT_MEDIA_ALLOWED_HOSTS=["private-media.exemple.fr"]
+FV_AGENT_EXPECTED_MODEL_REVISIONS={"fire_detection":"<sha-checkpoint>","multimodal_extraction":"<commit-qwen>"}
 ```
 
 Le mode `local_admin` reste limité à G1. G2 exige OIDC, identités nominatives et MFA.
@@ -131,6 +133,25 @@ curl.exe -i https://api.exemple.fr/readyz
 ```
 
 Ne connecter le frontend qu'après un `200` de `/readyz`.
+
+### Dispatcher agentique hors Function
+
+Le polling RunPod ne tourne pas dans une Function Vercel. Déployer une instance CPU dédiée avec la
+même base Neon et les variables supplémentaires suivantes :
+
+```text
+FV_AGENT_DISPATCH_ENABLED=true
+FV_AGENT_RUNPOD_ENDPOINT_ID=<endpoint>
+FV_AGENT_RUNPOD_API_KEY=<secret serveur>
+FV_AGENT_EXECUTION_TIMEOUT_MS=900000
+FV_AGENT_JOB_TTL_MS=3600000
+FV_AGENT_POLL_INTERVAL_SECONDS=5
+FV_AGENT_DISPATCH_LEASE_SECONDS=90
+```
+
+Lancer `fire-viewer-agent-dispatcher`. Le secret RunPod ne doit être présent ni dans le frontend, ni
+dans l'image Docker publique du worker. Une seule instance est recommandée au MVP ; le lease atomique
+protège néanmoins la prise de travail concurrente.
 
 ## 7. Connecter le frontend
 

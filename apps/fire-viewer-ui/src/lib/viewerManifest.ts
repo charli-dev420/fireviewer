@@ -73,6 +73,22 @@ export interface ViewerManifestAsset {
   lod: ViewerManifestAssetLod;
 }
 
+export interface ViewerManifestSceneFile {
+  file_id: number;
+  path: string;
+  kind: 'COG' | 'JPEG' | 'PNG' | 'GLB' | 'FWTILE' | 'FWTERRAIN';
+  url: string;
+  sha256: string;
+  size_bytes: number;
+  media_type: string;
+}
+
+export interface ViewerManifestScene {
+  package_id: string;
+  catalog_url: string;
+  files: ViewerManifestSceneFile[];
+}
+
 export interface ViewerManifestFrame {
   origin_wgs84: [number, number, number];
   local_frame: typeof VIEWER_MANIFEST_LOCAL_FRAME;
@@ -93,6 +109,7 @@ export interface ViewerManifest {
   status: ViewerManifestStatus;
   location: ViewerManifestLocation | null;
   asset: ViewerManifestAsset | null;
+  scene: ViewerManifestScene | null;
   frame: ViewerManifestFrame | null;
   freshness: ViewerManifestFreshness;
   model_state: ViewerManifestModelState;
@@ -112,6 +129,7 @@ export interface ViewerManifestSummary {
   reviewRequired: boolean;
   location: ViewerManifestLocation | null;
   asset: ViewerManifestAsset | null;
+  scene: ViewerManifestScene | null;
   frame: ViewerManifestFrame | null;
   freshness: ViewerManifestFreshness;
   modelState: ViewerManifestModelState;
@@ -274,6 +292,32 @@ function parseAsset(value: unknown): ViewerManifestAsset | null {
   };
 }
 
+function parseScene(value: unknown): ViewerManifestScene | null {
+  if (value === null) return null;
+  const record = strictRecord(value, 'scene', ['package_id', 'catalog_url', 'files']);
+  if (!Array.isArray(record.files) || record.files.length === 0 || record.files.length > 2_000) {
+    return fail('scene.files', 'doit contenir entre 1 et 2 000 fichiers.');
+  }
+  return {
+    package_id: string(record.package_id, 'scene.package_id'),
+    catalog_url: string(record.catalog_url, 'scene.catalog_url'),
+    files: record.files.map((value, index) => {
+      const file = strictRecord(value, `scene.files[${index}]`, [
+        'file_id', 'path', 'kind', 'url', 'sha256', 'size_bytes', 'media_type',
+      ]);
+      return {
+        file_id: integer(file.file_id, `scene.files[${index}].file_id`),
+        path: string(file.path, `scene.files[${index}].path`),
+        kind: enumValue(file.kind, `scene.files[${index}].kind`, ['COG', 'JPEG', 'PNG', 'GLB', 'FWTILE', 'FWTERRAIN'] as const),
+        url: string(file.url, `scene.files[${index}].url`),
+        sha256: string(file.sha256, `scene.files[${index}].sha256`),
+        size_bytes: integer(file.size_bytes, `scene.files[${index}].size_bytes`),
+        media_type: string(file.media_type, `scene.files[${index}].media_type`),
+      };
+    }),
+  };
+}
+
 function parseFrame(value: unknown): ViewerManifestFrame | null {
   if (value === null) return null;
   const record = strictRecord(value, 'frame', [
@@ -324,21 +368,21 @@ function parseFreshness(value: unknown): ViewerManifestFreshness {
 
 function validateModelStateInvariants(manifest: ViewerManifest): void {
   if (manifest.model_state === 'available') {
-    if (!manifest.location || !manifest.asset || !manifest.frame) {
-      fail('model_state', '"available" exige location, asset et frame.');
+    if (!manifest.location || (!manifest.asset && !manifest.scene) || !manifest.frame) {
+      fail('model_state', '"available" exige location, frame et asset ou scene.');
     }
     return;
   }
 
   if (manifest.model_state === 'not_available') {
-    if (!manifest.location || manifest.asset || manifest.frame) {
-      fail('model_state', '"not_available" exige location et asset/frame à null.');
+    if (!manifest.location || manifest.asset || manifest.scene || manifest.frame) {
+      fail('model_state', '"not_available" exige location et asset/scene/frame à null.');
     }
     return;
   }
 
-  if (manifest.location || manifest.asset || manifest.frame) {
-    fail('model_state', '"withheld" exige location, asset et frame à null.');
+  if (manifest.location || manifest.asset || manifest.scene || manifest.frame) {
+    fail('model_state', '"withheld" exige location, asset, scene et frame à null.');
   }
 }
 
@@ -361,6 +405,7 @@ export function parseViewerManifest(value: unknown): ViewerManifest {
     'status',
     'location',
     'asset',
+    'scene',
     'frame',
     'freshness',
     'model_state',
@@ -382,6 +427,7 @@ export function parseViewerManifest(value: unknown): ViewerManifest {
     status: parseStatus(record.status),
     location: parseLocation(record.location),
     asset: parseAsset(record.asset),
+    scene: parseScene(record.scene),
     frame: parseFrame(record.frame),
     freshness: parseFreshness(record.freshness),
     model_state: enumValue(record.model_state, 'model_state', MODEL_STATES),
@@ -406,6 +452,7 @@ export function toViewerManifestSummary(manifest: ViewerManifest): ViewerManifes
     reviewRequired: manifest.status.review_required,
     location: manifest.location,
     asset: manifest.asset,
+    scene: manifest.scene,
     frame: manifest.frame,
     freshness: manifest.freshness,
     modelState: manifest.model_state,

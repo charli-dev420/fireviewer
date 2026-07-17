@@ -126,6 +126,23 @@
 .fw-legal-content h2 { margin-bottom: 4px; font-size: .92rem; }
 .fw-legal-content p { margin-bottom: 0; font-size: .7rem; line-height: 1.45; }
 .fw-about-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+.fw-about-page { display: grid; gap: 28px; }
+.fw-about-commitments { padding-top: 3px; }
+.fw-about-commitments__heading { max-width: 650px; margin-bottom: 17px; }
+.fw-about-commitments__heading > span { color: var(--fw-orange); font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.fw-about-commitments__heading h2 { margin: 5px 0 6px; font-size: 1.35rem; }
+.fw-about-commitments__heading p { margin: 0; color: var(--fw-muted); font-size: .82rem; }
+.fw-about-commitments__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.fw-about-commitments__grid article { min-height: 158px; padding: 20px; border: 1px solid var(--fw-line); border-radius: 8px; background: rgb(255 255 255 / 68%); }
+.fw-about-commitments__grid article > div { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 50%; color: var(--fw-orange); background: var(--fw-warm); }
+.fw-about-commitments__grid h3 { margin: 13px 0 6px; font-size: .93rem; }
+.fw-about-commitments__grid p { margin: 0; color: var(--fw-muted); font-size: .72rem; line-height: 1.5; }
+.fw-about-actions { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; padding: 17px 18px; border: 1px solid #efd6c7; border-radius: 8px; background: linear-gradient(90deg, #fff6f0, rgb(255 255 255 / 70%)); }
+.fw-about-actions > div { display: flex; min-width: 0; align-items: center; gap: 12px; }
+.fw-about-actions > div > svg { flex: 0 0 auto; color: var(--fw-orange); }
+.fw-about-actions p { display: grid; margin: 0; font-size: .76rem; }
+.fw-about-actions p span { color: var(--fw-muted); font-size: .69rem; }
+.fw-about-actions .fw-button { white-space: nowrap; }
 .fw-report-page { max-width: 760px; }
 .fw-report-page > section { padding: 24px; border: 1px solid var(--fw-line); border-radius: 8px; background: rgb(255 255 255 / 65%); }
 .fw-incidents-page .fw-search { margin-bottom: 16px; }
@@ -226,6 +243,12 @@
   .fw-legal-content h2 { font-size: .9rem; }
   .fw-legal-content p { font-size: .72rem; }
   .fw-about-grid { grid-template-columns: 1fr; }
+  .fw-about-page { gap: 22px; }
+  .fw-about-commitments__heading h2 { font-size: 1.15rem; }
+  .fw-about-commitments__grid { grid-template-columns: 1fr; gap: 9px; }
+  .fw-about-commitments__grid article { min-height: 0; padding: 15px; }
+  .fw-about-actions { grid-template-columns: 1fr; }
+  .fw-about-actions .fw-button { width: 100%; }
   .fw-incidents-meta { align-items: flex-start; }
   .fw-incidents-tools { display: grid; grid-template-columns: 1fr 1fr; }
   .fw-incidents-tools > button { grid-column: 1 / -1; justify-content: center; }

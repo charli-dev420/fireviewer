@@ -50,6 +50,16 @@ from vegetation_lod import (  # noqa: E402
 
 
 PACKAGE_SCHEMA = "fireviewer.blender-preview-package.v2"
+NON_INCIDENT_PERIMETER_ROLE = "cems-activation-aoi-not-burn-perimeter"
+
+
+def should_render_fire_perimeter(
+    features: Iterable[PolygonFeature], *, explicitly_omitted: bool
+) -> bool:
+    if explicitly_omitted:
+        return False
+    roles = {str(feature.properties.get("role", "")) for feature in features}
+    return roles != {NON_INCIDENT_PERIMETER_ROLE}
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -63,7 +73,15 @@ def _parser() -> argparse.ArgumentParser:
         help="MNS GeoTIFF aligned pixel-for-pixel with the MNT; required with --vegetation",
     )
     parser.add_argument(
-        "--perimeter", type=Path, required=True, help="Fire perimeter GeoJSON"
+        "--perimeter",
+        type=Path,
+        required=True,
+        help="Production envelope GeoJSON, optionally rendered as a fire perimeter",
+    )
+    parser.add_argument(
+        "--omit-fire-perimeter",
+        action="store_true",
+        help="Use the perimeter for clipping only and emit no incident boundary ring",
     )
     parser.add_argument(
         "--buildings", type=Path, help="Optional building polygon GeoJSON"
@@ -1110,7 +1128,11 @@ def prepare_package(args: argparse.Namespace) -> dict[str, Any]:
             if feature.feature_id.rsplit(":", 1)[0] == wanted_id
         ]
     if not perimeter_features:
-        raise ValueError("Fire perimeter contains no polygon")
+        raise ValueError("Production perimeter contains no polygon")
+    render_fire_perimeter = should_render_fire_perimeter(
+        perimeter_features,
+        explicitly_omitted=args.omit_fire_perimeter,
+    )
     perimeter = unary_union([item.geometry for item in perimeter_features])
     buffer_geometry = perimeter.buffer(args.buffer_m)
 
@@ -1576,6 +1598,12 @@ def prepare_package(args: argparse.Namespace) -> dict[str, Any]:
             "source_axis_swapped": args.perimeter_swap_xy,
             "area_m2": perimeter.area,
             "polygon_count": len(perimeter_features),
+            "rendered_as_fire_perimeter": render_fire_perimeter,
+            "rendering_policy": (
+                "incident-ring"
+                if render_fire_perimeter
+                else "clipping-only-non-incident-envelope"
+            ),
         },
         "buildings": {
             "file_name": args.buildings.name if args.buildings else None,
@@ -1615,8 +1643,12 @@ def prepare_package(args: argparse.Namespace) -> dict[str, Any]:
         "metadata": metadata,
         "terrain": terrain_preview_mesh,
         "fire_perimeter": {
-            "rings": _boundary_rings(
-                perimeter, terrain, transform, origin, offset_m=3.0
+            "rings": (
+                []
+                if not render_fire_perimeter
+                else _boundary_rings(
+                    perimeter, terrain, transform, origin, offset_m=3.0
+                )
             )
         },
         "analysis_buffer": {

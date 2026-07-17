@@ -152,6 +152,91 @@
       "title": "ManifestFreshness",
       "type": "object"
     },
+    "ManifestSpatialScene": {
+      "additionalProperties": false,
+      "properties": {
+        "package_id": {
+          "maxLength": 96,
+          "minLength": 3,
+          "title": "Package Id",
+          "type": "string"
+        },
+        "catalog_url": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Catalog Url",
+          "type": "string"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/ManifestSpatialSceneFile"
+          },
+          "maxItems": 2000,
+          "minItems": 1,
+          "title": "Files",
+          "type": "array"
+        }
+      },
+      "required": [
+        "package_id",
+        "catalog_url",
+        "files"
+      ],
+      "title": "ManifestSpatialScene",
+      "type": "object"
+    },
+    "ManifestSpatialSceneFile": {
+      "additionalProperties": false,
+      "properties": {
+        "file_id": {
+          "minimum": 1,
+          "title": "File Id",
+          "type": "integer"
+        },
+        "path": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/SpatialPackageFileKind"
+        },
+        "url": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "exclusiveMinimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_id",
+        "path",
+        "kind",
+        "url",
+        "sha256",
+        "size_bytes",
+        "media_type"
+      ],
+      "title": "ManifestSpatialSceneFile",
+      "type": "object"
+    },
     "ManifestStatus": {
       "additionalProperties": false,
       "properties": {
@@ -247,6 +332,18 @@
       ],
       "title": "PointGeometryInput",
       "type": "object"
+    },
+    "SpatialPackageFileKind": {
+      "enum": [
+        "COG",
+        "JPEG",
+        "PNG",
+        "GLB",
+        "FWTILE",
+        "FWTERRAIN"
+      ],
+      "title": "SpatialPackageFileKind",
+      "type": "string"
     }
   },
   "additionalProperties": false,
@@ -281,6 +378,17 @@
       "anyOf": [
         {
           "$ref": "#/$defs/ManifestAsset"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "scene": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ManifestSpatialScene"
         },
         {
           "type": "null"

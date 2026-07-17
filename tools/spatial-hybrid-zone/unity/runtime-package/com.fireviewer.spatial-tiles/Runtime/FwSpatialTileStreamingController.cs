@@ -66,6 +66,7 @@ namespace FireViewer.SpatialTiles
         public bool IsReady => ready;
         public int ResidentTileCount => residents.Count;
         public bool DetailStreamingAuthorized => detailStreamingAuthorized;
+        public bool NearLodDisabled => catalog?.lod_policy?.detail?.near_disabled ?? false;
         public Camera ViewerCamera => viewerCamera != null ? viewerCamera : Camera.main;
 
         public void Configure(
@@ -266,7 +267,9 @@ namespace FireViewer.SpatialTiles
             SnapFocusToTerrain();
             if (!ready || !TryGetFocusLambert(out double east, out double north)) return;
             double viewDistance = detailStreamingAuthorized ? ViewDistanceMetres() : double.PositiveInfinity;
-            string lodBand = FwSpatialLodPlanner.ClassifyBand(viewDistance);
+            string lodBand = FwSpatialLodPlanner.ClassifyBand(
+                viewDistance,
+                catalog.lod_policy.detail.near_disabled);
             FwPlanarFootprint visibleFootprint = null;
             bool usesDetailTiles = !string.Equals(lodBand, "far", StringComparison.Ordinal);
             if (usesDetailTiles && !TryBuildCameraTerrainFootprint(viewDistance, out visibleFootprint))

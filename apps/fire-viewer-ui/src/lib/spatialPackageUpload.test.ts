@@ -74,6 +74,16 @@ describe('préparation du package spatial côté navigateur', () => {
     expect(prepared.totalSizeBytes).toBe(prepared.files.reduce((total, item) => total + item.file.size, 0));
   });
 
+  it.each([
+    ['assets/far/global.fwterrain', 'application/vnd.fireviewer.terrain'],
+    ['assets/detail/tile.fwtile', 'application/vnd.fireviewer.tile'],
+    ['assets/imagery/tile.jpg', 'image/jpeg'],
+  ])('accepte l’asset Unity distant %s', async (modelPath, expectedContentType) => {
+    const prepared = await prepareSpatialPackage(await validFiles({ modelPath }), ZONE_ID, REVISION);
+
+    expect(prepared.files.at(-1)).toMatchObject({ path: modelPath, contentType: expectedContentType });
+  });
+
   it('refuse un dossier sans manifeste ou catalogue', async () => {
     const files = await validFiles();
     files[0] = packageFile('metadata.json', '{}', 'application/json');

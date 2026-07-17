@@ -12,10 +12,14 @@ const ASSET_PREFIXES = ['assets/', 'terrain/', 'vectors/'] as const;
 const REQUIRED_PATHS = ['package-manifest.json', 'catalog.json'] as const;
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
   '.json': 'application/json',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
   '.png': 'image/png',
   '.tif': 'image/tiff',
   '.tiff': 'image/tiff',
   '.glb': 'model/gltf-binary',
+  '.fwtile': 'application/vnd.fireviewer.tile',
+  '.fwterrain': 'application/vnd.fireviewer.terrain',
 };
 
 interface CatalogAsset {
@@ -155,7 +159,7 @@ function collectCatalogAssets(catalog: Record<string, unknown>): CatalogAsset[] 
     Object.values(record).forEach(visit);
   };
   visit(catalog);
-  if (entries.length === 0) throw new Error('catalog.json ne déclare aucun COG, PNG ou GLB.');
+  if (entries.length === 0) throw new Error('catalog.json ne déclare aucun asset spatial pris en charge.');
   const paths = entries.map((entry) => entry.path);
   if (new Set(paths).size !== paths.length) throw new Error('catalog.json déclare un chemin plusieurs fois.');
   return entries;

@@ -9,6 +9,7 @@
   },
   "location": null,
   "asset": null,
+  "scene": null,
   "frame": null,
   "freshness": {
     "incident_at": "2026-07-12T08:24:00Z",

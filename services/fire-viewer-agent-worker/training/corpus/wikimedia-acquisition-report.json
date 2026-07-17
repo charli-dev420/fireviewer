@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "retrieved_at": "2026-07-16T04:48:15.425133+00:00",
+  "manifest_sha256": "a4ebdb91d4d9af47d4304df92d973d1d77d5327105ca030506934f8eafcc7a70",
+  "files_verified": true,
+  "rows": 442,
+  "training_rows": 0,
+  "annotation_candidate_rows": 380,
+  "geo_context_evaluation_rows": 62,
+  "location_pair_rows": 152,
+  "rejected_rows": 34,
+  "four_class_training_ready": false,
+  "source_rows": {
+    "commons_corbieres_2025": 62,
+    "commons_dfci_vehicles": 22,
+    "commons_firefighting_aircraft_france": 281,
+    "commons_firefighting_vehicles_france": 21,
+    "commons_wildfires_france_2021": 28,
+    "commons_wildfires_france_2022": 27,
+    "commons_wildfires_france_2023": 1
+  },
+  "location_pair_rows_by_source": {
+    "commons_corbieres_2025": 62,
+    "commons_firefighting_aircraft_france": 53,
+    "commons_firefighting_vehicles_france": 8,
+    "commons_wildfires_france_2021": 24,
+    "commons_wildfires_france_2022": 5
+  },
+  "missing_target_classes": [
+    "fire_response_vehicle_visible",
+    "firefighting_aircraft_visible",
+    "flame_visible",
+    "smoke_visible"
+  ]
+}

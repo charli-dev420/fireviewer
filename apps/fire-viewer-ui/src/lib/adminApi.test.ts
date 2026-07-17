@@ -248,4 +248,31 @@ describe('client API d’administration', () => {
     await expect(client.resolveObservation('OBS-001', { action: 'attach', expected_version: 1, reason: 'Rattachement humain justifié.', target_fire_id: 'FR-83-00042' }, { idempotencyKey: 'resolve-001' })).resolves.toMatchObject({ fire_id: 'FR-83-00042', version: 2 });
     expect(fetchMock).toHaveBeenCalledWith(`${API_ORIGIN}/api/v1/operator/observations/OBS-001/resolve`, expect.objectContaining({ headers: expect.objectContaining({ 'Idempotency-Key': 'resolve-001' }) }));
   });
+
+  it('charge la scène privée et conserve les projections glTF exactes de la revue spatiale', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response({
+      fire_id: 'FR-83-00042', episode_id: 'E01',
+      scene: { asset_url: 'https://private.invalid/model.glb', asset_version: 2, sha256: 'a'.repeat(64), origin_wgs84: [6.02, 43.29, 420], local_frame: 'ENU', gltf_profile: 'gltf-eun-negz-metric-v1' },
+      markers: [{ marker_id: 'IM-1', source_kind: 'agent_media', marker_type: 'media_capture', longitude: 6.021, latitude: 43.291, altitude_m: null, horizontal_accuracy_m: 12, geometry_origin: 'METADATA', review_state: 'PENDING', observed_at: null, spatial_display_allowed: false, gltf_position: [12, 0, -8], version: 1 }],
+      zone_revisions: [{ zone_revision_id: 'azr-1', revision: 1, valid_at: '2026-07-16T10:00:00Z', geometry_geojson: { type: 'MultiPolygon', coordinates: [] }, gltf_polygons: [[[[0, 0, 0], [10, 0, 0], [0, 0, -10], [0, 0, 0]]]], geometry_origin: 'HUMAN_AUTHORED', supporting_marker_ids: ['IM-1'], source_revision_ids: [], review_state: 'DRAFT', supersedes_zone_revision_id: null, reason: 'Contour de test suffisamment explicite.', created_by: 'admin', reviewed_by: null, reviewed_at: null, review_reason: null, created_at: '2026-07-16T10:00:00Z' }],
+      agent_reviews: [],
+    }));
+    const client = new AdminApiClient({ session: SESSION, fetchImpl: fetchMock });
+
+    await expect(client.getIncidentSpatialReview('FR-83-00042')).resolves.toMatchObject({ markers: [{ gltf_position: [12, 0, -8] }], zone_revisions: [{ review_state: 'DRAFT' }] });
+    expect(fetchMock).toHaveBeenCalledWith(`${API_ORIGIN}/api/v1/admin/incidents/FR-83-00042/spatial-review`, expect.objectContaining({ method: 'GET' }));
+  });
+
+  it('reprojette un clic de la carte 3D côté serveur avant de créer le contour WGS84', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response({ longitude: 6.0214, latitude: 43.2897, altitude_m: 420 }));
+    const client = new AdminApiClient({ session: SESSION, fetchImpl: fetchMock });
+
+    await expect(client.projectIncidentGltfPick('FR-83-00042', [15, 2, -8])).resolves.toEqual({ longitude: 6.0214, latitude: 43.2897, altitude_m: 420 });
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${API_ORIGIN}/api/v1/admin/incidents/FR-83-00042/spatial-review/project-pick`,
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ gltf_position: [15, 2, -8] }) }),
+    );
+  });
 });

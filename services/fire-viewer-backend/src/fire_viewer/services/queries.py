@@ -12,6 +12,7 @@ from fire_viewer.db.models import (
     IncidentSeries,
     ManifestRevision,
     ModelAsset,
+    SpatialPackage,
     SpatialZoneRevision,
     ZoneArchiveSnapshot,
 )
@@ -19,6 +20,7 @@ from fire_viewer.domain.enums import (
     AssetState,
     IncidentStatus,
     PublicVisibility,
+    SpatialPackageState,
     VerificationState,
 )
 from fire_viewer.domain.errors import DomainError, NotFoundError
@@ -34,6 +36,8 @@ from fire_viewer.domain.schemas import (
     ManifestAsset,
     ManifestFrame,
     ManifestFreshness,
+    ManifestSpatialScene,
+    ManifestSpatialSceneFile,
     ManifestStatus,
     PointGeometryInput,
     ViewerManifest,
@@ -187,12 +191,14 @@ def get_viewer_manifest(
         )
 
     revision_row = session.execute(
-        select(ManifestRevision, ModelAsset, SpatialZoneRevision)
+        select(ManifestRevision, ModelAsset, SpatialZoneRevision, SpatialPackage)
         .outerjoin(ModelAsset, ModelAsset.id == ManifestRevision.asset_id)
         .outerjoin(
             SpatialZoneRevision,
             SpatialZoneRevision.id == ManifestRevision.spatial_zone_revision_id,
         )
+        .outerjoin(SpatialPackage, SpatialPackage.id == ManifestRevision.spatial_package_id)
+        .options(selectinload(ManifestRevision.package).selectinload(SpatialPackage.files))
         .where(
             ManifestRevision.incident_id == incident.id,
             ManifestRevision.episode_id == current.id,
@@ -201,6 +207,7 @@ def get_viewer_manifest(
     ).one_or_none()
 
     asset_payload: ManifestAsset | None = None
+    scene_payload: ManifestSpatialScene | None = None
     frame_payload: ManifestFrame | None = None
     terrain_source_year: int | None = None
     generated_at = None
@@ -215,14 +222,22 @@ def get_viewer_manifest(
         # historic GLB, a viewer frame, or an archive URL through the public v2 manifest.
         # This also applies to every CLOSED episode before checking any stored asset.
         model_state = "not_available"
-    elif revision_row is None or revision_row[1] is None or revision_row[2] is None:
+    elif revision_row is None or revision_row[2] is None:
         model_state = "not_available"
     else:
-        _revision, asset, spatial_zone_revision = revision_row
-        if (
-            asset.state != AssetState.PUBLISHED
-            or asset.spatial_zone_revision_id != spatial_zone_revision.id
-        ):
+        _revision, asset, spatial_zone_revision, package = revision_row
+        asset_available = bool(
+            asset is not None
+            and asset.state == AssetState.PUBLISHED
+            and asset.spatial_zone_revision_id == spatial_zone_revision.id
+        )
+        scene_available = bool(
+            package is not None
+            and package.state == SpatialPackageState.PUBLISHED
+            and package.spatial_zone_revision_id == spatial_zone_revision.id
+            and package.files
+        )
+        if not asset_available and not scene_available:
             model_state = "not_available"
         else:
             try:
@@ -238,14 +253,37 @@ def get_viewer_manifest(
                 model_state = "not_available"
             else:
                 model_state = "available"
-                asset_payload = ManifestAsset(
-                    asset_id=asset.asset_id,
-                    version=asset.version,
-                    url=asset.glb_url,
-                    sha256=asset.sha256,
-                    size_bytes=asset.size_bytes,
-                    lod=asset.lod,
-                )
+                if asset_available and asset is not None:
+                    asset_payload = ManifestAsset(
+                        asset_id=asset.asset_id,
+                        version=asset.version,
+                        url=asset.glb_url,
+                        sha256=asset.sha256,
+                        size_bytes=asset.size_bytes,
+                        lod=asset.lod,
+                    )
+                    terrain_source_year = asset.terrain_source_year
+                    generated_at = as_utc(asset.generated_at)
+                if scene_available and package is not None:
+                    scene_payload = ManifestSpatialScene(
+                        package_id=package.package_id,
+                        catalog_url=f"/api/v1/incident/{incident.fire_id}/spatial-scene/catalog",
+                        files=[
+                            ManifestSpatialSceneFile(
+                                file_id=item.id,
+                                path=str(item.provenance.get("catalog_path", "")),
+                                kind=item.kind,
+                                url=(
+                                    f"/api/v1/incident/{incident.fire_id}/spatial-scene/files/{item.id}"
+                                ),
+                                sha256=item.sha256,
+                                size_bytes=item.size_bytes,
+                                media_type=item.media_type,
+                            )
+                            for item in sorted(package.files, key=lambda row: row.id)
+                            if item.provenance.get("catalog_path")
+                        ],
+                    )
                 frame_payload = ManifestFrame(
                     origin_wgs84=(
                         spatial_zone_revision.origin_lon,
@@ -256,8 +294,6 @@ def get_viewer_manifest(
                     meters_per_unit=spatial_zone_revision.meters_per_unit,
                     vertical_datum=spatial_zone_revision.vertical_datum,
                 )
-                terrain_source_year = asset.terrain_source_year
-                generated_at = as_utc(asset.generated_at)
 
     notice = settings.public_notice
     if incident.public_note:
@@ -276,6 +312,7 @@ def get_viewer_manifest(
         ),
         location=location,
         asset=asset_payload,
+        scene=scene_payload,
         frame=frame_payload,
         freshness=ManifestFreshness(
             incident_at=as_utc(current.last_observed_at),

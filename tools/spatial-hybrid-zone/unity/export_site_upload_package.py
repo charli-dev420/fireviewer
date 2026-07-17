@@ -17,8 +17,19 @@ from typing import Any, Iterator
 
 PACKAGE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{2,95}$")
 SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
-SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".fwtile", ".fwterrain"}
+SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".fwtile", ".fwterrain"}
 SOURCE_PREFIXES = ("far/", "detail/", "imagery/")
+UNITY_VALIDATION_SCHEMA = "fireviewer.unity-manual-validation.v1"
+UNITY_VERSION = "6000.3.18f1"
+UNITY_APPROVAL_STATEMENT = "ACCEPTÉ POUR PUBLICATION"
+UNITY_CHECKLIST_IDS = (
+    "catalog_loaded",
+    "terrain_grounding",
+    "vegetation_exclusions",
+    "lod_streaming",
+    "near_buildings",
+    "no_blocking_visual_artifacts",
+)
 
 
 def sha256_file(path: Path) -> str:
@@ -41,6 +52,75 @@ def json_bytes(value: dict[str, Any]) -> bytes:
         json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
         + "\n"
     ).encode("utf-8")
+
+
+def normalize_unity_validation_receipt(
+    *,
+    receipt_path: Path,
+    preview_path: Path,
+    source_catalog_path: Path,
+    package_id: str,
+    zone_id: str,
+    revision: int,
+) -> dict[str, Any]:
+    if not preview_path.is_file() or preview_path.stat().st_size <= 0:
+        raise ValueError("Unity validation preview PNG is absent or empty")
+    if preview_path.suffix.casefold() != ".png":
+        raise ValueError("Unity validation preview must be a PNG file")
+    with preview_path.open("rb") as stream:
+        if stream.read(8) != b"\x89PNG\r\n\x1a\n":
+            raise ValueError("Unity validation preview does not have a PNG signature")
+    receipt = read_json(receipt_path)
+    if receipt.get("schema") != UNITY_VALIDATION_SCHEMA:
+        raise ValueError("Unity validation receipt schema is unsupported")
+    if receipt.get("decision") != "accepted":
+        raise ValueError("Unity validation receipt decision is not accepted")
+    if receipt.get("approval_statement") != UNITY_APPROVAL_STATEMENT:
+        raise ValueError("Unity publication approval statement is absent")
+    for field, expected in (
+        ("package_id", package_id),
+        ("zone_id", zone_id),
+        ("revision", revision),
+        ("unity_version", UNITY_VERSION),
+        ("catalog_sha256", sha256_file(source_catalog_path)),
+        ("preview_sha256", sha256_file(preview_path)),
+    ):
+        if receipt.get(field) != expected:
+            raise ValueError(f"Unity validation receipt {field} does not match production")
+    reviewer = receipt.get("reviewer")
+    if not isinstance(reviewer, str) or len(reviewer.strip()) < 2:
+        raise ValueError("Unity validation receipt reviewer is absent")
+    reviewed_at = receipt.get("reviewed_at_utc")
+    if not isinstance(reviewed_at, str) or not reviewed_at.endswith("Z"):
+        raise ValueError("Unity validation receipt reviewed_at_utc must be UTC")
+    try:
+        parsed_reviewed_at = datetime.fromisoformat(reviewed_at.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("Unity validation receipt reviewed_at_utc is invalid") from exc
+    if parsed_reviewed_at.utcoffset() is None:
+        raise ValueError("Unity validation receipt reviewed_at_utc lacks a timezone")
+    checklist = receipt.get("checklist")
+    if not isinstance(checklist, dict) or set(checklist) != set(UNITY_CHECKLIST_IDS):
+        raise ValueError("Unity validation receipt checklist is incomplete")
+    failed = sorted(key for key, value in checklist.items() if value is not True)
+    if failed:
+        raise ValueError(
+            "Unity validation receipt contains failed checks: " + ", ".join(failed)
+        )
+    return {
+        "schema": UNITY_VALIDATION_SCHEMA,
+        "decision": "accepted",
+        "approval_statement": UNITY_APPROVAL_STATEMENT,
+        "package_id": package_id,
+        "zone_id": zone_id,
+        "revision": revision,
+        "reviewer": reviewer.strip(),
+        "reviewed_at_utc": reviewed_at,
+        "unity_version": UNITY_VERSION,
+        "catalog_sha256": receipt["catalog_sha256"],
+        "preview_sha256": receipt["preview_sha256"],
+        "checklist": {key: True for key in UNITY_CHECKLIST_IDS},
+    }
 
 
 def safe_relative_path(value: str, *, prefixes: tuple[str, ...]) -> PurePosixPath:
@@ -183,18 +263,32 @@ def build_site_package(
     package_id: str,
     zone_id: str,
     revision: int,
+    unity_validation_receipt: Path,
+    unity_preview_png: Path,
 ) -> dict[str, Any]:
     if not PACKAGE_ID_RE.fullmatch(package_id):
         raise ValueError("package_id does not match the site upload contract")
     if revision <= 0:
         raise ValueError("revision must be positive")
-    if output_root.exists():
-        return validate_site_package(output_root)
-
     source_catalog_path = source_root / "catalog.json"
     source_catalog = read_json(source_catalog_path)
     if source_catalog.get("schema") != "fireviewer.remote-tile-catalog.v1":
         raise ValueError("source is not a FireViewer Unity remote tile catalog")
+    manual_validation = normalize_unity_validation_receipt(
+        receipt_path=unity_validation_receipt,
+        preview_path=unity_preview_png,
+        source_catalog_path=source_catalog_path,
+        package_id=package_id,
+        zone_id=zone_id,
+        revision=revision,
+    )
+    if output_root.exists():
+        report = validate_site_package(output_root)
+        manifest = read_json(output_root / "package-manifest.json")
+        if manifest.get("manual_unity_validation") != manual_validation:
+            raise ValueError("existing site package has a different Unity validation receipt")
+        return report
+
     catalog = deepcopy(source_catalog)
     records = list(runtime_asset_records(catalog))
     if len(records) != 2 + (2 * int(catalog.get("exported_detail_tile_count", -1))):
@@ -238,8 +332,26 @@ def build_site_package(
             record["path"] = target_relative.as_posix()
             record["url"] = target_relative.as_posix()
 
+        preview_relative = PurePosixPath("assets/validation/unity-preview.png")
+        preview_target = temporary.joinpath(*preview_relative.parts)
+        preview_target.parent.mkdir(parents=True, exist_ok=True)
+        os.link(unity_preview_png, preview_target)
+        linked += 1
+        preview_record = {
+            "path": preview_relative.as_posix(),
+            "url": preview_relative.as_posix(),
+            "sha256": manual_validation["preview_sha256"],
+            "byte_count": unity_preview_png.stat().st_size,
+            "media_type": "image/png",
+            "role": "manual-unity-validation-preview",
+        }
+
         catalog["package_id"] = package_id
         catalog["zones"] = [{"zone_id": zone_id, "revision_id": f"R{revision}"}]
+        catalog["validation"] = {
+            "schema": UNITY_VALIDATION_SCHEMA,
+            "unity_preview": preview_record,
+        }
         catalog["upload_profile"] = {
             "delivery": "private object storage",
             "inventory": "catalog-exact",
@@ -268,9 +380,11 @@ def build_site_package(
                 "origin_l93_m": catalog.get("origin_l93_m"),
             },
             "inventory": {
-                "asset_count": len(records),
-                "asset_bytes": sum(int(record["byte_count"]) for record in records),
+                "asset_count": len(records) + 1,
+                "asset_bytes": sum(int(record["byte_count"]) for record in records)
+                + int(preview_record["byte_count"]),
             },
+            "manual_unity_validation": manual_validation,
             "provenance": {
                 "source_catalog_sha256": sha256_file(source_catalog_path),
                 "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
@@ -298,6 +412,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--package-id", required=True)
     parser.add_argument("--zone-id", required=True)
     parser.add_argument("--revision", type=int, required=True)
+    parser.add_argument("--unity-validation-receipt", type=Path, required=True)
+    parser.add_argument("--unity-preview-png", type=Path, required=True)
     return parser.parse_args()
 
 
@@ -309,6 +425,8 @@ def main() -> int:
         package_id=args.package_id,
         zone_id=args.zone_id,
         revision=args.revision,
+        unity_validation_receipt=args.unity_validation_receipt.resolve(),
+        unity_preview_png=args.unity_preview_png.resolve(),
     )
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
     return 0

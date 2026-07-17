@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firewarning.example/schemas/cross-view-registration-manifest-v1.json",
+  "title": "FireWarning cross-view registration pair",
+  "type": "object",
+  "required": [
+    "schema_version", "family", "sample_id", "source_id", "source_revision",
+    "source_view", "map_view", "ground_truth", "split", "split_group",
+    "validation_status", "license", "consent_basis", "operational_incident"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "family": {"const": "cross_view_registration"},
+    "sample_id": {"type": "string"},
+    "source_id": {
+      "enum": [
+        "aerialextrematch_localization",
+        "odm_seneca_rural",
+        "odm_sance_mountain"
+      ]
+    },
+    "source_revision": {"pattern": "^[0-9a-f]{40}$"},
+    "source_view": {"type": "object"},
+    "map_view": {"type": "object"},
+    "ground_truth": {"type": "object"},
+    "split": {"enum": ["train", "validation", "test"]},
+    "split_group": {"type": "string", "pattern": "^(epsg4547:|odm_site:)"},
+    "validation_status": {
+      "enum": ["source_pose_provided", "source_geotag_footprint_derived"]
+    },
+    "license": {"enum": ["MIT", "CC0-1.0", "CC-BY-SA-4.0"]},
+    "consent_basis": {"type": "object"},
+    "operational_incident": {"const": false}
+  }
+}

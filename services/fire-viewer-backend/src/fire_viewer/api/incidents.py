@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 from io import StringIO
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Header, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, PlainTextResponse
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from fire_viewer.api.dependencies import (
     FireIdDep,
@@ -16,6 +19,8 @@ from fire_viewer.api.dependencies import (
     SourceTokenDep,
     TraceIdDep,
 )
+from fire_viewer.db.models import SpatialPackage
+from fire_viewer.domain.errors import NotFoundError
 from fire_viewer.domain.hashing import sha256_hex
 from fire_viewer.domain.schemas import (
     DetectionRequest,
@@ -29,6 +34,7 @@ from fire_viewer.domain.schemas import (
 from fire_viewer.services.detection import process_detection
 from fire_viewer.services.public_incident_view import get_public_incident_view, submit_public_report
 from fire_viewer.services.queries import get_incident_public, get_viewer_manifest
+from fire_viewer.storage.object_store import ObjectStorageError, build_object_store
 
 router = APIRouter(tags=["incidents"])
 
@@ -61,6 +67,72 @@ _PROBLEM_DETAILS_SCHEMA: dict[str, Any] = {
         "trace_id": {"type": "string"},
     },
 }
+
+
+def _public_scene_package(
+    session: SessionDep, fire_id: str, settings: SettingsDep
+) -> SpatialPackage:
+    manifest = get_viewer_manifest(session, fire_id, settings)
+    if manifest.scene is None:
+        raise NotFoundError("spatial_scene", fire_id)
+    package = session.execute(
+        select(SpatialPackage)
+        .where(SpatialPackage.package_id == manifest.scene.package_id)
+        .options(selectinload(SpatialPackage.files))
+    ).scalar_one_or_none()
+    if package is None:
+        raise NotFoundError("spatial_scene", fire_id)
+    return package
+
+
+def _public_scene_binary(
+    *,
+    content: bytes,
+    media_type: str,
+    sha256: str,
+    if_none_match: str | None,
+    range_header: str | None = None,
+) -> Response:
+    etag = f'"{sha256}"'
+    headers = {
+        "ETag": etag,
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "Accept-Ranges": "bytes",
+    }
+    if if_none_match == etag:
+        return Response(status_code=304, headers=headers)
+    if range_header:
+        unit, separator, raw_range = range_header.partition("=")
+        start_text, dash, end_text = raw_range.partition("-")
+        size = len(content)
+        try:
+            if unit.casefold() != "bytes" or not separator or not dash or "," in raw_range:
+                raise ValueError
+            if start_text:
+                start = int(start_text)
+                end = int(end_text) if end_text else size - 1
+            else:
+                suffix_length = int(end_text)
+                if suffix_length <= 0:
+                    raise ValueError
+                start = max(size - suffix_length, 0)
+                end = size - 1
+            if start < 0 or start >= size or end < start:
+                raise ValueError
+            end = min(end, size - 1)
+        except ValueError:
+            return Response(
+                status_code=416,
+                headers={**headers, "Content-Range": f"bytes */{size}"},
+            )
+        headers["Content-Range"] = f"bytes {start}-{end}/{size}"
+        return Response(
+            content=content[start : end + 1],
+            status_code=206,
+            media_type=media_type,
+            headers=headers,
+        )
+    return Response(content=content, media_type=media_type, headers=headers)
 
 
 def _manifest_problem_response(description: str) -> dict[str, Any]:
@@ -166,6 +238,56 @@ def export_public_timeline_csv(
             "Cache-Control": _PUBLIC_VIEW_CACHE_CONTROL,
             "Content-Disposition": f'attachment; filename="{fire_id}-public-timeline.csv"',
         },
+    )
+
+
+@router.get("/{fire_id}/spatial-scene/catalog")
+def get_public_spatial_scene_catalog(
+    fire_id: FireIdDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    if_none_match: Annotated[str | None, Header(alias="If-None-Match")] = None,
+) -> Response:
+    package = _public_scene_package(session, fire_id, settings)
+    uri = f"{package.storage_uri.rstrip('/')}/catalog.json"
+    try:
+        content = build_object_store(settings).read_bytes(uri)
+    except ObjectStorageError as exc:
+        raise NotFoundError("spatial_scene_catalog", fire_id) from exc
+    catalog_sha256 = str(package.provenance.get("catalog_sha256", ""))
+    if len(catalog_sha256) != 64:
+        catalog_sha256 = hashlib.sha256(content).hexdigest()
+    return _public_scene_binary(
+        content=content,
+        media_type="application/json",
+        sha256=catalog_sha256,
+        if_none_match=if_none_match,
+    )
+
+
+@router.get("/{fire_id}/spatial-scene/files/{file_id}")
+def get_public_spatial_scene_file(
+    fire_id: FireIdDep,
+    file_id: int,
+    session: SessionDep,
+    settings: SettingsDep,
+    if_none_match: Annotated[str | None, Header(alias="If-None-Match")] = None,
+    range_header: Annotated[str | None, Header(alias="Range")] = None,
+) -> Response:
+    package = _public_scene_package(session, fire_id, settings)
+    file = next((item for item in package.files if item.id == file_id), None)
+    if file is None:
+        raise NotFoundError("spatial_scene_file", f"{fire_id}/{file_id}")
+    try:
+        content = build_object_store(settings).read_bytes(file.uri)
+    except ObjectStorageError as exc:
+        raise NotFoundError("spatial_scene_file", f"{fire_id}/{file_id}") from exc
+    return _public_scene_binary(
+        content=content,
+        media_type=file.media_type,
+        sha256=file.sha256,
+        if_none_match=if_none_match,
+        range_header=range_header,
     )
 
 

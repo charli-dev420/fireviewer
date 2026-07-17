@@ -11,12 +11,12 @@ sol. Il ne modifie jamais la géométrie exportée.
 
 ```powershell
 python tools/spatial-lidar-surface/fetch_orthophoto.py `
-  --source-project D:\Dev\Sandbox\c-est-l-approche-d-un `
+  --source-project D:\chemin\vers\les-sources-lidar `
   --tile-id DIE-08-T00-V33 `
   --output .artifacts/spatial-lidar-surface/sources/DIE-08-T00-V33-orthophoto-ign.tif
 
 python tools/spatial-lidar-surface/produce.py `
-  --source-project D:\Dev\Sandbox\c-est-l-approche-d-un `
+  --source-project D:\chemin\vers\les-sources-lidar `
   --workspace .artifacts/spatial-lidar-surface `
   --tile-id DIE-08-T00-V33 `
   --orthophoto .artifacts/spatial-lidar-surface/sources/DIE-08-T00-V33-orthophoto-ign.tif `
@@ -44,7 +44,7 @@ Production du socle complet :
 
 ```powershell
 python tools/spatial-lidar-surface/produce_far_domain.py `
-  --source-project D:\Dev\Sandbox\c-est-l-approche-d-un `
+  --source-project D:\chemin\vers\les-sources-lidar `
   --workspace .artifacts/spatial-lidar-surface `
   --force
 ```
@@ -53,7 +53,7 @@ Mise en cache d'une zone consultée :
 
 ```powershell
 python tools/spatial-lidar-surface/cache_near.py `
-  --source-project D:\Dev\Sandbox\c-est-l-approche-d-un `
+  --source-project D:\chemin\vers\les-sources-lidar `
   --workspace .artifacts/spatial-lidar-surface `
   --tile-id DIE-08-T00-V33
 ```

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -15,7 +16,9 @@ from prepare_global_05m import (
     RECEIPT_SCHEMA,
     SCHEMA,
     Global05mConfig,
+    _asset_lock,
     _atomic_write_json,
+    _lock_owner_is_alive,
     _selected_tiles,
     build_plan,
     completion_receipt,
@@ -249,6 +252,31 @@ def test_shared_elevation_cache_is_validated_and_downloaded_once(
     assert second["cache"] == "hit"
     assert calls == ["https://example.invalid/mnt"]
     assert not list((tmp_path / "sources").rglob("*.part"))
+
+
+def test_asset_lock_reclaims_a_dead_process_owner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "source.tif"
+    lock = tmp_path / ".source.tif.lock"
+    lock.write_text("pid=99999999\n", encoding="ascii")
+    monkeypatch.setattr(
+        "prepare_global_05m._lock_owner_is_alive", lambda _path: False
+    )
+
+    with _asset_lock(target, timeout_s=0.1):
+        assert lock.read_text(encoding="ascii") == f"pid={os.getpid()}\n"
+
+    assert not lock.exists()
+
+
+def test_lock_owner_probe_is_conservative_for_malformed_content(
+    tmp_path: Path,
+) -> None:
+    lock = tmp_path / ".source.tif.lock"
+    lock.write_text("not-a-pid\n", encoding="ascii")
+
+    assert _lock_owner_is_alive(lock) is None
 
 
 def test_orthophoto_cache_is_atomic_resumable_and_uses_visual_contract(

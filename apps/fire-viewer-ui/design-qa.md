@@ -21,16 +21,16 @@
 
 ## Preuves de rendu
 
-- `D:/Dev/project/fireviewer/.artifacts/account-desktop-v2.png`
-- `D:/Dev/project/fireviewer/.artifacts/settings-mobile-v2.png`
-- `D:/Dev/project/fireviewer/.artifacts/operation-desktop-v2.png`
-- `D:/Dev/project/fireviewer/.artifacts/privacy-desktop-v2.png`
-- `D:/Dev/project/fireviewer/.artifacts/accessibility-mobile-v2.png`
-- `D:/Dev/project/fireviewer/.artifacts/report-desktop-v3.png`
-- `D:/Dev/project/fireviewer/.artifacts/report-form-mobile-v5.png`
-- `D:/Dev/project/fireviewer/.artifacts/add-evidence-desktop-v3.png`
-- `D:/Dev/project/fireviewer/.artifacts/incident-error-mobile-v3.png`
-- `D:/Dev/project/fireviewer/.artifacts/public-menu-mobile-v4.png`
+- `.artifacts/account-desktop-v2.png`
+- `.artifacts/settings-mobile-v2.png`
+- `.artifacts/operation-desktop-v2.png`
+- `.artifacts/privacy-desktop-v2.png`
+- `.artifacts/accessibility-mobile-v2.png`
+- `.artifacts/report-desktop-v3.png`
+- `.artifacts/report-form-mobile-v5.png`
+- `.artifacts/add-evidence-desktop-v3.png`
+- `.artifacts/incident-error-mobile-v3.png`
+- `.artifacts/public-menu-mobile-v4.png`
 
 ## Résultat
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 import gzip
 import hashlib
 import json
@@ -387,20 +388,34 @@ def load_contract(config_path: Path) -> dict[str, Any]:
     ):
         raise ProductionError("expected_source_tile_count doit etre null ou positif")
     blender_requested = bool(execution.get("build_blender_scene", True))
+    near_lod_enabled = execution.get("near_lod_enabled", True)
+    if not isinstance(near_lod_enabled, bool):
+        raise ProductionError("execution.near_lod_enabled doit etre un booleen")
     blender_executable = execution.get("blender_executable")
     if blender_requested and not blender_executable:
         raise ProductionError(
             "blender_executable est obligatoire quand build_blender_scene vaut true"
         )
+    validation_paths: dict[str, Path] = {}
+    for field in ("unity_validation_receipt", "unity_preview_png"):
+        value = execution.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise ProductionError(f"execution.{field} est obligatoire")
+        validation_paths[field] = resolve_path(config_directory, value)
 
+    artifact_config = deepcopy(config)
+    artifact_config.get("execution", {}).pop("near_lod_enabled", None)
+    delivery_policy = {"near_lod_enabled": near_lod_enabled}
     return {
         "config_path": config_path,
         "config": config,
         "profile_path": profile_path,
         "profile": profile,
         "config_hash": canonical_hash(
-            config, profile, {"source_metadata": source_metadata}
+            artifact_config, profile, {"source_metadata": source_metadata}
         ),
+        "delivery_policy": delivery_policy,
+        "delivery_policy_hash": canonical_hash(delivery_policy),
         "zone": zone,
         "inputs": resolved_inputs,
         "attention_zones": normalized_attention,
@@ -418,7 +433,9 @@ def load_contract(config_path: Path) -> dict[str, Any]:
             else None
         ),
         "build_blender_scene": blender_requested,
+        "near_lod_enabled": near_lod_enabled,
         "expected_source_tile_count": expected_count,
+        **validation_paths,
     }
 
 
@@ -504,18 +521,22 @@ def build_stages(contract: Mapping[str, Any]) -> list[dict[str, Any]]:
     _append_paths(produce_command, "--exclude-lines", inputs["roads_l93"])
     _append_paths(produce_command, "--exclude-lines", inputs["water_courses_l93"])
     _append_paths(produce_command, "--exclude-lines", inputs["water_segments_l93"])
-    near_command = [
-        python,
-        str(BLENDER_DIRECTORY / "prepare_global_05m.py"),
-        "--output-root",
-        str(global_root),
-        "--download-workers",
-        str(limits["download_workers"]),
-        "--minimum-free-gib",
-        str(limits["minimum_free_gib"]),
-        "--all-near-orthophoto-tiles",
-        "--execute-near-orthophoto",
-    ]
+    near_command = (
+        [
+            python,
+            str(BLENDER_DIRECTORY / "prepare_global_05m.py"),
+            "--output-root",
+            str(global_root),
+            "--download-workers",
+            str(limits["download_workers"]),
+            "--minimum-free-gib",
+            str(limits["minimum_free_gib"]),
+            "--all-near-orthophoto-tiles",
+            "--execute-near-orthophoto",
+        ]
+        if contract["near_lod_enabled"]
+        else None
+    )
     far_command = [
         python,
         str(KIT_DIRECTORY / "build_far_rasters.py"),
@@ -673,6 +694,8 @@ def build_stages(contract: Mapping[str, Any]) -> list[dict[str, Any]]:
         "--batch-size",
         str(limits["unity_batch_size"]),
     ]
+    if not contract["near_lod_enabled"]:
+        unity_command.append("--disable-near-lod")
     validate_command = [
         python,
         str(UNITY_DIRECTORY / "validate_remote_catalog.py"),
@@ -694,11 +717,20 @@ def build_stages(contract: Mapping[str, Any]) -> list[dict[str, Any]]:
         str(contract["zone"]["zone_id"]),
         "--revision",
         str(contract["zone"]["revision"]),
+        "--unity-validation-receipt",
+        str(contract["unity_validation_receipt"]),
+        "--unity-preview-png",
+        str(contract["unity_preview_png"]),
     ]
     return [
         {"name": "plan_05m", "command": plan_command, "requires": []},
         {"name": "produce_05m", "command": produce_command, "requires": ["plan_05m"]},
-        {"name": "near_imagery", "command": near_command, "requires": ["produce_05m"]},
+        {
+            "name": "near_imagery",
+            "command": near_command,
+            "requires": ["produce_05m"],
+            "optional": not contract["near_lod_enabled"],
+        },
         {"name": "far_rasters", "command": far_command, "requires": ["produce_05m"]},
         {"name": "far_imagery", "command": imagery_command, "requires": ["plan_05m"]},
         {
@@ -767,6 +799,8 @@ def stage_artifact_complete(name: str, contract: Mapping[str, Any]) -> bool:
     if name == "near_imagery":
         if not stage_artifact_complete("produce_05m", contract):
             return False
+        if not contract["near_lod_enabled"]:
+            return True
         tiles = read_json(manifest_path).get("tiles", [])
         return bool(tiles) and all(
             tile.get("near_orthophoto_status", {}).get("state") == "ready"
@@ -824,9 +858,17 @@ def stage_artifact_complete(name: str, contract: Mapping[str, Any]) -> bool:
             return False
         catalog = read_json(path)
         manifest = read_json(manifest_path)
-        return catalog.get("schema") == "fireviewer.remote-tile-catalog.v1" and int(
-            catalog.get("exported_detail_tile_count", -1)
-        ) == len(manifest.get("tiles", []))
+        return (
+            catalog.get("schema") == "fireviewer.remote-tile-catalog.v1"
+            and int(catalog.get("exported_detail_tile_count", -1))
+            == len(manifest.get("tiles", []))
+            and bool(
+                catalog.get("lod_policy", {})
+                .get("detail", {})
+                .get("near_disabled", False)
+            )
+            is (not contract["near_lod_enabled"])
+        )
     if name == "site_upload":
         path = (
             root
@@ -834,9 +876,19 @@ def stage_artifact_complete(name: str, contract: Mapping[str, Any]) -> bool:
             / contract["zone"]["package_id"]
             / "package-manifest.json"
         )
-        return (
-            path.is_file()
-            and read_json(path).get("package_id") == contract["zone"]["package_id"]
+        receipt_path: Path = contract["unity_validation_receipt"]
+        preview_path: Path = contract["unity_preview_png"]
+        if not path.is_file() or not receipt_path.is_file() or not preview_path.is_file():
+            return False
+        receipt = read_json(receipt_path)
+        manual_validation = read_json(path).get("manual_unity_validation")
+        return bool(
+            read_json(path).get("package_id") == contract["zone"]["package_id"]
+            and receipt.get("decision") == "accepted"
+            and receipt.get("catalog_sha256")
+            == sha256_file(root / "unity-remote-catalog-v1-complete/catalog.json")
+            and receipt.get("preview_sha256") == sha256_file(preview_path)
+            and manual_validation == receipt
         )
     return False
 
@@ -876,6 +928,8 @@ def plan_record(
         "profile": str(contract["profile_path"]),
         "profile_id": contract["profile"]["profile_id"],
         "config_hash": contract["config_hash"],
+        "delivery_policy": contract["delivery_policy"],
+        "delivery_policy_hash": contract["delivery_policy_hash"],
         "artifact_root": str(contract["artifact_root"]),
         "aoi_bounds_l93_m": contract["aoi_bounds_l93_m"],
         "aoi_bounding_area_km2": contract["aoi_bounding_area_km2"],
@@ -904,6 +958,18 @@ def execute(
     state_path = root / ".production/state.json"
     root.mkdir(parents=True, exist_ok=True)
     state = load_state(state_path, str(contract["config_hash"]))
+    previous_delivery_hash = state.get("delivery_policy_hash")
+    if (
+        previous_delivery_hash not in (None, contract["delivery_policy_hash"])
+        and any(
+            state["stages"].get(name, {}).get("status") == "complete"
+            for name in ("near_imagery", "unity_catalog", "validate_catalog", "site_upload")
+        )
+    ):
+        raise ProductionError(
+            "la politique LOD a change apres la production des artefacts de livraison"
+        )
+    state["delivery_policy_hash"] = contract["delivery_policy_hash"]
     atomic_json(root / ".production/detail-zones.json", detail_zone_contract(contract))
     atomic_json(root / ".production/preflight.json", plan_record(contract, stages))
     selected_stages = (

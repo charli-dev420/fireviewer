@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     database_pool_recycle_seconds: int = Field(default=300, ge=30, le=3_600)
     database_statement_timeout_ms: int = Field(default=15_000, ge=1_000, le=120_000)
     database_schema_revision: str = Field(
-        default="e6f3a1b8c420",
+        default="d2a6e8f1b430",
         pattern=r"^[0-9a-f]{12}$",
     )
     log_level: str = "INFO"
@@ -95,13 +95,22 @@ class Settings(BaseSettings):
         "ce service ne remplace pas les secours."
     )
     public_report_rate_limit_per_day: int = Field(default=5, ge=1, le=25)
-    public_report_hash_secret: str = (
-        "development-only-public-report-secret-change-me"  # noqa: S105
-    )
+    public_report_hash_secret: str = "development-only-public-report-secret-change-me"  # noqa: S105
     corroboration_min_independent_proofs: int = Field(default=3, ge=3, le=20)
     model_generation_min_area_ha: float = Field(default=500.0, ge=1.0, le=1_000_000.0)
     raw_purge_delay_hours: int = Field(default=24, ge=1, le=24)
     unpublished_model_retention_days: int = Field(default=30, ge=1, le=365)
+    agent_dispatch_enabled: bool = False
+    agent_media_allowed_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1"])
+    agent_runpod_endpoint_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_-]{3,128}$")
+    agent_runpod_api_key: SecretStr | None = None
+    agent_runpod_base_url: HttpUrl = HttpUrl("https://api.runpod.ai")
+    agent_expected_model_revisions: dict[str, str] = Field(default_factory=dict)
+    agent_execution_timeout_ms: int = Field(default=900_000, ge=5_000, le=604_800_000)
+    agent_job_ttl_ms: int = Field(default=3_600_000, ge=10_000, le=604_800_000)
+    agent_poll_interval_seconds: int = Field(default=5, ge=2, le=300)
+    agent_dispatch_lease_seconds: int = Field(default=90, ge=30, le=900)
+    agent_dispatch_max_attempts: int = Field(default=3, ge=1, le=10)
 
     @model_validator(mode="after")
     def validate_security(self) -> "Settings":
@@ -137,6 +146,17 @@ class Settings(BaseSettings):
             raise ValueError("zone_upload_max_unpacked_bytes must cover the archive size limit")
         if self.environment == "production" and "*" in self.trusted_hosts:
             raise ValueError("Wildcard trusted host is forbidden in production")
+        if "*" in self.agent_media_allowed_hosts:
+            raise ValueError("Wildcard agent media host is forbidden")
+        if self.agent_dispatch_enabled and (
+            not self.agent_runpod_endpoint_id or not self.agent_runpod_api_key
+        ):
+            raise ValueError(
+                "agent_runpod_endpoint_id and agent_runpod_api_key are required "
+                "when dispatch is enabled"
+            )
+        if self.agent_execution_timeout_ms > self.agent_job_ttl_ms:
+            raise ValueError("agent_job_ttl_ms must cover agent_execution_timeout_ms")
         if (
             self.environment in {"staging", "production"}
             and len(self.public_report_hash_secret) < 32

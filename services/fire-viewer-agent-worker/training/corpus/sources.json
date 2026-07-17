@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-07-16",
+  "sources": [
+    {
+      "source_id": "pyro_sdis_a1e553e",
+      "status": "approved",
+      "purpose": "French wildfire smoke positives and fixed-camera negatives",
+      "repository": "pyronear/pyro-sdis",
+      "revision": "a1e553ec4d806f71fc6db744cc22bc3469487382",
+      "expected_rows": 33636,
+      "license": "Apache-2.0",
+      "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+      "source_url": "https://huggingface.co/datasets/pyronear/pyro-sdis",
+      "class_map": {"1": "smoke_visible"},
+      "split_policy": "partner_camera_holdout",
+      "acquisition": "huggingface_snapshot"
+    },
+    {
+      "source_id": "fasdd_v9",
+      "status": "acquired_locally_curated",
+      "purpose": "Flame, smoke, UAV and confusing negative expansion",
+      "dataset_id": "ce9c9400b44148e1b0a749f5c3eb0bda",
+      "version": "9.0.0",
+      "doi": "10.57760/sciencedb.j00104.00103",
+      "declared_bytes": 82125550221,
+      "selected_archive_bytes": 31921782564,
+      "expected_rows": 122634,
+      "retained_rows": 122450,
+      "exact_duplicate_rows_removed": 184,
+      "manifest_sha256": "e8c8536de79bcb6c5f62c7f35a788e41a1684cf6b4641c363f79980a19561339",
+      "license": "CC-BY-SA-4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "source_url": "https://www.scidb.cn/en/detail?dataSetId=ce9c9400b44148e1b0a749f5c3eb0bda",
+      "class_map": {"fire": "flame_visible", "smoke": "smoke_visible"},
+      "split_policy": "balanced_sequence_components_with_rgb32q5_visual_duplicate_links",
+      "acquisition": "official_selected_domain_archives_curated",
+      "selected_archives": ["FASDD_CV.zip", "FASDD_RS.zip", "FASDD_UAV.zip"],
+      "discarded_archives": ["FASDD.zip", "FASDD_RS_RAW.zip", "FASDD_RS_SWIR.zip"],
+      "local_storage_policy": "Verified source archives deleted after curation; only hash-addressed RGB media, COCO-derived manifest and provenance reports retained"
+    },
+    {
+      "source_id": "commons_corbieres_2025",
+      "status": "approved_for_candidate_acquisition",
+      "purpose": "Fire and response imagery paired with an explicit source event in Massif des Corbieres",
+      "source_url": "https://commons.wikimedia.org/wiki/Category:2025_Massif_des_Corbi%C3%A8res_wildfire",
+      "expected_direct_files_at_review": 61,
+      "license": "per-file-open-license",
+      "license_policy": "Allowlisted CC0, Public Domain, CC BY or CC BY-SA only; preserve per-file attribution",
+      "split_policy": "event_holdout",
+      "acquisition": "wikimedia_api_per_file_license_gate"
+    },
+    {
+      "source_id": "commons_firefighting_aircraft_france",
+      "status": "approved_for_candidate_acquisition",
+      "purpose": "French firefighting aircraft annotation candidates",
+      "source_url": "https://commons.wikimedia.org/wiki/Category:Firefighting_aircraft_in_France",
+      "license": "per-file-open-license",
+      "license_policy": "Allowlisted CC0, Public Domain, CC BY or CC BY-SA only; preserve per-file attribution",
+      "split_policy": "file_series_or_uploader_holdout_after_annotation",
+      "acquisition": "wikimedia_api_per_file_license_gate"
+    },
+    {
+      "source_id": "commons_dfci_vehicles",
+      "status": "approved_for_candidate_acquisition",
+      "purpose": "Operational DFCI vehicle annotation candidates",
+      "source_url": "https://commons.wikimedia.org/wiki/Category:Firefighting_vehicles_of_DFCI",
+      "expected_direct_files_at_review": 22,
+      "license": "per-file-open-license",
+      "license_policy": "Allowlisted CC0, Public Domain, CC BY or CC BY-SA only; preserve per-file attribution",
+      "split_policy": "file_series_or_uploader_holdout_after_annotation",
+      "acquisition": "wikimedia_api_per_file_license_gate"
+    },
+    {
+      "source_id": "commons_wildfires_france_2022",
+      "status": "approved_for_candidate_acquisition",
+      "purpose": "French wildfire flame, smoke and hard-negative annotation candidates",
+      "source_url": "https://commons.wikimedia.org/wiki/Category:2022_wildfires_in_France",
+      "license": "per-file-open-license",
+      "license_policy": "Allowlisted CC0, Public Domain, CC BY or CC BY-SA only; preserve per-file attribution",
+      "split_policy": "event_holdout",
+      "acquisition": "wikimedia_api_per_file_license_gate"
+    },
+    {
+      "source_id": "commons_wildfires_france_2021",
+      "status": "approved_for_candidate_acquisition",
+      "purpose": "French wildfire, burn-scar and hard-negative candidates, including Massif de la Clape and Maury",
+      "source_url": "https://commons.wikimedia.org/wiki/Category:2021_wildfires_in_France",
+      "expected_direct_files_at_review": 15,
+      "license": "per-file-open-license",
+      "license_policy": "Allowlisted CC0, Public Domain, CC BY or CC BY-SA only; preserve per-file attribution",
+      "split_policy": "event_or_file_series_holdout_after_annotation",
+      "acquisition": "wikimedia_api_per_file_license_gate"
+    },
+    {
+      "source_id": "commons_wildfires_france_2023",
+      "status": "approved_for_candidate_acquisition",
+      "purpose": "French wildfire and burn-scar candidates with explicit Pyrenees-Orientales source context",
+      "source_url": "https://commons.wikimedia.org/wiki/Category:2023_wildfires_in_France",
+      "expected_direct_files_at_review": 3,
+      "license": "per-file-open-license",
+      "license_policy": "Allowlisted CC0, Public Domain, CC BY or CC BY-SA only; preserve per-file attribution",
+      "split_policy": "event_or_file_series_holdout_after_annotation",
+      "acquisition": "wikimedia_api_per_file_license_gate"
+    },
+    {
+      "source_id": "commons_firefighting_vehicles_france",
+      "status": "approved_for_candidate_acquisition",
+      "purpose": "Additional French firefighting vehicle annotation candidates outside the DFCI-only lot",
+      "source_url": "https://commons.wikimedia.org/wiki/Category:Firefighting_vehicles_in_France",
+      "expected_direct_files_at_review": 21,
+      "license": "per-file-open-license",
+      "license_policy": "Allowlisted CC0, Public Domain, CC BY or CC BY-SA only; preserve per-file attribution",
+      "split_policy": "file_series_or_uploader_holdout_after_annotation",
+      "acquisition": "wikimedia_api_per_file_license_gate"
+    },
+    {
+      "source_id": "ign_debroussaillement_2026",
+      "status": "approved_for_spatial_join_not_downloaded",
+      "purpose": "Authoritative national geometry for forest areas subject to legal brush-clearing obligations",
+      "source_url": "https://www.data.gouv.fr/datasets/debroussaillement",
+      "license": "Licence-Ouverte-2.0",
+      "license_url": "https://www.etalab.gouv.fr/licence-ouverte-open-licence/",
+      "acquisition": "official_ign_archive_only",
+      "usage_constraint": "Spatial context only; does not turn a source event label into an exact fire coordinate"
+    },
+    {
+      "source_id": "anct_massifs_cog2021",
+      "status": "acquired_reference",
+      "purpose": "Official commune-to-massif membership for controlled future spatial joins",
+      "source_url": "https://www.data.gouv.fr/datasets/les-perimetres-de-massifs",
+      "resource_url": "https://static.data.gouv.fr/resources/les-perimetres-de-massifs/20210907-123330/diffusion-zonages-massifs-cog2021.xls",
+      "resource_sha1": "7f31890d29a03ab2c8e65841296b8d5fc23fe007",
+      "license": "Licence-Ouverte-2.0",
+      "license_url": "https://www.etalab.gouv.fr/licence-ouverte-open-licence/",
+      "reference_version": "COG-2021",
+      "acquisition": "official_data_gouv_resource",
+      "usage_constraint": "Commune membership only; requires a separately pinned COG 2021 commune geometry for point-in-polygon joins"
+    },
+    {
+      "source_id": "datacluster_sample_2026",
+      "status": "rejected",
+      "purpose": "Documented exclusion",
+      "license": "restricted-commercial-sample",
+      "source_url": "https://huggingface.co/datasets/Dataclusterlabspvtltd/Fire-and-Smoke-Dataset",
+      "rejection_reason": "Commercial training and redistribution are explicitly forbidden"
+    }
+  ]
+}

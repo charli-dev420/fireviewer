@@ -1,0 +1,47 @@
+{
+  "schema": "fireviewer.france-map-production.v1",
+  "quality_profile": "../../profiles/unity-v1-accepted.json",
+  "zone": {
+    "zone_id": "FONTAINEBLEAU-FOREST-01",
+    "revision": 1,
+    "package_id": "fireviewer-fontainebleau-forest-r1-v1",
+    "artifact_slug": "fontainebleau-forest-r1-v1",
+    "label": "Forêt de Fontainebleau — EMSR894 — juillet 2026",
+    "origin_l93_m": [669564.773, 6809985.915, 90.0]
+  },
+  "inputs": {
+    "aoi_l93": "../../../../../.artifacts/spatial-lidar-surface/fontainebleau-forest-r1-v1/sources/aoi.l93.geojson",
+    "production_envelope_l93": "../../../../../.artifacts/spatial-lidar-surface/fontainebleau-forest-r1-v1/sources/production-envelope.l93.geojson",
+    "buildings_l93": "../../../../../.artifacts/spatial-lidar-surface/fontainebleau-forest-r1-v1/sources/buildings.l93.geojson",
+    "vegetation_l93": "../../../../../.artifacts/spatial-lidar-surface/fontainebleau-forest-r1-v1/sources/vegetation.l93.geojson",
+    "roads_l93": [
+      "../../../../../.artifacts/spatial-lidar-surface/fontainebleau-forest-r1-v1/sources/roads.l93.geojson"
+    ],
+    "water_courses_l93": [
+      "../../../../../.artifacts/spatial-lidar-surface/fontainebleau-forest-r1-v1/sources/water-courses.l93.geojson"
+    ],
+    "water_segments_l93": [
+      "../../../../../.artifacts/spatial-lidar-surface/fontainebleau-forest-r1-v1/sources/water-segments.l93.geojson"
+    ],
+    "water_surfaces_l93": [
+      "../../../../../.artifacts/spatial-lidar-surface/fontainebleau-forest-r1-v1/sources/water-surfaces.l93.geojson"
+    ]
+  },
+  "attention_zones": [
+    {
+      "id": "emsr894-aoi01-centre",
+      "label": "Centre de l'AOI officielle EMSR894",
+      "bounds_l93_m": [668564.773, 6808985.915, 670564.773, 6810985.915]
+    }
+  ],
+  "execution": {
+    "artifact_root": "../../../../../.artifacts/spatial-lidar-surface/fontainebleau-forest-r1-v1",
+    "python_executable": "python",
+    "blender_executable": null,
+    "build_blender_scene": false,
+    "near_lod_enabled": false,
+    "expected_source_tile_count": 208,
+    "unity_validation_receipt": "../../../../../.artifacts/spatial-lidar-surface/fontainebleau-forest-r1-v1/unity-validation-receipt.json",
+    "unity_preview_png": "../../../../../.artifacts/spatial-lidar-surface/fontainebleau-forest-r1-v1/unity-validation-preview.png"
+  }
+}

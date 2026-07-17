@@ -1,9 +1,16 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { loadPublicIncidentView, type PublicIncidentView } from '../../lib/publicIncidentView';
+import { getViewerManifestApiOrigin } from '../../lib/manifestClient';
 import type { ViewerManifestStatusCode, ViewerManifestSummary } from '../../lib/viewerManifest';
 import { IncidentGlbViewer } from './IncidentGlbViewer';
 import { PublicIcon, type PublicIconName } from './PublicIcon';
+import type { TiledSceneViewPreset } from './TiledSpatialScene3D';
 import './public-incident.css';
+
+const TiledSpatialScene3D = lazy(async () => {
+  const module = await import('./TiledSpatialScene3D');
+  return { default: module.TiledSpatialScene3D };
+});
 
 type MainView = 'three-d' | 'information' | 'safety' | 'statistics';
 type SidePanel = 'media' | 'comments' | 'episodes' | null;
@@ -101,11 +108,26 @@ function StatisticsView({ view }: { readonly view: PublicIncidentView | null }) 
 }
 
 function ViewerView({ view, summary, lowData }: { readonly view: PublicIncidentView | null; readonly summary: ViewerManifestSummary; readonly lowData: boolean }) {
+  const [viewPreset, setViewPreset] = useState<TiledSceneViewPreset>('near');
+  const tiledSource = useMemo(() => {
+    if (!summary.scene) return null;
+    const apiOrigin = getViewerManifestApiOrigin() ?? window.location.origin;
+    return {
+      catalogUrl: new URL(summary.scene.catalog_url, apiOrigin).toString(),
+      files: Object.fromEntries(summary.scene.files.map((file) => [file.path, new URL(file.url, apiOrigin).toString()])),
+    };
+  }, [summary.scene]);
   if (lowData) return <section className="fw-viewer-fallback"><PublicIcon name="data" size={32} /><h2>Mode faible connexion actif</h2><p>La 3D n’est pas chargée automatiquement. Les informations, gestes et statistiques restent accessibles.</p></section>;
-  if (summary.modelState !== 'available' || !summary.asset) return <section className="fw-viewer-fallback"><PublicIcon name="map" size={32} /><h2>Représentation 3D indisponible</h2><p>La fiche reste utilisable sans le modèle. Dernière information disponible : {formatDate(view?.freshness_at ?? summary.freshness.incident_at)}.</p></section>;
+  if (summary.modelState !== 'available' || (!summary.asset && !summary.scene)) return <section className="fw-viewer-fallback"><PublicIcon name="map" size={32} /><h2>Représentation 3D indisponible</h2><p>La fiche reste utilisable sans le modèle. Dernière information disponible : {formatDate(view?.freshness_at ?? summary.freshness.incident_at)}.</p></section>;
   return <div className="fw-incident-viewer">
-    <div className="fw-viewer-distance" aria-label="Distance de la représentation"><button type="button" className="is-active">Zone proche</button><button type="button">Secteur local</button><button type="button">Vue étendue</button></div>
-    <IncidentGlbViewer assetUrl={summary.asset.url} version={summary.asset.version} sha256={summary.asset.sha256} frame={summary.frame} terrainSourceYear={summary.freshness.terrain_source_year} observations={view?.observations ?? []} />
+    <div className="fw-viewer-distance" aria-label="Distance de la représentation">
+      {([
+        ['near', 'Zone proche'],
+        ['local', 'Secteur local'],
+        ['extended', 'Vue étendue'],
+      ] as const).map(([preset, label]) => <button key={preset} type="button" className={viewPreset === preset ? 'is-active' : undefined} aria-pressed={viewPreset === preset} onClick={() => setViewPreset(preset)}>{label}</button>)}
+    </div>
+    {tiledSource ? <Suspense fallback={<div className="incident-tiled-scene__loading" role="status">Initialisation du moteur cartographique 3D…</div>}><TiledSpatialScene3D source={tiledSource} overlayOriginWgs84={summary.frame?.origin_wgs84} viewPreset={viewPreset} /></Suspense> : summary.asset ? <IncidentGlbViewer assetUrl={summary.asset.url} version={summary.asset.version} sha256={summary.asset.sha256} frame={summary.frame} terrainSourceYear={summary.freshness.terrain_source_year} observations={view?.observations ?? []} /> : null}
     <footer><span>Représentation : {formatDate(summary.freshness.generated_at)}</span><span>Nord et échelle visibles dans le viewer</span></footer>
   </div>;
 }

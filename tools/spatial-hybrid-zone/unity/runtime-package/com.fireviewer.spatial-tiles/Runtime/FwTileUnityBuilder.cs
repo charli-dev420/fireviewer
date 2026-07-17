@@ -666,13 +666,18 @@ namespace FireViewer.SpatialTiles
 
             Camera camera = streaming?.ViewerCamera ?? Camera.main;
             float scale = Mathf.Max(0.0001f, Mathf.Abs(transform.lossyScale.x));
-            bool forceNearBand = string.Equals(streaming?.Telemetry?.lod_band, "near", StringComparison.Ordinal);
+            bool nearLodDisabled = streaming?.NearLodDisabled == true;
+            bool forceNearBand = !nearLodDisabled && string.Equals(streaming?.Telemetry?.lod_band, "near", StringComparison.Ordinal);
             foreach (TreeBatch batch in batches)
             {
                 float distanceMetres = camera == null
                     ? 0f
                     : Vector3.Distance(camera.transform.position, transform.TransformPoint(batch.LocalCentre)) / scale;
-                if (forceNearBand)
+                if (nearLodDisabled)
+                {
+                    batch.UseNear = false;
+                }
+                else if (forceNearBand)
                 {
                     batch.UseNear = true;
                 }

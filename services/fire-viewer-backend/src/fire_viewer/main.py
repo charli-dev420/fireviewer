@@ -10,6 +10,7 @@ from prometheus_client import Info, make_asgi_app
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from fire_viewer.api.admin_v2 import router as admin_v2_router
+from fire_viewer.api.agent_batches import router as agent_batches_router
 from fire_viewer.api.errors import install_exception_handlers
 from fire_viewer.api.health import router as health_router
 from fire_viewer.api.middleware import (
@@ -89,6 +90,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health_router)
     app.include_router(api_router, prefix=settings.api_prefix)
     app.include_router(admin_v2_router)
+    app.include_router(agent_batches_router)
     app.mount("/metrics", make_asgi_app())
 
     default_openapi = app.openapi

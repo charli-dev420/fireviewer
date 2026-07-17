@@ -372,7 +372,15 @@ def _create_verified_publication(
 
 def _assert_required_preview_files(package: SpatialPackage) -> None:
     kinds = {file.kind for file in package.files}
-    required = {SpatialPackageFileKind.PNG, SpatialPackageFileKind.GLB}
+    tiled_kinds = {
+        SpatialPackageFileKind.FWTILE,
+        SpatialPackageFileKind.FWTERRAIN,
+    }
+    required = (
+        {SpatialPackageFileKind.PNG, *tiled_kinds}
+        if kinds.intersection(tiled_kinds)
+        else {SpatialPackageFileKind.PNG, SpatialPackageFileKind.GLB}
+    )
     missing = sorted(kind.value for kind in required.difference(kinds))
     if missing:
         raise ConflictError(
@@ -417,6 +425,14 @@ def validate_spatial_package(
         "status": "passed",
         "scope": "registered-metadata-and-immutable-inventory",
         "checks": ["manifest-metadata", "immutable-file-inventory", "preview-assets"],
+        "scene_kind": (
+            "remote_tiles"
+            if {
+                SpatialPackageFileKind.FWTILE,
+                SpatialPackageFileKind.FWTERRAIN,
+            }.issubset({file.kind for file in package.files})
+            else "single_asset"
+        ),
         "package_id": package.package_id,
     }
     package.verified_at = utcnow()

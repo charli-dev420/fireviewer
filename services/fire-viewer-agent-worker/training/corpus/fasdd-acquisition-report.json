@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-16",
+  "source_id": "fasdd_v9",
+  "source_url": "https://www.scidb.cn/en/detail?dataSetId=ce9c9400b44148e1b0a749f5c3eb0bda",
+  "version": "9.0.0",
+  "license": "CC-BY-SA-4.0",
+  "selected_archives": [
+    {
+      "lot": "CV",
+      "filename": "FASDD_CV.zip",
+      "bytes": 12326081298,
+      "md5": "da5e1410e13113fc9d605567aea54508",
+      "source_rows": 95314,
+      "retained_rows": 95164,
+      "exact_duplicates_removed": 150,
+      "quality_fixes": {
+        "accepted_negative_dimension_mismatch": 7,
+        "clamped_one_pixel_bbox": 138,
+        "dropped_non_positive_bbox": 3
+      }
+    },
+    {
+      "lot": "RS",
+      "filename": "FASDD_RS.zip",
+      "bytes": 4707516376,
+      "md5": "42d07b005f99f6903f5c1610fb1a5bbb",
+      "source_rows": 2223,
+      "retained_rows": 2216,
+      "exact_duplicates_removed": 7,
+      "quality_fixes": {}
+    },
+    {
+      "lot": "UAV",
+      "filename": "FASDD_UAV.zip",
+      "bytes": 14888184890,
+      "md5": "c5ea9651ca672fc128c6f17d0797c2f2",
+      "source_rows": 25097,
+      "retained_rows": 25070,
+      "exact_duplicates_removed": 27,
+      "quality_fixes": {
+        "dropped_non_positive_bbox": 1
+      }
+    }
+  ],
+  "discarded_archives": {
+    "FASDD.zip": "Duplicate aggregate of the selected domain archives",
+    "FASDD_RS_RAW.zip": "Raw remote-sensing payload not required for RGB detector training",
+    "FASDD_RS_SWIR.zip": "Spectral domain differs from the deployed RGB input"
+  },
+  "discarded_annotation_representations": ["YOLO", "VOC", "TDML"],
+  "source_rows": 122634,
+  "retained_rows": 122450,
+  "exact_duplicates_removed": 184,
+  "negative_rows": 51974,
+  "annotation_counts": {
+    "flame_visible": 109556,
+    "smoke_visible": 72958
+  },
+  "split_counts": {
+    "train": 85712,
+    "validation": 18369,
+    "test": 18369
+  },
+  "visual_fingerprint_version": "rgb32q5-v1",
+  "visual_duplicate_links": 232,
+  "cross_split_visual_duplicates": 0,
+  "manifest_sha256": "e8c8536de79bcb6c5f62c7f35a788e41a1684cf6b4641c363f79980a19561339",
+  "files_verified": true,
+  "source_archives_retained": false
+}

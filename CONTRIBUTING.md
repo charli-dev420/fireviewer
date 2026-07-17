@@ -23,6 +23,9 @@ Tout code soumis à ce dépôt est proposé sous **AGPL-3.0-or-later**. Toute do
 - Gardez les changements concentrés : n'introduisez ni données réelles, ni dépendance non justifiée, ni asset généré non traçable.
 - Exécutez les contrôles ciblés disponibles et indiquez explicitement ceux qui n'ont pas été exécutés.
 - Vérifiez que `git status` ne contient pas de `.env`, base locale, build, cache ou archive ZIP reçue.
+- Exécutez un détecteur de secrets sur le diff et l'historique avant une publication publique.
+- Utilisez une adresse Git de type `noreply` si votre adresse personnelle ne doit pas apparaître dans l'historique public.
+- Inscrivez chaque image, document binaire ou média dans [ASSET_PROVENANCE.md](ASSET_PROVENANCE.md) avec sa licence et sa preuve d'origine.
 
 ## Convention de sécurité
 

@@ -68,9 +68,14 @@
 .fw-incident-metric small { width: fit-content; padding: 3px 6px; border-radius: 3px; color: #8e3217; background: #ffede4; font-size: .62rem; font-weight: 800; }
 
 .fw-incident-viewer { overflow: hidden; border: 1px solid #203747; border-radius: 8px; background: #061624; }
+.incident-tiled-scene { position: relative; min-height: 520px; }
+.incident-tiled-scene__canvas { width: 100%; height: 520px; }
+.incident-tiled-scene__canvas canvas { display: block; width: 100%; height: 100%; }
+.incident-tiled-scene__status { position: absolute; right: 12px; bottom: 12px; padding: 6px 9px; border-radius: 4px; color: #fff; background: rgb(4 20 33 / 82%); font-size: .68rem; }
+.incident-tiled-scene__status.is-error { background: #8e3217; }
 .fw-viewer-distance { display: flex; padding: 9px; gap: 5px; }
-.fw-viewer-distance button { padding: 7px 11px; border: 1px solid #51636f; border-radius: 4px; color: #d7e0e5; background: transparent; font-size: .68rem; cursor: pointer; }
-.fw-viewer-distance button.is-active { color: #fff; border-color: var(--fw-orange); background: var(--fw-orange); }
+.fw-incident-viewer .fw-viewer-distance button { padding: 7px 11px; border: 1px solid #51636f; border-radius: 4px; color: #d7e0e5; background: transparent; font-size: .68rem; cursor: pointer; }
+.fw-incident-viewer .fw-viewer-distance button.is-active { color: #fff; border-color: var(--fw-orange); background: var(--fw-orange); }
 .fw-incident-viewer > footer { display: flex; padding: 9px 12px; justify-content: space-between; gap: 12px; color: #bdc9d0; font-size: .65rem; }
 .fw-viewer-fallback { display: grid; min-height: 370px; place-items: center; align-content: center; padding: 30px; color: #d9e2e7; background: #061624; text-align: center; }
 .fw-viewer-fallback svg { color: var(--fw-orange); }

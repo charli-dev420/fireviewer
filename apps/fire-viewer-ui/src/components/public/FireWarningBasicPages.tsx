@@ -213,5 +213,42 @@ export function LegalPage() {
 }
 
 export function AboutPage() {
-  return <><PageHero visual="about" title="À propos de FireWarning" description="Un outil libre et communautaire pour rendre l’information sur les incendies plus lisible, sans se substituer aux secours." /><div className="fw-page fw-standard-page"><div className="fw-about-grid"><Checklist positive title="Notre objectif" items={['Une page publique unique par incendie.', 'Une information claire sur mobile.', 'Des contributions modérées avant publication.', 'Une architecture ouverte et documentée.']} /><Checklist positive={false} title="Nos limites" items={['Aucune alerte directe aux secours.', 'Aucune consigne officielle produite par la plateforme.', 'Aucune publication automatique des médias utilisateurs.', 'Aucune garantie d’exhaustivité en temps réel.']} /></div></div></>;
+  const commitments: readonly { icon: PublicIconName; title: string; text: string }[] = [
+    { icon: 'flame', title: 'Une page par incendie', text: 'Chaque événement publié dispose d’une page permanente qui rassemble sa représentation 3D, ses zones et ses informations utiles.' },
+    { icon: 'monitor', title: 'Pensé d’abord pour le mobile', text: 'Les informations essentielles restent lisibles rapidement, même lorsque la 3D est désactivée ou que la connexion est limitée.' },
+    { icon: 'shield', title: 'Une publication contrôlée', text: 'Les contributions sont vérifiées avant publication. Les images utilisateurs ne sont affichées qu’avec un consentement explicite.' },
+  ];
+
+  return (
+    <>
+      <PageHero visual="about" title="À propos de FireWarning" description="Un outil libre et communautaire pour rendre l’information sur les incendies plus lisible, sans se substituer aux secours." />
+      <div className="fw-page fw-standard-page fw-about-page">
+        <div className="fw-about-grid">
+          <Checklist positive title="Notre objectif" items={['Une page publique unique par incendie.', 'Une information claire sur mobile.', 'Des contributions modérées avant publication.', 'Une architecture ouverte et documentée.']} />
+          <Checklist positive={false} title="Nos limites" items={['Aucune alerte directe aux secours.', 'Aucune consigne officielle produite par la plateforme.', 'Aucune publication automatique des médias utilisateurs.', 'Aucune garantie d’exhaustivité en temps réel.']} />
+        </div>
+        <section className="fw-about-commitments" aria-labelledby="fw-about-commitments-title">
+          <div className="fw-about-commitments__heading">
+            <span>Notre approche</span>
+            <h2 id="fw-about-commitments-title">Trois engagements concrets</h2>
+            <p>Une interface publique sobre, utile en mobilité et honnête sur les limites des informations disponibles.</p>
+          </div>
+          <div className="fw-about-commitments__grid">
+            {commitments.map((commitment) => (
+              <article key={commitment.title}>
+                <div><PublicIcon name={commitment.icon} size={25} /></div>
+                <h3>{commitment.title}</h3>
+                <p>{commitment.text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+        <aside className="fw-about-actions">
+          <div><PublicIcon name="info" size={27} /><p><strong>Comprendre avant d’utiliser</strong><span>Découvrez le parcours d’une observation jusqu’à la page publique d’un incendie.</span></p></div>
+          <a className="fw-button fw-button--outline" href="/comment-ca-fonctionne">Comment ça fonctionne ? <PublicIcon name="arrow" size={16} /></a>
+          <a className="fw-button fw-button--primary" href="/incendies">Voir les incendies en cours <PublicIcon name="arrow" size={16} /></a>
+        </aside>
+      </div>
+    </>
+  );
 }

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "source_id": "pyro_sdis_a1e553e",
+  "source_revision": "a1e553ec4d806f71fc6db744cc22bc3469487382",
+  "source_rows": 33636,
+  "rows": 32594,
+  "training_rows": 32594,
+  "manifest_sha256": "5a0222e425d5bb116a7e772014d9130f347e28ba76686d412cc11afc4960292a",
+  "files_verified": true,
+  "exact_duplicates_removed": 1042,
+  "near_duplicates_flagged_before_reconciliation": 27529,
+  "cross_split_near_duplicates_before_reconciliation": 58,
+  "cross_split_near_duplicates": 0,
+  "missing_near_duplicate_references": 0,
+  "negative_rows": 5320,
+  "annotation_counts": {
+    "smoke_visible": 31129
+  },
+  "split_counts": {
+    "test": 5537,
+    "train": 21737,
+    "validation": 5320
+  },
+  "split_group_counts": {
+    "test": 8,
+    "train": 22,
+    "validation": 10
+  },
+  "split_leakage_groups": 0,
+  "split_reconciliation": {
+    "merged_group_components": 4,
+    "reassigned_rows": 7500
+  },
+  "four_class_training_ready": false,
+  "missing_target_classes": [
+    "fire_response_vehicle_visible",
+    "firefighting_aircraft_visible",
+    "flame_visible"
+  ]
+}

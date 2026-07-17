@@ -31,6 +31,9 @@
     "python_executable": "python",
     "blender_executable": "C:/Program Files/Blender Foundation/Blender 4.5/blender.exe",
     "build_blender_scene": true,
-    "expected_source_tile_count": null
+    "near_lod_enabled": true,
+    "expected_source_tile_count": null,
+    "unity_validation_receipt": "../../../.artifacts/spatial-lidar-surface/zone-fr-exemple-r1/unity-validation-receipt.json",
+    "unity_preview_png": "../../../.artifacts/spatial-lidar-surface/zone-fr-exemple-r1/unity-validation-preview.png"
   }
 }

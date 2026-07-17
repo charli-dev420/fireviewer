@@ -12,6 +12,7 @@ license = { text = "AGPL-3.0-or-later" }
 authors = [{ name = "Fire-Viewer contributors" }]
 dependencies = [
   "fastapi==0.128.2",
+  "httpx==0.28.1",
   "uvicorn[standard]==0.48.0",
   "SQLAlchemy==2.0.50",
   "alembic==1.18.4",
@@ -22,6 +23,7 @@ dependencies = [
   "PyJWT[crypto]==2.13.0",
   "prometheus-client==0.25.0",
   "pyproj==3.7.2",
+  "shapely==2.1.2",
 ]
 
 [project.optional-dependencies]
@@ -41,6 +43,7 @@ fire-viewer-backup = "fire_viewer.scripts.backup_sqlite:main"
 fire-viewer-restore = "fire_viewer.scripts.restore_sqlite:main"
 fire-viewer-check-migrations = "fire_viewer.scripts.check_migrations:main"
 fire-viewer-hash-admin-password = "fire_viewer.scripts.hash_admin_password:main"
+fire-viewer-agent-dispatcher = "fire_viewer.scripts.run_agent_dispatcher:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -87,4 +90,8 @@ exclude = ["migrations/"]
 
 [[tool.mypy.overrides]]
 module = ["prometheus_client.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["shapely.*"]
 ignore_missing_imports = true

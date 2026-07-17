@@ -32,6 +32,19 @@ from fire_viewer.domain.errors import (
     NotFoundError,
     UnauthorizedError,
 )
+from fire_viewer.domain.incident_spatial_schemas import (
+    ActiveFireZoneMergeRequest,
+    ActiveFireZoneReviewRequest,
+    ActiveFireZoneRevisionCreateRequest,
+    AdminActiveFireZoneRevision,
+    AdminAgentReviewPackage,
+    AdminIncidentSpatialMarker,
+    AdminIncidentSpatialReviewWorkspace,
+    AgentReviewResolutionRequest,
+    IncidentGltfPickRequest,
+    IncidentGltfPickResponse,
+    IncidentMarkerReviewRequest,
+)
 from fire_viewer.domain.schemas import (
     AdminAuditListResponse,
     AdminBlobUploadGrantRequest,
@@ -96,6 +109,17 @@ from fire_viewer.services.blob_uploads import (
     ALLOWED_PACKAGE_CONTENT_TYPES,
     create_blob_upload_grant,
     issue_blob_client_token,
+)
+from fire_viewer.services.incident_spatial_review import (
+    create_zone_revision as create_active_zone_revision_service,
+)
+from fire_viewer.services.incident_spatial_review import (
+    get_spatial_review_workspace,
+    merge_zone_revisions,
+    project_gltf_pick,
+    resolve_agent_review,
+    review_marker,
+    review_zone_revision,
 )
 from fire_viewer.services.public_incident_view import list_public_reports, review_public_report
 from fire_viewer.services.spatial_package_blob_import import (
@@ -431,6 +455,141 @@ def get_incident_models_pipeline(
     _require_admin(actor)
     _set_admin_read_headers(response)
     return get_admin_incident_models_pipeline_service(session, fire_id=fire_id)
+
+
+@router.get(
+    "/incidents/{fire_id}/spatial-review",
+    response_model=AdminIncidentSpatialReviewWorkspace,
+)
+def get_incident_spatial_review(
+    fire_id: str,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+) -> AdminIncidentSpatialReviewWorkspace:
+    """Current immutable scene plus private marker and active-zone overlay revisions."""
+    _require_admin(actor)
+    _set_admin_read_headers(response)
+    return get_spatial_review_workspace(session, fire_id=fire_id)
+
+
+@router.post(
+    "/incidents/{fire_id}/spatial-review/project-pick",
+    response_model=IncidentGltfPickResponse,
+)
+def project_incident_spatial_pick(
+    fire_id: str,
+    payload: IncidentGltfPickRequest,
+    actor: ActorDep,
+    session: SessionDep,
+) -> IncidentGltfPickResponse:
+    _require_admin(actor)
+    return project_gltf_pick(session, fire_id=fire_id, payload=payload)
+
+
+@router.post(
+    "/incidents/{fire_id}/spatial-markers/{marker_id}/review",
+    response_model=AdminIncidentSpatialMarker,
+)
+def review_incident_spatial_marker(
+    fire_id: str,
+    marker_id: str,
+    payload: IncidentMarkerReviewRequest,
+    actor: ActorDep,
+    session: SessionDep,
+    trace_id: TraceIdDep,
+) -> AdminIncidentSpatialMarker:
+    _require_admin(actor)
+    return review_marker(
+        session,
+        fire_id=fire_id,
+        marker_id=marker_id,
+        payload=payload,
+        actor=actor,
+        trace_id=trace_id,
+    )
+
+
+@router.post(
+    "/incidents/{fire_id}/active-zone-revisions",
+    response_model=AdminActiveFireZoneRevision,
+    status_code=201,
+)
+def create_incident_active_zone_revision(
+    fire_id: str,
+    payload: ActiveFireZoneRevisionCreateRequest,
+    actor: ActorDep,
+    session: SessionDep,
+    trace_id: TraceIdDep,
+) -> AdminActiveFireZoneRevision:
+    _require_admin(actor)
+    return create_active_zone_revision_service(
+        session, fire_id=fire_id, payload=payload, actor=actor, trace_id=trace_id
+    )
+
+
+@router.post(
+    "/incidents/{fire_id}/active-zone-revisions/merge",
+    response_model=AdminActiveFireZoneRevision,
+    status_code=201,
+)
+def merge_incident_active_zone_revisions(
+    fire_id: str,
+    payload: ActiveFireZoneMergeRequest,
+    actor: ActorDep,
+    session: SessionDep,
+    trace_id: TraceIdDep,
+) -> AdminActiveFireZoneRevision:
+    _require_admin(actor)
+    return merge_zone_revisions(
+        session, fire_id=fire_id, payload=payload, actor=actor, trace_id=trace_id
+    )
+
+
+@router.post(
+    "/incidents/{fire_id}/active-zone-revisions/{zone_revision_id}/review",
+    response_model=AdminActiveFireZoneRevision,
+)
+def review_incident_active_zone_revision(
+    fire_id: str,
+    zone_revision_id: str,
+    payload: ActiveFireZoneReviewRequest,
+    actor: ActorDep,
+    session: SessionDep,
+    trace_id: TraceIdDep,
+) -> AdminActiveFireZoneRevision:
+    _require_admin(actor)
+    return review_zone_revision(
+        session,
+        fire_id=fire_id,
+        zone_revision_id=zone_revision_id,
+        payload=payload,
+        actor=actor,
+        trace_id=trace_id,
+    )
+
+
+@router.post(
+    "/incidents/{fire_id}/agent-reviews/{review_id}/resolve",
+    response_model=AdminAgentReviewPackage,
+)
+def resolve_incident_agent_review(
+    fire_id: str,
+    review_id: str,
+    payload: AgentReviewResolutionRequest,
+    actor: ActorDep,
+    session: SessionDep,
+    trace_id: TraceIdDep,
+) -> AdminAgentReviewPackage:
+    _require_admin(actor)
+    return resolve_agent_review(
+        session,
+        fire_id=fire_id,
+        review_id=review_id,
+        payload=payload,
+        actor=actor,
+        trace_id=trace_id,
+    )
 
 
 @router.get("/reports", response_model=AdminPublicReportListResponse)

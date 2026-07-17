@@ -22,6 +22,7 @@
     "size_bytes": 123456,
     "lod": "desktop"
   },
+  "scene": null,
   "frame": {
     "origin_wgs84": [2.0, 46.0, 454.203998565679],
     "local_frame": "ENU",

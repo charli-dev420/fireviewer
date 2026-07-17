@@ -15,6 +15,8 @@ def _seed_draft_package(
     *,
     package_id: str = "pkg-workflow-01",
     include_png: bool = True,
+    tiled: bool = False,
+    include_fwterrain: bool = True,
 ) -> None:
     zone = SpatialZone(zone_id="PACKAGE-WORKFLOW-01", label="Package workflow")
     session.add(zone)
@@ -60,16 +62,44 @@ def _seed_draft_package(
                 ]
                 if include_png
                 else []
-            ) + [
-                SpatialPackageFile(
-                    kind=SpatialPackageFileKind.GLB,
-                    uri=f"s3://private/{package_id}/model.glb",
-                    sha256="c" * 64,
-                    size_bytes=2048,
-                    media_type="model/gltf-binary",
-                    provenance={},
-                ),
-            ],
+            )
+            + (
+                [
+                    SpatialPackageFile(
+                        kind=SpatialPackageFileKind.FWTILE,
+                        uri=f"s3://private/{package_id}/detail/tile.fwtile",
+                        sha256="c" * 64,
+                        size_bytes=2048,
+                        media_type="application/vnd.fireviewer.tile",
+                        provenance={},
+                    ),
+                    *(
+                        [
+                            SpatialPackageFile(
+                                kind=SpatialPackageFileKind.FWTERRAIN,
+                                uri=f"s3://private/{package_id}/far/global.fwterrain",
+                                sha256="d" * 64,
+                                size_bytes=2048,
+                                media_type="application/vnd.fireviewer.terrain",
+                                provenance={},
+                            )
+                        ]
+                        if include_fwterrain
+                        else []
+                    ),
+                ]
+                if tiled
+                else [
+                    SpatialPackageFile(
+                        kind=SpatialPackageFileKind.GLB,
+                        uri=f"s3://private/{package_id}/model.glb",
+                        sha256="c" * 64,
+                        size_bytes=2048,
+                        media_type="model/gltf-binary",
+                        provenance={},
+                    ),
+                ]
+            ),
         )
     )
     session.commit()
@@ -142,3 +172,38 @@ def test_admin_rejects_preview_when_the_registered_package_has_no_png(client, se
     )
     assert response.status_code == 409
     assert response.json()["type"] == "urn:fire-viewer:error:spatial_package_missing_preview_assets"
+
+
+def test_admin_validates_remote_tiles_without_requiring_a_glb(client, session) -> None:
+    _seed_draft_package(session, package_id="pkg-remote-tiles", tiled=True)
+    base = "/api/v1/admin/zones/PACKAGE-WORKFLOW-01/revisions/1"
+
+    validation = client.post(
+        f"{base}/validations",
+        json={"package_id": "pkg-remote-tiles", "reason": "Validation du catalogue Unity tuilé."},
+        headers=_headers("package-workflow-remote-validation-0001"),
+    )
+    assert validation.status_code == 200, validation.text
+    preview = client.post(
+        f"{base}/preview",
+        json={"package_id": "pkg-remote-tiles", "reason": "Aperçu privé du catalogue Unity tuilé."},
+        headers=_headers("package-workflow-remote-preview-0001"),
+    )
+    assert preview.status_code == 200, preview.text
+
+
+def test_admin_rejects_an_incomplete_remote_tile_profile(client, session) -> None:
+    _seed_draft_package(
+        session,
+        package_id="pkg-remote-incomplete",
+        tiled=True,
+        include_fwterrain=False,
+    )
+
+    response = client.post(
+        "/api/v1/admin/zones/PACKAGE-WORKFLOW-01/revisions/1/validations",
+        json={"package_id": "pkg-remote-incomplete", "reason": "Tentative sans terrain FAR."},
+        headers=_headers("package-workflow-remote-incomplete-0001"),
+    )
+    assert response.status_code == 409
+    assert "FWTERRAIN" in response.json()["detail"]

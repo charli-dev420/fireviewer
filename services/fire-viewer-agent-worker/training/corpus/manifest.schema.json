@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firewarning.example/schemas/training-corpus-manifest-v1.json",
+  "title": "FireWarning training corpus sample",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sample_id", "source_id", "source_record_id", "corpus_role", "image_relpath", "sha256",
+    "phash", "width", "height", "event_id", "sequence_id", "split_group",
+    "split", "license", "consent_basis", "sample_validation_status",
+    "candidate_classes", "annotations",
+    "negative_tags", "location"
+  ],
+  "properties": {
+    "sample_id": {"type": "string", "minLength": 8, "maxLength": 160},
+    "source_id": {"type": "string", "minLength": 1, "maxLength": 80},
+    "source_record_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "corpus_role": {
+      "enum": [
+        "detector_training", "detector_critical_test", "annotation_candidate",
+        "geo_context_evaluation"
+      ]
+    },
+    "image_relpath": {"type": "string", "pattern": "^images/[0-9a-f]{2}/[0-9a-f]{64}\\.(jpg|png|webp)$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "phash": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+    "near_duplicate_of": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+    "width": {"type": "integer", "minimum": 32},
+    "height": {"type": "integer", "minimum": 32},
+    "event_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "sequence_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "split_group": {"type": "string", "minLength": 1, "maxLength": 256},
+    "captured_at_literal": {"type": ["string", "null"], "maxLength": 64},
+    "split": {"enum": ["train", "validation", "test", "critical_test"]},
+    "license": {"type": "string", "minLength": 1, "maxLength": 80},
+    "consent_basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "reference"],
+      "properties": {
+        "kind": {"enum": ["source_license", "explicit_training_consent"]},
+        "reference": {"type": "string", "minLength": 1, "maxLength": 256}
+      }
+    },
+    "sample_validation_status": {
+      "enum": [
+        "candidate_unreviewed", "source_provided", "single_validated",
+        "double_validated", "rejected"
+      ]
+    },
+    "source_asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "original_url", "description_url", "original_sha1", "variant",
+        "artist", "credit", "license_url"
+      ],
+      "properties": {
+        "original_url": {"type": "string", "format": "uri", "maxLength": 2048},
+        "description_url": {"type": "string", "format": "uri", "maxLength": 2048},
+        "original_sha1": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "variant": {"enum": ["original", "thumbnail_2048"]},
+        "artist": {"type": "string", "maxLength": 4096},
+        "credit": {"type": "string", "maxLength": 4096},
+        "license_url": {"type": "string", "format": "uri", "maxLength": 2048}
+      }
+    },
+    "candidate_classes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "smoke_visible", "flame_visible", "firefighting_aircraft_visible",
+          "fire_response_vehicle_visible"
+        ]
+      }
+    },
+    "annotations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "class_id", "class_name", "bbox_xywh", "visibility", "occlusion",
+          "origin", "annotated_at", "annotator_id", "validation_status"
+        ],
+        "properties": {
+          "class_id": {"type": "integer", "minimum": 0, "maximum": 3},
+          "class_name": {
+            "enum": [
+              "smoke_visible", "flame_visible", "firefighting_aircraft_visible",
+              "fire_response_vehicle_visible"
+            ]
+          },
+          "bbox_xywh": {
+            "type": "array", "minItems": 4, "maxItems": 4,
+            "items": {"type": "number", "minimum": 0}
+          },
+          "visibility": {"enum": ["unknown", "partial", "clear"]},
+          "occlusion": {"enum": ["unknown", "none", "partial", "heavy"]},
+          "origin": {"type": "string", "minLength": 1, "maxLength": 160},
+          "annotated_at": {"type": ["string", "null"], "maxLength": 64},
+          "annotator_id": {"type": "string", "minLength": 1, "maxLength": 160},
+          "validation_status": {"enum": ["source_provided", "single_validated", "double_validated", "rejected"]}
+        }
+      }
+    },
+    "negative_tags": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "cloud", "fog", "dust", "steam", "chimney", "sunset", "reflection",
+          "orange_lighting", "controlled_burn", "no_target_visible"
+        ]
+      }
+    },
+    "location": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": [
+        "origin", "precision", "latitude", "longitude", "massif_id",
+        "massif_name", "reference", "reference_version"
+      ],
+      "properties": {
+        "origin": {
+          "enum": [
+            "source_page_coordinates", "embedded_metadata", "source_event_category",
+            "authoritative_spatial_join", "human_confirmed"
+          ]
+        },
+        "precision": {"enum": ["point", "event_area", "commune", "massif"]},
+        "latitude": {"type": ["number", "null"], "minimum": -90, "maximum": 90},
+        "longitude": {"type": ["number", "null"], "minimum": -180, "maximum": 180},
+        "massif_id": {"type": ["string", "null"], "maxLength": 160},
+        "massif_name": {"type": ["string", "null"], "maxLength": 256},
+        "reference": {"type": "string", "format": "uri", "maxLength": 2048},
+        "reference_version": {"type": ["string", "null"], "maxLength": 160}
+      }
+    }
+  }
+}

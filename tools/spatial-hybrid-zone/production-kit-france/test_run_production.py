@@ -97,7 +97,10 @@ def _config(tmp_path: Path) -> Path:
             "python_executable": "python",
             "blender_executable": None,
             "build_blender_scene": False,
+            "near_lod_enabled": True,
             "expected_source_tile_count": None,
+            "unity_validation_receipt": "artifacts/test-fr-01-r1/unity-validation-receipt.json",
+            "unity_preview_png": "artifacts/test-fr-01-r1/unity-validation-preview.png",
         },
     }
     path = tmp_path / "zone.json"
@@ -133,6 +136,11 @@ def test_plan_is_complete_generic_and_does_not_create_artifacts(
     assert "--global-vector-package" in unity_command
     assert "--detail-zones" in unity_command
     assert "--batch-size" in unity_command
+    upload_command = next(
+        stage["command"] for stage in stages if stage["name"] == "site_upload"
+    )
+    assert "--unity-validation-receipt" in upload_command
+    assert "--unity-preview-png" in upload_command
     produce = next(
         stage["command"] for stage in stages if stage["name"] == "produce_05m"
     )
@@ -177,3 +185,24 @@ def test_contract_hash_locks_local_source_contents(tmp_path: Path) -> None:
     water.write_text(water.read_text(encoding="utf-8") + "\n", encoding="utf-8")
 
     assert load_contract(config_path)["config_hash"] != initial
+
+
+def test_disabling_near_lod_skips_02m_download_and_marks_unity_export(
+    tmp_path: Path,
+) -> None:
+    config_path = _config(tmp_path)
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    initial_hash = load_contract(config_path)["config_hash"]
+    config["execution"]["near_lod_enabled"] = False
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+
+    contract = load_contract(config_path)
+    stages = build_stages(contract)
+    near = next(stage for stage in stages if stage["name"] == "near_imagery")
+    unity = next(stage for stage in stages if stage["name"] == "unity_catalog")
+
+    assert contract["config_hash"] == initial_hash
+    assert contract["delivery_policy"] == {"near_lod_enabled": False}
+    assert near["command"] is None
+    assert near["optional"] is True
+    assert "--disable-near-lod" in unity["command"]

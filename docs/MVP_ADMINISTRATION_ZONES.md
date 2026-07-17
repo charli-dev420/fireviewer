@@ -114,9 +114,9 @@ les transitions de publication sont présents. Les identifiants de zone suivent 
 contrat canonique en majuscules, par exemple `DIE-PONTAIX-08`, et les révisions
 transportent leur entier, par exemple `1`, affiché comme `R1`.
 
-NON VÉRIFIÉ en hébergement réel : l'import du package de 417 Mo dans le store Blob
-de production, le raccordement à Neon/PostGIS et le cycle publication/retrait après
-déploiement du backend Vercel.
+VÉRIFIÉ comme infrastructure raccordée : le backend Vercel, Neon/PostGIS et Vercel Blob
+privé sont configurés. NON VÉRIFIÉ en recette réelle : l'import du package de 417 Mo et
+le cycle complet prévisualisation/publication/retrait/restauration en production.
 
 Séparation des accès.
 
@@ -136,9 +136,10 @@ Persistance et coût.
 Le registre dynamique de zones nécessite une base de données : il ne peut pas
 reposer sur le catalogue versionné G1. SQLite reste la référence locale,
 reproductible et sans coût récurrent imposé pour les migrations, les tests et
-les démonstrations. La cible de persistance partagée est Neon PostgreSQL/PostGIS
-et la cible des objets privés est Vercel Blob. Leur raccordement réel reste NON
-VÉRIFIÉ. Le MVP-4 conserve SQLite et le stockage local pour les tests
+les démonstrations. La cible de persistance partagée est Neon PostgreSQL/PostGIS et
+la cible des objets privés est Vercel Blob. Ces services sont raccordés sur la
+baseline hébergée `e6f3a1b8c420`; le checkout courant `a4e9c2f7d610` doit encore
+être promu. Le MVP-4 conserve SQLite et le stockage local pour les tests
 reproductibles, sans reconstruction Unity dans le navigateur.
 
 Ordre MVP acté.

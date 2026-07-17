@@ -86,8 +86,11 @@ class ZonePublicationState(StrEnum):
 
 class SpatialPackageFileKind(StrEnum):
     COG = "COG"
+    JPEG = "JPEG"
     PNG = "PNG"
     GLB = "GLB"
+    FWTILE = "FWTILE"
+    FWTERRAIN = "FWTERRAIN"
 
 
 class ZoneUploadState(StrEnum):
@@ -142,6 +145,95 @@ class JobState(StrEnum):
     RETRY_WAIT = "RETRY_WAIT"
     QUARANTINED = "QUARANTINED"
     CANCELLED = "CANCELLED"
+
+
+class AgentBatchType(StrEnum):
+    USER_MEDIA = "user_media"
+    EXTERNAL_MEDIA = "external_media"
+    SATELLITE_MEDIA = "satellite_media"
+
+
+class AgentBatchPriority(StrEnum):
+    USER_DEADLINE = "user_deadline"
+    SCHEDULED_COMBINED = "scheduled_combined"
+    SCHEDULED = "scheduled"
+
+
+class AgentBatchState(StrEnum):
+    DRAFT = "DRAFT"
+    QUEUED = "QUEUED"
+    SUBMITTING = "SUBMITTING"
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    PARTIAL_FAILURE = "PARTIAL_FAILURE"
+    FAILED = "FAILED"
+    DEAD_LETTER = "DEAD_LETTER"
+    CANCEL_REQUESTED = "CANCEL_REQUESTED"
+    CANCELLED = "CANCELLED"
+
+
+class AgentMediaType(StrEnum):
+    IMAGE = "image"
+    VIDEO = "video"
+    AUDIO = "audio"
+    ARTICLE = "article"
+    SATELLITE_IMAGE = "satellite_image"
+
+
+class AgentConsentBasis(StrEnum):
+    EXPLICIT_UPLOAD = "explicit_upload"
+    SOURCE_LICENSE = "source_license"
+    INSTITUTIONAL_MANDATE = "institutional_mandate"
+
+
+class AgentConsentState(StrEnum):
+    GRANTED = "GRANTED"
+    WITHDRAWN = "WITHDRAWN"
+    EXPIRED = "EXPIRED"
+
+
+class AgentDispatchState(StrEnum):
+    QUEUED = "QUEUED"
+    SUBMITTING = "SUBMITTING"
+    AWAITING_REMOTE = "AWAITING_REMOTE"
+    POLL_WAIT = "POLL_WAIT"
+    SUCCEEDED = "SUCCEEDED"
+    PARTIAL_FAILURE = "PARTIAL_FAILURE"
+    FAILED = "FAILED"
+    DEAD_LETTER = "DEAD_LETTER"
+    CANCEL_REQUESTED = "CANCEL_REQUESTED"
+    CANCELLED = "CANCELLED"
+
+
+class AgentDeadLetterState(StrEnum):
+    OPEN = "OPEN"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
+    REPLAYED = "REPLAYED"
+
+
+class AgentModelRunState(StrEnum):
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class AgentReviewState(StrEnum):
+    PENDING = "PENDING"
+    IN_REVIEW = "IN_REVIEW"
+    RESOLVED = "RESOLVED"
+    REJECTED = "REJECTED"
+
+
+class IncidentMarkerReviewState(StrEnum):
+    PENDING = "PENDING"
+    VALIDATED = "VALIDATED"
+    REJECTED = "REJECTED"
+
+
+class ActiveFireZoneReviewState(StrEnum):
+    DRAFT = "DRAFT"
+    READY_FOR_PUBLICATION = "READY_FOR_PUBLICATION"
+    REJECTED = "REJECTED"
 
 
 class ActorType(StrEnum):

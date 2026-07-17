@@ -7,7 +7,7 @@ Private Blob. L'état exact par rapport au cahier des charges complet est suivi 
 
 > Ce logiciel est un socle de développement et de démonstration. Il n'est pas certifié pour la conduite des secours, l'évacuation, la prévision de propagation ni la confirmation automatique d'un feu.
 
-## Ce qui est opérationnel
+## Ce qui est implémenté
 
 - API FastAPI versionnée sous `/api/v1`, contrat OpenAPI exporté et erreurs au format Problem Details.
 - SQLite en mode WAL, migrations Alembic reproductibles et index spatial RTree.
@@ -21,10 +21,11 @@ Private Blob. L'état exact par rapport au cahier des charges complet est suivi 
 - Les sources de confiance utilisent un secret d'ingestion dédié, transmis dans `X-Source-Token` et stocké uniquement sous forme de hash.
 - Journal d'audit append-only avec snapshots avant/après, hashes, auteur, raison et `trace_id`; des triggers SQLite interdisent `UPDATE` et `DELETE`.
 - Outbox transactionnelle et table de jobs avec états, tentatives et leases, prêtes pour le branchement des workers.
+- Lots médias agentiques, consentements, dispatcher RunPod asynchrone et dead-letter queue dans des tables dédiées ; la table `job` terrain/publication n'est pas réutilisée.
 - Machine à états contrôlée, confirmation humaine documentée et suspension/kill switch au niveau incident.
 - Résolution opérateur des observations en revue : rattacher, créer une série distincte ou rejeter.
 - Manifeste viewer avec ETag, cache court, asset immuable et masquage lors d'une suspension.
-- OIDC/JWT configurable pour staging/production; le mode sans authentification est interdit hors développement/test.
+- Compte administrateur unique avec session `HttpOnly`, CSRF et réauthentification ; OIDC/JWT reste configurable pour une évolution multi-utilisateur.
 - Logs JSON avec `trace_id`, métriques Prometheus, headers de sécurité et limite de taille des corps HTTP.
 - Sauvegarde SQLite locale validée et restauration non destructive vers une nouvelle cible,
   avec intégrité, clés étrangères, migrations, audit et triggers critiques contrôlés.
@@ -144,7 +145,10 @@ Le connecteur envoie ensuite le même secret dans `X-Source-Token`. Le secret n'
 
 Les anciennes routes au pluriel `/api/v1/incidents/...` restent disponibles comme alias de compatibilité, mais ne figurent pas dans OpenAPI.
 
-Les mutations sensibles exigent un bearer JWT en staging/production. Le claim de rôles est configurable avec `FV_OIDC_ROLES_CLAIM`. Rôles reconnus : `administrator`, `analyst`, `validator`, `security_operator`.
+En mode `local_admin`, les mutations Admin exigent la session, le jeton CSRF et, pour les actions
+irréversibles, une réauthentification. En mode OIDC/JWT, les mutations opérateur exigent un bearer
+JWT et utilisent le claim configuré par `FV_OIDC_ROLES_CLAIM`. La présence de ce mode dans le code
+ne prouve pas qu'un IdP ou une MFA sont raccordés au déploiement actuel.
 
 ## Garanties du premier incrément
 
@@ -174,17 +178,10 @@ La confiance déclarée dans le JSON n'est jamais suffisante. Pour une source en
 make quality
 ```
 
-Résultat de référence de cette livraison :
-
-- 87 tests passants;
-- couverture branches incluse : 88,06 %;
-- Ruff : aucune erreur et format vérifié;
-- mypy strict : aucune erreur;
-- compilation Python : réussie;
-- migration `upgrade -> upgrade idempotent -> check -> downgrade` validée sur une base vierge,
-  avec contrôle des triggers SQLite critiques et de l'index RTree.
-
-Le détail des commandes exécutées et le smoke test sont consignés dans [`QUALITY_REPORT.md`](QUALITY_REPORT.md).
+Le rapport historique [`QUALITY_REPORT.md`](QUALITY_REPORT.md) décrit la baseline G1 au moment de
+sa rédaction ; il ne doit pas être interprété comme la preuve de la révision courante. L'état de
+validation le plus récent, les commandes réellement exécutées et les limites restantes sont suivis
+dans [`../../docs/ADMIN_BACKEND_READINESS.md`](../../docs/ADMIN_BACKEND_READINESS.md).
 
 Le contrat public viewer v2 est documenté dans
 [`../../docs/adr/ADR-001-viewer-manifest-public-contract.md`](../../docs/adr/ADR-001-viewer-manifest-public-contract.md).
@@ -193,6 +190,14 @@ Son schéma versionné est généré depuis `ViewerManifest` avec :
 ```bash
 make viewer-contract-schema
 ```
+
+## Revue spatiale agentique
+
+La revue Admin ne génère pas un nouveau modèle 3D. Elle charge le `ModelAsset` GLB courant comme
+socle immuable et superpose des calques privés : marqueurs WGS84, révisions `MultiPolygon` de la zone
+active et paquet de résultat agentique. Dessiner, reprendre ou fusionner crée uniquement une nouvelle
+révision du calque de zone. Aucun de ces actes ne crée de `ModelAsset`, ne remplace le GLB courant et
+ne publie la révision ; l'approbation humaine la place seulement à `READY_FOR_PUBLICATION`.
 
 ## Sauvegarde SQLite
 
@@ -240,13 +245,15 @@ fichier ni téléchargement. Un asset GLB de démonstration vérifiable est repo
 - La géométrie d'ingestion est limitée à `Point` + incertitude horizontale.
 - Les fonctions de score sont des paramètres de prototype G1, pas des seuils opérationnels validés.
 - La préparation LiDAR reste volontairement locale ; le backend reçoit des packages déjà produits.
-- Le téléversement hébergé direct/multipart des gros packages n'est pas encore implémenté.
-- Le workflow complet contributions/médias/consentements n'est pas encore implémenté.
-- Aucun runner RunPod, registre SLM ou supervision IA de production n'est inclus.
-- Les tables `job` et `outbox_event` sont persistées, mais aucun runner/dispatcher n'est encore fourni.
+- Le téléversement direct/multipart des gros packages est implémenté ; la recette réelle du package
+  de 417 Mo sur le store Blob de production reste à exécuter.
+- La collecte publique, l'antivirus, l'extraction de frames et l'interface de revue des médias restent à raccorder ; les lots privés, preuves de consentement, retraits et dates de purge sont persistés.
+- Le dispatcher RunPod dédié est fourni mais n'a pas été exécuté contre un endpoint de production ; le registre de modèles attendu est configuré par révision.
+- Les tables historiques `job` et `outbox_event` restent réservées au terrain, aux assets et à l'outbox. Leur runner n'est pas fourni par le dispatcher agentique.
 - Le schéma PostgreSQL/PostGIS est migré par Alembic ; l'import automatisé depuis une base SQLite
   existante reste une phase dédiée.
-- L'authentification forte des opérateurs dépend de l'IdP OIDC raccordé par le déploiement.
+- Le déploiement mono-administrateur n'a pas de MFA ; un passage multi-utilisateur exige un IdP OIDC,
+  des identités nominatives, des rôles et une MFA réellement raccordés et testés.
 - Le rate limiting, le WAF et la protection de `/metrics` sont à appliquer au proxy/ingress.
 
 ## Arborescence

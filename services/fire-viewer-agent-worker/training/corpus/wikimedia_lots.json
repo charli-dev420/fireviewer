@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "api_url": "https://commons.wikimedia.org/w/api.php",
+  "thumbnail_width": 2048,
+  "lots": [
+    {
+      "lot_id": "commons_corbieres_2025_geo",
+      "source_id": "commons_corbieres_2025",
+      "category": "2025 Massif des Corbières wildfire",
+      "recursive_depth": 0,
+      "corpus_role": "geo_context_evaluation",
+      "candidate_classes": [
+        "smoke_visible",
+        "flame_visible",
+        "firefighting_aircraft_visible",
+        "fire_response_vehicle_visible"
+      ],
+      "default_location": {
+        "origin": "source_event_category",
+        "precision": "massif",
+        "latitude": null,
+        "longitude": null,
+        "massif_id": "wikidata:Q1115037",
+        "massif_name": "Massif des Corbières",
+        "reference": "https://commons.wikimedia.org/wiki/Category:2025_Massif_des_Corbi%C3%A8res_wildfire",
+        "reference_version": "category-retrieved-at-acquisition"
+      }
+    },
+    {
+      "lot_id": "commons_aircraft_france",
+      "source_id": "commons_firefighting_aircraft_france",
+      "category": "Firefighting aircraft in France",
+      "recursive_depth": 2,
+      "corpus_role": "annotation_candidate",
+      "candidate_classes": ["firefighting_aircraft_visible"],
+      "default_location": null
+    },
+    {
+      "lot_id": "commons_dfci_vehicles",
+      "source_id": "commons_dfci_vehicles",
+      "category": "Firefighting vehicles of DFCI",
+      "recursive_depth": 0,
+      "corpus_role": "annotation_candidate",
+      "candidate_classes": ["fire_response_vehicle_visible"],
+      "default_location": null
+    },
+    {
+      "lot_id": "commons_wildfires_france_2022",
+      "source_id": "commons_wildfires_france_2022",
+      "category": "2022 wildfires in France",
+      "recursive_depth": 2,
+      "corpus_role": "annotation_candidate",
+      "candidate_classes": ["smoke_visible", "flame_visible"],
+      "default_location": null
+    },
+    {
+      "lot_id": "commons_wildfires_france_2021",
+      "source_id": "commons_wildfires_france_2021",
+      "category": "2021 wildfires in France",
+      "recursive_depth": 1,
+      "corpus_role": "annotation_candidate",
+      "candidate_classes": ["smoke_visible", "flame_visible"],
+      "default_location": null
+    },
+    {
+      "lot_id": "commons_wildfires_france_2023",
+      "source_id": "commons_wildfires_france_2023",
+      "category": "2023 wildfires in France",
+      "recursive_depth": 0,
+      "corpus_role": "annotation_candidate",
+      "candidate_classes": ["smoke_visible", "flame_visible"],
+      "default_location": null
+    },
+    {
+      "lot_id": "commons_firefighting_vehicles_france",
+      "source_id": "commons_firefighting_vehicles_france",
+      "category": "Firefighting vehicles in France",
+      "recursive_depth": 0,
+      "corpus_role": "annotation_candidate",
+      "candidate_classes": ["fire_response_vehicle_visible"],
+      "default_location": null
+    }
+  ]
+}

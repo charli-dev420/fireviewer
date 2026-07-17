@@ -12,6 +12,7 @@ from pydantic import SecretStr
 from sqlalchemy import select
 
 from fire_viewer.db.models import AuditEvent, SpatialPackage, SpatialPackageFile
+from fire_viewer.domain.enums import SpatialPackageFileKind
 
 _PNG = (
     b"\x89PNG\r\n\x1a\n"
@@ -91,8 +92,11 @@ def _package_documents(*, package_id: str, revision: int = 1) -> dict[str, bytes
 def _content_type(path: str) -> str:
     return {
         ".json": "application/json",
+        ".jpg": "image/jpeg",
         ".png": "image/png",
         ".glb": "model/gltf-binary",
+        ".fwtile": "application/vnd.fireviewer.tile",
+        ".fwterrain": "application/vnd.fireviewer.terrain",
     }[Path(path).suffix]
 
 
@@ -227,6 +231,95 @@ def test_admin_finalizes_exact_blob_inventory_then_previews_and_publishes(
     assert published.json()["publication"]["package_state"] == "PUBLISHED"
 
 
+def test_admin_finalizes_unity_remote_tile_inventory(client, settings, session) -> None:
+    _create_zone_and_revision(client)
+    package_id = "pkg-unity-remote-r1"
+    assets = {
+        "assets/validation/unity-preview.png": _PNG,
+        "assets/far/global.jpg": b"far-imagery",
+        "assets/far/global.fwterrain": b"far-terrain",
+        "assets/imagery/tile.jpg": b"tile-imagery",
+        "assets/detail/tile/tile.fwtile": b"tile-payload",
+    }
+    catalog = {
+        "schema": "fireviewer.remote-tile-catalog.v1",
+        "assets": [
+            {
+                "path": path,
+                "sha256": hashlib.sha256(payload).hexdigest(),
+                "byte_count": len(payload),
+            }
+            for path, payload in assets.items()
+        ],
+    }
+    catalog_raw = json.dumps(catalog, separators=(",", ":")).encode()
+    manifest = {
+        "package_id": package_id,
+        "catalog": {
+            "path": "catalog.json",
+            "sha256": hashlib.sha256(catalog_raw).hexdigest(),
+            "byte_count": len(catalog_raw),
+        },
+        "zones": [{"zone_id": "IMPORT-TEST-01", "revision_id": "R1"}],
+    }
+    documents = {
+        "package-manifest.json": json.dumps(manifest, separators=(",", ":")).encode(),
+        "catalog.json": catalog_raw,
+        **assets,
+    }
+    root = settings.zone_upload_storage_dir / "packages" / _UPLOAD_ID
+    objects: list[dict[str, Any]] = []
+    for path, payload in documents.items():
+        target = root / Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(payload)
+        objects.append(
+            {
+                "path": path,
+                "pathname": f"packages/{_UPLOAD_ID}/{path}",
+                "size_bytes": len(payload),
+                "content_type": _content_type(path),
+            }
+        )
+
+    response = _finalize(
+        client,
+        package_id=package_id,
+        objects=objects,
+        key="spatial-import-unity-remote-0001",
+    )
+
+    assert response.status_code == 201
+    package = session.scalar(select(SpatialPackage).where(SpatialPackage.package_id == package_id))
+    assert package is not None
+    kinds = set(
+        session.scalars(
+            select(SpatialPackageFile.kind).where(
+                SpatialPackageFile.spatial_package_id == package.id
+            )
+        )
+    )
+    assert kinds == {
+        SpatialPackageFileKind.PNG,
+        SpatialPackageFileKind.JPEG,
+        SpatialPackageFileKind.FWTILE,
+        SpatialPackageFileKind.FWTERRAIN,
+    }
+    base = "/api/v1/admin/zones/IMPORT-TEST-01/revisions/1"
+    validated = client.post(
+        f"{base}/validations",
+        json={"package_id": package_id, "reason": "Validation du package Unity distant."},
+        headers=_headers("spatial-import-unity-remote-validation-0001"),
+    )
+    assert validated.status_code == 200, validated.text
+    preview = client.post(
+        f"{base}/preview",
+        json={"package_id": package_id, "reason": "Aperçu privé du package Unity distant."},
+        headers=_headers("spatial-import-unity-remote-preview-0001"),
+    )
+    assert preview.status_code == 200, preview.text
+
+
 @pytest.mark.parametrize(
     ("mutation", "expected_error"),
     [
@@ -357,6 +450,9 @@ def test_admin_grant_issues_a_prefix_limited_vercel_blob_client_token(
     )
     assert token_payload["allowedContentTypes"] == [
         "application/json",
+        "application/vnd.fireviewer.terrain",
+        "application/vnd.fireviewer.tile",
+        "image/jpeg",
         "image/png",
         "image/tiff",
         "image/geotiff",

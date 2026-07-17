@@ -143,11 +143,14 @@ def _asset_path_and_hash(
 
 
 def _choose_orthophoto(
-    tile: Mapping[str, Any], manifest_directory: Path
+    tile: Mapping[str, Any],
+    manifest_directory: Path,
+    *,
+    near_lod_disabled: bool = False,
 ) -> tuple[Path, str, float]:
     assets = tile.get("assets", {})
     near_status = tile.get("near_orthophoto_status", {}).get("state")
-    if near_status == "ready":
+    if near_status == "ready" and not near_lod_disabled:
         path, digest = _asset_path_and_hash(
             manifest_directory,
             assets.get("near_orthophoto_image"),
@@ -315,6 +318,7 @@ class ExportContext:
     production_manifest_sha256: str
     global_vector_sha256: str
     exporter_sha256: str
+    near_lod_disabled: bool
     vector_builder: Callable[..., dict[str, Any]]
     _global_vector_package: dict[str, Any] | None = None
     _validated_mnt_sources: dict[str, str] | None = None
@@ -438,6 +442,7 @@ def create_context(
     global_vector_package_path: Path,
     output_root: Path,
     *,
+    near_lod_disabled: bool = False,
     vector_builder: Callable[..., dict[str, Any]] | None = None,
 ) -> ExportContext:
     manifest = _load_json(production_manifest_path)
@@ -457,6 +462,7 @@ def create_context(
         production_manifest_sha256=sha256_file(production_manifest_path),
         global_vector_sha256=sha256_file(global_vector_package_path),
         exporter_sha256=_exporter_fingerprint(),
+        near_lod_disabled=near_lod_disabled,
         vector_builder=vector_builder or _load_detail_vector_builder(),
     )
 
@@ -539,7 +545,9 @@ def export_tile(context: ExportContext, tile: Mapping[str, Any]) -> dict[str, An
         f"tile {tile_id} package",
     )
     image_path, image_sha, image_resolution = _choose_orthophoto(
-        tile, context.manifest_directory
+        tile,
+        context.manifest_directory,
+        near_lod_disabled=context.near_lod_disabled,
     )
     expected_inputs = {
         "exporter_sha256": context.exporter_sha256,
@@ -794,6 +802,7 @@ def build_catalog(context: ExportContext, far: Mapping[str, Any]) -> dict[str, A
                 "publish_distance_m": 600.0,
                 "preload_radius_m": 750.0,
                 "maximum_resident_tile_count": 16,
+                "near_disabled": context.near_lod_disabled,
                 "transition": "global_fallback_then_atomic_detail_footprint",
                 "eviction": "least_priority_outside_desired_footprint",
             },
@@ -822,6 +831,8 @@ def validate_catalog(catalog: Mapping[str, Any]) -> None:
         raise FWTileError("catalog must preserve the accepted 600 m publish distance")
     if float(policy.get("preload_radius_m", 0)) != 750.0:
         raise FWTileError("catalog must preserve the accepted 750 m preload radius")
+    if not isinstance(policy.get("near_disabled"), bool):
+        raise FWTileError("catalog must declare whether the near LOD is disabled")
     urls: set[str] = set()
     far = catalog.get("lod_policy", {}).get("far", {})
     if far.get("terrain", {}).get("resolution_m") != [5.0, 5.0]:
@@ -840,6 +851,11 @@ def validate_catalog(catalog: Mapping[str, Any]) -> None:
         tile_ids.add(tile_id)
         if tuple(tile.get("sections", [])) != REQUIRED_DETAIL_SECTIONS:
             raise FWTileError(f"catalog tile {tile_id} lacks required sections")
+        imagery_resolution = float(tile.get("imagery", {}).get("resolution_m", 0))
+        if policy["near_disabled"] and imagery_resolution < 0.5:
+            raise FWTileError(
+                f"catalog tile {tile_id} publishes near imagery while near LOD is disabled"
+            )
         bounds = tile.get("bounds_l93_m", [])
         if (
             len(bounds) != 4
@@ -967,6 +983,7 @@ def _parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     selection.add_argument("--tile-id", action="append")
     selection.add_argument("--all-ready", action="store_true")
     parser.add_argument("--far-imagery-resolution-m", type=float, default=2.0)
+    parser.add_argument("--disable-near-lod", action="store_true")
     return parser.parse_args(argv)
 
 
@@ -990,6 +1007,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             else artifact_root / "blender/justin-global-control-v5-vector-lod.json.gz"
         ),
         output_root,
+        near_lod_disabled=arguments.disable_near_lod,
     )
     far = export_far_assets(
         context,

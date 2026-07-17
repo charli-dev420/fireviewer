@@ -41,6 +41,8 @@ tuiles.
 - `build_archive_manifest.py` : inventaire SHA-256 d'une archive locale separee ;
 - `Invoke-Production.ps1` : lanceur PowerShell ;
 - `CHECKLIST_RELEASE.md` : controle humain avant remise a l'administration.
+- `unity-validation-receipt.schema.json` : preuve manuelle obligatoire avant
+  la creation du dossier d'upload.
 
 ## Prerequis
 
@@ -92,6 +94,9 @@ Copier `zone.example.json`, puis modifier :
 - tous les chemins `inputs` ;
 - au moins une `attention_zone`, utilisee seulement pour prioriser l'export ;
 - `artifact_root`, qui doit etre propre a cette revision ;
+- les chemins futurs `unity_validation_receipt` et `unity_preview_png` ; ils
+  peuvent etre absents pendant la production mais deviennent obligatoires pour
+  l'etape `site_upload` ;
 - le chemin de Blender, ou `build_blender_scene: false` pour sauter le `.blend`.
 
 Ne reutilisez pas le meme `artifact_root` apres avoir change la configuration :
@@ -158,7 +163,20 @@ Ses dependances doivent deja etre valides. L'ordre complet est :
 7. scene de controle Blender facultative ;
 8. catalogue Unity distant ;
 9. validation exhaustive du catalogue ;
-10. dossier exact d'upload du site.
+10. dossier exact d'upload du site, uniquement après reçu Unity accepté.
+
+## Gate manuel Unity
+
+Après `validate_catalog`, servir le catalogue local et l'ouvrir avec le projet
+Unity du dépôt en version `6000.3.18f1`. Effectuer la checklist de release,
+capturer une vue PNG représentative puis créer un reçu conforme à
+`unity-validation-receipt.schema.json`. Le reçu doit lier le `package_id`, la
+zone, la révision, le SHA-256 du catalogue validé et celui de la capture.
+
+L'étape `site_upload` refuse un reçu absent, rejeté ou périmé. Elle exige aussi
+la déclaration explicite `ACCEPTÉ POUR PUBLICATION`. Un refus impose une
+nouvelle racine d'artefacts et un nouveau `package_id`; une V1 existante n'est
+jamais écrasée.
 
 ## 5. Resultat
 
@@ -169,13 +187,17 @@ contrat publiable :
 site-upload/<package_id>/
 |-- package-manifest.json
 |-- catalog.json
-|-- far/
-|-- detail/
-`-- imagery/
+`-- assets/
+    |-- far/
+    |-- detail/
+    |-- imagery/
+    `-- validation/unity-preview.png
 ```
 
-Les fichiers lourds de travail, le `.blend`, les GeoTIFF et les receipts Unity
-restent hors du dossier d'upload. Le kit ne declenche aucun upload :
+Les fichiers lourds de travail, le `.blend`, les GeoTIFF et le fichier source
+du reçu Unity restent hors du dossier d'upload. Sa forme normalisée est incluse
+dans le manifeste et la capture est incluse dans le catalogue. Le kit ne
+declenche aucun upload :
 l'administration du site recoit exactement le dossier `site-upload/<package_id>`
 apres la checklist de release.
 

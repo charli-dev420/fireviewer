@@ -187,6 +187,7 @@ namespace FireViewer.SpatialTiles
         public double publish_distance_m;
         public double preload_radius_m;
         public int maximum_resident_tile_count;
+        public bool near_disabled;
         public string transition;
         public string eviction;
     }

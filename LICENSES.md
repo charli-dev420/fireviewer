@@ -13,7 +13,7 @@ Portée.
 
 La licence de code s'applique aux sources Fire Viewer dans ce dépôt. La licence documentaire s'applique notamment au README, aux fichiers Markdown, au PDF de roadmap et aux diagrammes produits pour Fire Viewer.
 
-Les dépendances tierces, données IGN, textures, modèles externes et contenus apportés par des contributeurs conservent leurs propres licences, attributions et contraintes de provenance. Une contribution ne doit être ajoutée que si son auteur peut accorder les droits correspondants.
+Les dépendances tierces, données IGN, textures, modèles externes et contenus apportés par des contributeurs conservent leurs propres licences, attributions et contraintes de provenance. Une contribution ne doit être ajoutée que si son auteur peut accorder les droits correspondants. Le statut détaillé des visuels suivis est publié dans [ASSET_PROVENANCE.md](ASSET_PROVENANCE.md) ; les JPEG de hero qui y sont marqués `NON VÉRIFIÉ` sont explicitement exclus de la concession documentaire tant que leur origine n'est pas établie.
 
 Donnée géodésique RAF20 distribuée via PROJ.
 
@@ -28,6 +28,13 @@ La grille ne constitue ni un terrain, ni une texture, ni un asset GLB et ne conf
 droit sur de telles données. Son emploi est limité par l'[ADR-002](docs/adr/ADR-002-spatial-local-unity-contract.md)
 au profil France continentale NGF-IGN69/RAF20 ; Corse et outre-mer demandent des profils et
 des conditions de provenance distincts.
+
+Moteur cartographique web 3D.
+
+VÉRIFIÉ localement dans les métadonnées des versions verrouillées : Giro3D 2.0.3 est sous
+licence MIT, OpenLayers 10.8.0 sous BSD-2-Clause et proj4 2.19.0 sous MIT. Ces licences
+permettent leur utilisation dans le site AGPL et en production gratuite ; leurs avis restent
+ceux des projets amont et ne sont pas remplacés par la licence Fire Viewer.
 
 Données de la release spatiale Die–Pontaix R1.
 

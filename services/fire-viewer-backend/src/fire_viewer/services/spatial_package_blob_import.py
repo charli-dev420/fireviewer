@@ -42,10 +42,14 @@ _REQUIRED_PATHS = frozenset({"package-manifest.json", "catalog.json"})
 _ASSET_PREFIXES = ("assets/", "terrain/", "vectors/")
 _CONTENT_TYPES = {
     ".json": "application/json",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
     ".png": "image/png",
     ".tif": "image/tiff",
     ".tiff": "image/tiff",
     ".glb": "model/gltf-binary",
+    ".fwtile": "application/vnd.fireviewer.tile",
+    ".fwterrain": "application/vnd.fireviewer.terrain",
 }
 
 
@@ -141,7 +145,7 @@ def _catalog_entries(catalog: dict[str, Any]) -> list[dict[str, Any]]:
     if not entries:
         raise BadRequestError(
             "empty_package_catalog",
-            "catalog.json must declare at least one PNG, GLB or GeoTIFF asset.",
+            "catalog.json must declare at least one supported spatial asset.",
         )
     return entries
 
@@ -318,12 +322,18 @@ def validate_blob_package(
 
 def _kind_and_media_type(path: str) -> tuple[SpatialPackageFileKind, str]:
     suffix = PurePosixPath(path).suffix.casefold()
+    if suffix in {".jpg", ".jpeg"}:
+        return SpatialPackageFileKind.JPEG, "image/jpeg"
     if suffix == ".png":
         return SpatialPackageFileKind.PNG, "image/png"
     if suffix == ".glb":
         return SpatialPackageFileKind.GLB, "model/gltf-binary"
     if suffix in {".tif", ".tiff"}:
         return SpatialPackageFileKind.COG, "image/tiff"
+    if suffix == ".fwtile":
+        return SpatialPackageFileKind.FWTILE, "application/vnd.fireviewer.tile"
+    if suffix == ".fwterrain":
+        return SpatialPackageFileKind.FWTERRAIN, "application/vnd.fireviewer.terrain"
     raise BadRequestError("unsupported_package_file_type", "The package asset type is unsupported.")
 
 

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "classes": [
+    {"id": 0, "name": "smoke_visible"},
+    {"id": 1, "name": "flame_visible"},
+    {"id": 2, "name": "firefighting_aircraft_visible"},
+    {"id": 3, "name": "fire_response_vehicle_visible"}
+  ],
+  "negative_tags": [
+    "cloud",
+    "fog",
+    "dust",
+    "steam",
+    "chimney",
+    "sunset",
+    "reflection",
+    "orange_lighting",
+    "controlled_burn",
+    "no_target_visible"
+  ]
+}

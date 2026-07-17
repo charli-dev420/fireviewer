@@ -1,0 +1,40 @@
+.admin-spatial-message { margin: 16px 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.admin-spatial-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(270px, 340px); gap: 18px; margin-top: 20px; }
+.admin-spatial-scene-column { min-width: 0; }
+.admin-spatial-camera-controls { display: flex; min-height: 46px; padding: 7px; align-items: center; flex-wrap: wrap; gap: 7px; border: 1px solid var(--border); border-bottom: 0; border-radius: 12px 12px 0 0; background: var(--surface); }
+.admin-spatial-camera-controls button { padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; background: transparent; cursor: pointer; }
+.admin-spatial-camera-controls button.is-active { color: #fff; border-color: #0b5963; background: #0b5963; }
+.admin-spatial-camera-controls span { margin-left: auto; color: var(--ink-600); font-size: .72rem; }
+.admin-spatial-3d { position: relative; min-height: 620px; overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: #0b2026; }
+.admin-spatial-3d.is-drawing { box-shadow: 0 0 0 3px rgb(248 225 108 / 35%); }
+.admin-spatial-3d__canvas { position: absolute; inset: 0; }
+.admin-spatial-3d__canvas canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+.admin-spatial-3d.is-drawing .admin-spatial-3d__canvas canvas { cursor: crosshair; }
+.admin-spatial-3d__state { position: absolute; top: 12px; left: 12px; z-index: 2; padding: 7px 10px; border-radius: 999px; color: #effcf8; background: rgb(4 20 24 / 82%); font-size: .76rem; }
+.admin-spatial-3d__state.is-error { color: #ffd5cf; }
+.admin-spatial-layout .incident-tiled-scene { position: relative; min-height: 620px; overflow: hidden; border: 1px solid var(--border); border-radius: 0 0 14px 14px; background: #0b2026; }
+.admin-spatial-layout .incident-tiled-scene.is-drawing { box-shadow: 0 0 0 3px rgb(248 225 108 / 35%); }
+.admin-spatial-layout .incident-tiled-scene__canvas { position: absolute; inset: 0; }
+.admin-spatial-layout .incident-tiled-scene__canvas canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+.admin-spatial-layout .incident-tiled-scene.is-drawing canvas { cursor: crosshair; }
+.admin-spatial-layout .incident-tiled-scene__status { position: absolute; top: 12px; left: 12px; width: fit-content; height: fit-content; padding: 7px 10px; border-radius: 999px; color: #effcf8; background: rgb(4 20 24 / 82%); font-size: .76rem; }
+.admin-spatial-tools { align-self: start; display: grid; gap: 14px; padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.admin-spatial-tools label, .admin-spatial-tools fieldset { display: grid; gap: 7px; }
+.admin-spatial-tools textarea { width: 100%; resize: vertical; }
+.admin-spatial-tools fieldset { max-height: 180px; overflow: auto; padding: 10px; border: 1px solid var(--border); border-radius: 8px; }
+.admin-spatial-tools fieldset label { display: flex; align-items: center; gap: 7px; overflow-wrap: anywhere; font-size: .76rem; }
+.admin-spatial-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-spatial-vertices { display: grid; max-height: 260px; margin: 0; padding: 0; overflow: auto; gap: 6px; list-style: none; }
+.admin-spatial-vertices li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; }
+.admin-spatial-vertices li.is-moving { border-color: #d6a900; background: rgb(248 225 108 / 18%); }
+.admin-spatial-vertices li > span { display: grid; gap: 2px; font-size: .78rem; }
+.admin-spatial-vertices li small { color: var(--ink-600); font-family: monospace; font-size: .65rem; }
+.admin-spatial-vertices li > div { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+.admin-spatial-records { display: grid; gap: 12px; padding: 16px; }
+.admin-spatial-records > article { padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.admin-spatial-records article > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.admin-spatial-records article p { margin: 5px 0; color: var(--ink-600); font-size: .8rem; }
+.admin-spatial-records details { margin: 10px 0; }
+.admin-spatial-records pre { max-height: 320px; overflow: auto; padding: 10px; border-radius: 8px; background: #0b2026; color: #d7f4ec; font-size: .7rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.admin-spatial-merge { padding: 0 16px 16px; }
+@media (max-width: 980px) { .admin-spatial-layout { grid-template-columns: 1fr; } .admin-spatial-3d { min-height: 480px; } }

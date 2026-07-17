@@ -17,6 +17,7 @@ export type AdminRoute =
   | { kind: 'incident-observations'; fireId: string }
   | { kind: 'incident-sources-media'; fireId: string }
   | { kind: 'incident-models-pipeline'; fireId: string }
+  | { kind: 'incident-spatial-review'; fireId: string }
   | { kind: 'audit' }
   | { kind: 'roles' }
   | { kind: 'system' }
@@ -66,6 +67,7 @@ export function resolveAdminRoute(pathname: string): AdminRoute {
     if (segments[3] === 'observations') return { kind: 'incident-observations', fireId: segments[2] };
     if (segments[3] === 'sources-medias') return { kind: 'incident-sources-media', fireId: segments[2] };
     if (segments[3] === 'modeles-pipeline') return { kind: 'incident-models-pipeline', fireId: segments[2] };
+    if (segments[3] === 'revue-spatiale') return { kind: 'incident-spatial-review', fireId: segments[2] };
   }
   if (segments.length === 3 && segments[0] === 'admin' && segments[1] === 'incidents' && /^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(segments[2])) return { kind: 'incident-detail', fireId: segments[2] };
 

@@ -25,6 +25,19 @@
 **/*.sqlite
 **/*.sqlite3
 **/data/
+**/dataset/
+**/datasets/
+**/checkpoints/
+**/weights/
+**/huggingface-cache/
+**/hub/models--*/
+*.bin
+*.ckpt
+*.gguf
+*.onnx
+*.pt
+*.pth
+*.safetensors
 
 # Donnée géodésique publique, épinglée et nécessaire aux conversions RAF20 hors ligne.
 !services/fire-viewer-backend/src/fire_viewer/data/

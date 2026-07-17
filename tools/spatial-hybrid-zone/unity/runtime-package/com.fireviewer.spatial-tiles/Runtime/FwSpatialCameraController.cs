@@ -99,7 +99,13 @@ namespace FireViewer.SpatialTiles
 
         public void SetNearView()
         {
-            if (RequireDetailNavigation("near")) SetViewDistance(NearDistanceMetres, "near");
+            if (!RequireDetailNavigation("near")) return;
+            if (streaming?.NearLodDisabled == true)
+            {
+                SetViewDistance(MidDistanceMetres, "mid");
+                return;
+            }
+            SetViewDistance(NearDistanceMetres, "near");
         }
 
         public void SetMidView()
@@ -295,7 +301,8 @@ namespace FireViewer.SpatialTiles
             if (GUILayout.Button("1  Vue globale")) SetFarView();
             GUI.enabled = detailNavigationAuthorized;
             if (GUILayout.Button("2  Moyen")) SetMidView();
-            if (GUILayout.Button("3  Proche")) SetNearView();
+            GUI.enabled = detailNavigationAuthorized && streaming?.NearLodDisabled != true;
+            if (GUILayout.Button(streaming?.NearLodDisabled == true ? "3  Proche désactivé" : "3  Proche")) SetNearView();
             GUI.enabled = true;
             GUILayout.EndHorizontal();
 

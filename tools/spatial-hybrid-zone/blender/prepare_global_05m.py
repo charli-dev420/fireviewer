@@ -609,7 +609,8 @@ def _asset_lock(target: Path, *, timeout_s: float = 3_600.0) -> Iterable[None]:
                 stale = time.time() - lock.stat().st_mtime > 6 * 60 * 60
             except FileNotFoundError:
                 continue
-            if stale:
+            owner_alive = _lock_owner_is_alive(lock)
+            if stale or owner_alive is False:
                 lock.unlink(missing_ok=True)
                 continue
             if time.monotonic() - started >= timeout_s:
@@ -620,6 +621,39 @@ def _asset_lock(target: Path, *, timeout_s: float = 3_600.0) -> Iterable[None]:
     finally:
         os.close(descriptor)
         lock.unlink(missing_ok=True)
+
+
+def _lock_owner_is_alive(lock: Path) -> bool | None:
+    """Return whether the PID recorded by a production lock still exists.
+
+    ``None`` deliberately means "unknown" so malformed or unreadable locks
+    retain the conservative six-hour expiry policy.  A hard-killed production
+    process otherwise leaves every active source locked for six hours, which
+    defeats the resumable download contract.
+    """
+
+    try:
+        owner = lock.read_text(encoding="ascii").strip()
+    except (OSError, UnicodeError):
+        return None
+    if not owner.startswith("pid=") or not owner[4:].isdigit():
+        return None
+    pid = int(owner[4:])
+    if pid <= 0:
+        return None
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError as exc:
+        # CPython reports an absent Windows process as ERROR_INVALID_PARAMETER
+        # rather than ProcessLookupError when probing with signal 0.
+        if os.name == "nt" and getattr(exc, "winerror", None) == 87:
+            return False
+        return None
+    return True
 
 
 def ensure_elevation_source(

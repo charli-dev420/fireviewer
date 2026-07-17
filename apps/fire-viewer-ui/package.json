@@ -21,7 +21,10 @@
     "@fontsource-variable/ibm-plex-sans": "^5.2.8",
     "@fontsource-variable/source-serif-4": "^5.2.9",
     "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@giro3d/giro3d": "^2.0.3",
     "@vercel/blob": "^2.6.1",
+    "ol": "^10.8.0",
+    "proj4": "^2.19.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "three": "0.180.0"

@@ -61,13 +61,16 @@
     "execution": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["artifact_root"],
+      "required": ["artifact_root", "unity_validation_receipt", "unity_preview_png"],
       "properties": {
         "artifact_root": {"type": "string", "minLength": 1},
         "python_executable": {"type": "string", "default": "python"},
         "blender_executable": {"type": ["string", "null"]},
         "build_blender_scene": {"type": "boolean", "default": true},
-        "expected_source_tile_count": {"type": ["integer", "null"], "minimum": 1}
+        "near_lod_enabled": {"type": "boolean", "default": true},
+        "expected_source_tile_count": {"type": ["integer", "null"], "minimum": 1},
+        "unity_validation_receipt": {"type": "string", "minLength": 1},
+        "unity_preview_png": {"type": "string", "minLength": 1}
       }
     }
   },

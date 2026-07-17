@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "families": {
+    "fire_pointing": {
+      "media_policy": "reference_existing_content_addressed_images_without_copy",
+      "sources": [
+        {
+          "source_id": "fasdd_v9",
+          "local_manifest": "corpus/fasdd/manifest.jsonl",
+          "usage": "weak fire and smoke point candidates; negatives require abstention review"
+        },
+        {
+          "source_id": "pyro_sdis_v0_1_0",
+          "local_manifest": "corpus/pyro-sdis-v0.1.0/manifest.jsonl",
+          "usage": "weak smoke-column-base point candidates"
+        },
+        {
+          "source_id": "wikimedia_candidates_v0_1_0",
+          "local_manifest": "corpus/wikimedia-candidates-v0.1.0/manifest.jsonl",
+          "usage": "human pointing annotation candidates; source-page location is not fire location"
+        }
+      ]
+    },
+    "cross_view_registration": {
+      "selected_source": {
+        "source_id": "aerialextrematch_localization",
+        "repository": "https://huggingface.co/datasets/Xecades/AerialExtreMatch-Localization",
+        "revision": "b70225c2fd468976d5f9fc9bf435645da4184492",
+        "declared_license": "MIT",
+        "capture_year": 2023,
+        "useful_subset": [
+          "rgb/*",
+          "LQref/*",
+          "gt_pose.txt",
+          "pose.txt",
+          "intrinsic.txt",
+          "README.md"
+        ],
+        "excluded_subset": [
+          "HQref/DOM.tif",
+          "HQref/DSM.tif"
+        ],
+        "reason": "264 real UAV views with pose and intrinsics plus georeferenced DOM/DSM; unrelated to FireWarning incidents"
+      },
+      "future_fire_specific_source": {
+        "source_id": "flame3",
+        "repository": "https://doi.org/10.21227/w0mz-aq48",
+        "declared_license": "CC-BY-4.0",
+        "status": "registered_not_downloaded",
+        "reason": "georeferenced historical prescribed-burn NADIR thermal imagery and GCP data; access path must be validated before acquisition"
+      }
+    }
+  },
+  "operational_training_denylist": [
+    "fireviewer-die-pontaix",
+    "die-pontaix-08",
+    "die-pontaix-r1"
+  ],
+  "denylist_policy": "active incident media and every crop, render or synthetic derivative are forbidden in train and validation"
+}

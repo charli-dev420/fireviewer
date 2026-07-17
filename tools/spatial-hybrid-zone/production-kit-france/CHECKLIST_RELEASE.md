@@ -1,5 +1,9 @@
 # Checklist de validation d'une carte V1
 
+Cette checklist doit être reportée dans un reçu conforme à
+`unity-validation-receipt.schema.json`. Tant que la décision n'est pas
+`accepted`, l'étape `site_upload` reste bloquée.
+
 ## Contrat et sources
 
 - [ ] `--plan` termine sans erreur.

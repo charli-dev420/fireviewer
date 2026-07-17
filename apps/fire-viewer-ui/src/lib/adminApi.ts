@@ -93,6 +93,32 @@ export interface AdminIncidentModelsPipelineWorkspace {
   }[];
 }
 
+export type AdminGltfPoint = readonly [number, number, number];
+export interface AdminIncidentSpatialMarker {
+  readonly marker_id: string; readonly source_kind: 'observation' | 'agent_media'; readonly marker_type: string;
+  readonly longitude: number; readonly latitude: number; readonly altitude_m: number | null;
+  readonly horizontal_accuracy_m: number | null; readonly geometry_origin: string; readonly review_state: string;
+  readonly observed_at: string | null; readonly spatial_display_allowed: boolean;
+  readonly gltf_position: AdminGltfPoint | null; readonly version: number;
+}
+export interface AdminActiveFireZoneRevision {
+  readonly zone_revision_id: string; readonly revision: number; readonly valid_at: string;
+  readonly geometry_geojson: Readonly<Record<string, unknown>>;
+  readonly gltf_polygons: readonly (readonly (readonly AdminGltfPoint[])[])[];
+  readonly geometry_origin: string; readonly supporting_marker_ids: readonly string[];
+  readonly source_revision_ids: readonly string[]; readonly review_state: 'DRAFT' | 'READY_FOR_PUBLICATION' | 'REJECTED';
+  readonly supersedes_zone_revision_id: string | null; readonly reason: string; readonly created_by: string;
+  readonly reviewed_by: string | null; readonly reviewed_at: string | null; readonly review_reason: string | null;
+  readonly created_at: string;
+}
+export interface AdminIncidentSpatialReviewWorkspace {
+  readonly fire_id: string; readonly episode_id: string;
+  readonly scene: { readonly asset_url: string | null; readonly asset_version: number | null; readonly sha256: string | null; readonly package_id: string | null; readonly catalog_url: string | null; readonly files: Readonly<Record<string, string>>; readonly origin_wgs84: readonly [number, number, number]; readonly local_frame: 'ENU'; readonly gltf_profile: 'gltf-eun-negz-metric-v1' } | null;
+  readonly markers: readonly AdminIncidentSpatialMarker[];
+  readonly zone_revisions: readonly AdminActiveFireZoneRevision[];
+  readonly agent_reviews: readonly { readonly review_id: string; readonly batch_id: string; readonly state: string; readonly reason_codes: readonly string[]; readonly completed_at: string | null; readonly result: Readonly<Record<string, unknown>> | null }[];
+}
+
 export interface AdminSourceUpdateInput {
   readonly type: string;
   readonly trust: string;
@@ -727,6 +753,37 @@ function parseIncidentModelsPipelineWorkspace(value: unknown): AdminIncidentMode
         updated_at: readIsoDate(item.updated_at, 'updated_at'),
       };
     }),
+  };
+}
+
+function parseGltfPoint(value: unknown, field: string): AdminGltfPoint {
+  if (!Array.isArray(value) || value.length !== 3) throw new Error(`Point ${field} invalide.`);
+  return [readFiniteNumber(value[0], `${field}.x`), readFiniteNumber(value[1], `${field}.y`), readFiniteNumber(value[2], `${field}.z`)];
+}
+
+function parseActiveFireZoneRevision(value: unknown): AdminActiveFireZoneRevision {
+  if (!isRecord(value) || !isRecord(value.geometry_geojson) || !Array.isArray(value.gltf_polygons) || !Array.isArray(value.supporting_marker_ids) || !Array.isArray(value.source_revision_ids)) throw new Error('Révision de zone active invalide.');
+  return {
+    zone_revision_id: readString(value.zone_revision_id, 'zone_revision_id', { max: 128 })!, revision: readPositiveInteger(value.revision, 'revision'), valid_at: readIsoDate(value.valid_at, 'valid_at'), geometry_geojson: value.geometry_geojson,
+    gltf_polygons: value.gltf_polygons.map((polygon, polygonIndex) => { if (!Array.isArray(polygon)) throw new Error('Polygone glTF invalide.'); return polygon.map((ring, ringIndex) => { if (!Array.isArray(ring)) throw new Error('Anneau glTF invalide.'); return ring.map((point, pointIndex) => parseGltfPoint(point, `gltf_polygons.${polygonIndex}.${ringIndex}.${pointIndex}`)); }); }),
+    geometry_origin: readString(value.geometry_origin, 'geometry_origin', { max: 64 })!, supporting_marker_ids: value.supporting_marker_ids.map((item) => readString(item, 'supporting_marker_id', { max: 128 })!), source_revision_ids: value.source_revision_ids.map((item) => readString(item, 'source_revision_id', { max: 128 })!), review_state: readEnum(value.review_state, 'review_state', ['DRAFT', 'READY_FOR_PUBLICATION', 'REJECTED'] as const),
+    supersedes_zone_revision_id: readString(value.supersedes_zone_revision_id, 'supersedes_zone_revision_id', { nullable: true, max: 128 }), reason: readString(value.reason, 'reason', { max: 500 })!, created_by: readString(value.created_by, 'created_by', { max: 255 })!, reviewed_by: readString(value.reviewed_by, 'reviewed_by', { nullable: true, max: 255 }), reviewed_at: value.reviewed_at === null ? null : readIsoDate(value.reviewed_at, 'reviewed_at'), review_reason: readString(value.review_reason, 'review_reason', { nullable: true, max: 500 }), created_at: readIsoDate(value.created_at, 'created_at'),
+  };
+}
+
+function parseIncidentSpatialReviewWorkspace(value: unknown): AdminIncidentSpatialReviewWorkspace {
+  if (!isRecord(value) || !Array.isArray(value.markers) || !Array.isArray(value.zone_revisions) || !Array.isArray(value.agent_reviews)) throw new Error('Espace de revue spatiale invalide.');
+  let scene: AdminIncidentSpatialReviewWorkspace['scene'] = null;
+  if (value.scene !== null) {
+    if (!isRecord(value.scene) || (value.scene.files !== undefined && !isRecord(value.scene.files)) || !Array.isArray(value.scene.origin_wgs84) || value.scene.origin_wgs84.length !== 3) throw new Error('Scène 3D invalide.');
+    const sceneFiles = isRecord(value.scene.files) ? value.scene.files : {};
+    scene = { asset_url: value.scene.asset_url === undefined ? null : readString(value.scene.asset_url, 'asset_url', { nullable: true, max: 2_048 }), asset_version: value.scene.asset_version === undefined || value.scene.asset_version === null ? null : readPositiveInteger(value.scene.asset_version, 'asset_version'), sha256: value.scene.sha256 === undefined ? null : readString(value.scene.sha256, 'sha256', { nullable: true, max: 64 }), package_id: value.scene.package_id === undefined ? null : readString(value.scene.package_id, 'package_id', { nullable: true, max: 96 }), catalog_url: value.scene.catalog_url === undefined ? null : readString(value.scene.catalog_url, 'catalog_url', { nullable: true, max: 2_048 }), files: Object.fromEntries(Object.entries(sceneFiles).map(([path, url]) => [path, readString(url, `files.${path}`, { max: 2_048 })!])), origin_wgs84: [readFiniteNumber(value.scene.origin_wgs84[0], 'origin.lon'), readFiniteNumber(value.scene.origin_wgs84[1], 'origin.lat'), readFiniteNumber(value.scene.origin_wgs84[2], 'origin.alt')], local_frame: readEnum(value.scene.local_frame, 'local_frame', ['ENU'] as const), gltf_profile: readEnum(value.scene.gltf_profile, 'gltf_profile', ['gltf-eun-negz-metric-v1'] as const) };
+  }
+  return {
+    fire_id: readString(value.fire_id, 'fire_id', { max: 32 })!, episode_id: readString(value.episode_id, 'episode_id', { max: 16 })!, scene,
+    markers: value.markers.map((item) => { if (!isRecord(item) || typeof item.spatial_display_allowed !== 'boolean') throw new Error('Marqueur spatial invalide.'); return { marker_id: readString(item.marker_id, 'marker_id', { max: 128 })!, source_kind: readEnum(item.source_kind, 'source_kind', ['observation', 'agent_media'] as const), marker_type: readString(item.marker_type, 'marker_type', { max: 64 })!, longitude: readFiniteNumber(item.longitude, 'longitude'), latitude: readFiniteNumber(item.latitude, 'latitude'), altitude_m: item.altitude_m === null ? null : readFiniteNumber(item.altitude_m, 'altitude_m'), horizontal_accuracy_m: item.horizontal_accuracy_m === null ? null : readFiniteNumber(item.horizontal_accuracy_m, 'horizontal_accuracy_m'), geometry_origin: readString(item.geometry_origin, 'geometry_origin', { max: 64 })!, review_state: readString(item.review_state, 'review_state', { max: 64 })!, observed_at: item.observed_at === null ? null : readIsoDate(item.observed_at, 'observed_at'), spatial_display_allowed: item.spatial_display_allowed, gltf_position: item.gltf_position === null ? null : parseGltfPoint(item.gltf_position, 'gltf_position'), version: readPositiveInteger(item.version, 'version') }; }),
+    zone_revisions: value.zone_revisions.map(parseActiveFireZoneRevision),
+    agent_reviews: value.agent_reviews.map((item) => { if (!isRecord(item) || !Array.isArray(item.reason_codes) || (item.result !== null && !isRecord(item.result))) throw new Error('Revue agentique invalide.'); return { review_id: readString(item.review_id, 'review_id', { max: 128 })!, batch_id: readString(item.batch_id, 'batch_id', { max: 128 })!, state: readString(item.state, 'state', { max: 64 })!, reason_codes: item.reason_codes.map((reason) => readString(reason, 'reason_code', { max: 128 })!), completed_at: item.completed_at === null ? null : readIsoDate(item.completed_at, 'completed_at'), result: item.result }; }),
   };
 }
 
@@ -1423,6 +1480,48 @@ export class AdminApiClient {
     const payload = await this.request(`/incidents/${encodeURIComponent(fireId)}/models-pipeline`, { method: 'GET' }, options);
     try { return parseIncidentModelsPipelineWorkspace(payload); }
     catch { throw new AdminApiError('parse', 'Les modèles et jobs de l’incident sont invalides.'); }
+  }
+
+  async getIncidentSpatialReview(fireId: string, options: AdminRequestOptions = {}): Promise<AdminIncidentSpatialReviewWorkspace> {
+    if (!/^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(fireId)) throw new AdminApiError('configuration', 'Identifiant fire_id invalide.');
+    const payload = await this.request(`/incidents/${encodeURIComponent(fireId)}/spatial-review`, { method: 'GET' }, options);
+    try { return parseIncidentSpatialReviewWorkspace(payload); }
+    catch { throw new AdminApiError('parse', 'L’espace de revue spatiale est invalide.'); }
+  }
+
+  async projectIncidentGltfPick(fireId: string, point: AdminGltfPoint, options: AdminRequestOptions = {}): Promise<{ longitude: number; latitude: number; altitude_m: number }> {
+    const payload = await this.request(`/incidents/${encodeURIComponent(fireId)}/spatial-review/project-pick`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gltf_position: point }) }, options);
+    if (!isRecord(payload)) throw new AdminApiError('parse', 'La projection du point 3D est invalide.');
+    return { longitude: readFiniteNumber(payload.longitude, 'longitude'), latitude: readFiniteNumber(payload.latitude, 'latitude'), altitude_m: readFiniteNumber(payload.altitude_m, 'altitude_m') };
+  }
+
+  async reviewIncidentSpatialMarker(fireId: string, markerId: string, input: { action: 'validate' | 'reject'; expected_version: number; reason: string }, options: AdminRequestOptions): Promise<void> {
+    if (input.reason.trim().length < 10) throw new AdminApiError('configuration', 'Le motif de revue est trop court.');
+    const payload = await this.postJson(`/incidents/${encodeURIComponent(fireId)}/spatial-markers/${encodeURIComponent(markerId)}/review`, input, options);
+    if (!isRecord(payload) || payload.marker_id !== markerId) throw new AdminApiError('parse', 'La réponse de revue du marqueur est invalide.');
+  }
+
+  async createActiveFireZoneRevision(fireId: string, input: { expected_latest_revision: number; valid_at: string; geometry_geojson: Readonly<Record<string, unknown>>; supporting_marker_ids: readonly string[]; geometry_origin?: 'HUMAN_AUTHORED' | 'SATELLITE_PRODUCT'; reason: string }, options: AdminRequestOptions): Promise<AdminActiveFireZoneRevision> {
+    const payload = await this.postJson(`/incidents/${encodeURIComponent(fireId)}/active-zone-revisions`, input, options);
+    try { return parseActiveFireZoneRevision(payload); }
+    catch { throw new AdminApiError('parse', 'La révision de zone active retournée est invalide.'); }
+  }
+
+  async mergeActiveFireZoneRevisions(fireId: string, input: { expected_latest_revision: number; source_revision_ids: readonly string[]; valid_at: string; supporting_marker_ids: readonly string[]; reason: string }, options: AdminRequestOptions): Promise<AdminActiveFireZoneRevision> {
+    const payload = await this.postJson(`/incidents/${encodeURIComponent(fireId)}/active-zone-revisions/merge`, input, options);
+    try { return parseActiveFireZoneRevision(payload); }
+    catch { throw new AdminApiError('parse', 'La fusion de zones retournée est invalide.'); }
+  }
+
+  async reviewActiveFireZoneRevision(fireId: string, revisionId: string, input: { action: 'approve' | 'reject'; expected_state: AdminActiveFireZoneRevision['review_state']; reason: string }, options: AdminRequestOptions): Promise<AdminActiveFireZoneRevision> {
+    const payload = await this.postJson(`/incidents/${encodeURIComponent(fireId)}/active-zone-revisions/${encodeURIComponent(revisionId)}/review`, input, options);
+    try { return parseActiveFireZoneRevision(payload); }
+    catch { throw new AdminApiError('parse', 'La validation de zone retournée est invalide.'); }
+  }
+
+  async resolveIncidentAgentReview(fireId: string, reviewId: string, input: { action: 'approve' | 'reject'; expected_state: 'PENDING' | 'IN_REVIEW'; reason: string }, options: AdminRequestOptions): Promise<void> {
+    const payload = await this.postJson(`/incidents/${encodeURIComponent(fireId)}/agent-reviews/${encodeURIComponent(reviewId)}/resolve`, input, options);
+    if (!isRecord(payload) || payload.review_id !== reviewId) throw new AdminApiError('parse', 'La résolution de revue agentique est invalide.');
   }
 
   async updateSource(sourceKey: string, input: AdminSourceUpdateInput, options: AdminRequestOptions): Promise<void> {

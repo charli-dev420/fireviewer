@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firewarning.example/schemas/fire-pointing-manifest-v1.json",
+  "title": "FireWarning fire-pointing candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "family", "sample_id", "source", "event_id", "sequence_id",
+    "split_group", "proposed_split", "pointing_status", "training_eligibility",
+    "targets", "human_validation"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "family": {"const": "fire_pointing"},
+    "sample_id": {"type": "string", "minLength": 8},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id", "source_record_id", "source_manifest_relpath", "image_relpath",
+        "sha256", "width", "height", "license", "consent_basis"
+      ],
+      "properties": {
+        "source_id": {"type": "string"},
+        "source_record_id": {"type": "string"},
+        "source_manifest_relpath": {"type": "string"},
+        "image_relpath": {"type": "string", "pattern": "^corpus/"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "width": {"type": "integer", "minimum": 32},
+        "height": {"type": "integer", "minimum": 32},
+        "license": {"type": "string"},
+        "consent_basis": {"type": "object"}
+      }
+    },
+    "event_id": {"type": "string"},
+    "sequence_id": {"type": "string"},
+    "split_group": {"type": "string"},
+    "proposed_split": {"enum": ["train", "validation", "test", "critical_test"]},
+    "pointing_status": {
+      "enum": ["point_candidate", "non_fire_negative_candidate", "annotation_candidate"]
+    },
+    "training_eligibility": {
+      "enum": [
+        "requires_point_validation", "excluded_until_abstention_review",
+        "requires_point_annotation"
+      ]
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "target_id", "semantic_anchor", "source_pixel_normalized", "label_origin",
+          "validation_status"
+        ],
+        "properties": {
+          "target_id": {"type": "string"},
+          "semantic_anchor": {
+            "enum": [
+              "fire_base", "smoke_column_base", "fire_response_vehicle",
+              "firefighting_aircraft"
+            ]
+          },
+          "source_pixel_normalized": {
+            "type": "array", "minItems": 2, "maxItems": 2,
+            "items": {"type": "number", "minimum": 0, "maximum": 1}
+          },
+          "label_origin": {"const": "bbox_bottom_center_weak"},
+          "validation_status": {"const": "candidate_unreviewed"}
+        }
+      }
+    },
+    "human_validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "minimum_validators", "completed_validators"],
+      "properties": {
+        "required": {"const": true},
+        "minimum_validators": {"type": "integer", "minimum": 2},
+        "completed_validators": {"const": 0}
+      }
+    }
+  }
+}

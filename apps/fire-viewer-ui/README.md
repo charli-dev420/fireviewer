@@ -17,10 +17,11 @@ erreur de détail affiche un état dégradé explicite tout en conservant les m�
 manifest. Le viewer GLB est chargé uniquement lorsque le manifest publie un asset ; il
 ne prédit pas la propagation et ne remplace pas les consignes officielles.
 
-L'administration utilise des routes dédiées : file de traitement, incidents,
-signalements, audit global, rôles et accès, état système, configuration sûre et
-références spatiales techniques. Les rôles restent contrôlés par le backend et le
-fournisseur d'identité ; le navigateur ne les attribue jamais.
+L'administration utilise des routes dédiées : tableau de bord, carte opérationnelle
+nationale interne, file de traitement, incidents, rapprochement spatial, signalements,
+audit, état système, configuration, zones, packages et publications. Le MVP utilise un
+compte administrateur unique validé par le backend ; le navigateur ne s'attribue jamais
+de rôle ou de capacité.
 
 > Les jeux de données de développement et les tests ne constituent pas un service
 > d'urgence. En situation réelle, contacter les services d'urgence compétents.
@@ -77,7 +78,9 @@ contrat et d'intégration. Ils ne sont pas montés par l'application publique.
 
 ## Déploiement
 
-Le dépôt fournit `vercel.json` et `public/_redirects` pour les réécritures SPA. Un
-déploiement doit fournir `VITE_API_BASE_URL` vers une origine HTTPS de confiance. Les
-secrets, chemins de stockage et politiques d'identité ne doivent jamais être injectés
-dans le bundle frontend.
+Le dépôt fournit `vercel.json` et `public/_redirects` pour les réécritures SPA. En
+production, `/api/*` est réécrit vers `https://fireviewer-api.vercel.app/api/*`, ce qui
+permet au cookie Admin `SameSite=Strict` de rester sur un parcours même origine. Une
+origine explicite `VITE_API_BASE_URL` reste utilisée en développement et en recette.
+Les secrets, chemins de stockage et politiques d'identité ne doivent jamais être
+injectés dans le bundle frontend.

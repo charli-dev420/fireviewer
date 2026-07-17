@@ -120,7 +120,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 export function getDataMode(environment?: ViewerManifestEnvironment): ViewerDataMode {
   const resolved = resolveEnvironment(environment);
   if (resolved.VITE_USE_MOCKS === 'true') return 'mock';
-  if (resolved.VITE_USE_MOCKS === 'false' && getViewerManifestApiOrigin(resolved)) return 'api';
+  if (resolved.VITE_USE_MOCKS !== 'TRUE' && getViewerManifestApiOrigin(resolved)) return 'api';
   return 'unconfigured';
 }
 

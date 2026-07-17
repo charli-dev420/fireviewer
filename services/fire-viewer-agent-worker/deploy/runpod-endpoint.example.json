@@ -1,0 +1,26 @@
+{
+  "endpoint_type": "queue",
+  "active_workers": 0,
+  "max_workers": 1,
+  "gpus_per_worker": 1,
+  "gpu_vram_minimum_gb": 16,
+  "autoscaling": "queue_delay",
+  "queue_delay_seconds": 4,
+  "idle_timeout_seconds_initial": 90,
+  "execution_timeout_seconds": 1800,
+  "job_ttl_seconds": 3600,
+  "flashboot": true,
+  "cached_model": "Qwen/Qwen3-VL-4B-Instruct",
+  "cached_model_revision_required_by_worker": "ebb281ec70b05090aa6165b016eac8ec08e71b17",
+  "environment": {
+    "FW_ALLOWED_MEDIA_HOSTS": "private-media.example",
+    "FW_ENABLE_TRANSFORMERS_RUNTIME": "true",
+    "FW_HF_CACHE_ROOT": "/runpod-volume/huggingface-cache/hub",
+    "FW_ROMA_ROOT": "/runpod-volume/firewarning-roma",
+    "FW_MAX_DOWNLOAD_BYTES": "536870912",
+    "FW_ATTENTION_IMPLEMENTATION": "flash_attention_2",
+    "FW_RTDETR_CHECKPOINT_PATH": "/runpod-volume/firewarning-rtdetr",
+    "FW_RTDETR_CHECKPOINT_SHA256": "REPLACE_WITH_64_HEX_CHARACTERS"
+  },
+  "warning": "Documentation example, not a directly importable RunPod API payload. Benchmark before production."
+}

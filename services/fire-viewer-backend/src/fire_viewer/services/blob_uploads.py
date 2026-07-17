@@ -25,12 +25,17 @@ BLOB_UPLOAD_GRANT_ISSUER = "fire-viewer-api"
 BLOB_UPLOAD_GRANT_AUDIENCE = "fire-viewer-blob-upload"
 ALLOWED_PACKAGE_CONTENT_TYPES = (
     "application/json",
+    "application/vnd.fireviewer.terrain",
+    "application/vnd.fireviewer.tile",
+    "image/jpeg",
     "image/png",
     "image/tiff",
     "image/geotiff",
     "model/gltf-binary",
 )
-_ALLOWED_SUFFIXES = frozenset({".json", ".png", ".tif", ".tiff", ".glb"})
+_ALLOWED_SUFFIXES = frozenset(
+    {".json", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".glb", ".fwtile", ".fwterrain"}
+)
 
 
 @dataclass(frozen=True, slots=True)

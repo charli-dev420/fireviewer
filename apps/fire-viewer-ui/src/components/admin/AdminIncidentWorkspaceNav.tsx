@@ -1,6 +1,6 @@
 interface AdminIncidentWorkspaceNavProps {
   readonly fireId: string;
-  readonly active: 'dossier' | 'observations' | 'sources-media' | 'models-pipeline';
+  readonly active: 'dossier' | 'observations' | 'sources-media' | 'models-pipeline' | 'spatial-review';
 }
 
 const SECTIONS = [
@@ -8,6 +8,7 @@ const SECTIONS = [
   { key: 'observations', label: 'Observations', suffix: '/observations' },
   { key: 'sources-media', label: 'Sources et médias', suffix: '/sources-medias' },
   { key: 'models-pipeline', label: 'Modèles et pipeline', suffix: '/modeles-pipeline' },
+  { key: 'spatial-review', label: 'Revue 3D', suffix: '/revue-spatiale' },
 ] as const;
 
 /** Navigation locale : les surfaces restent toujours rattachées au même fire_id. */
