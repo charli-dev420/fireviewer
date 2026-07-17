@@ -189,7 +189,6 @@ async function buildTile(
   ]);
   const decoded = await decodeUnityTile(buffer, origin, far ? 5 : 1);
   const root = new Group(); root.name = far ? 'Unity FAR terrain' : `Unity detail ${decoded.tileId}`;
-  root.position.set(origin[0], origin[1], origin[2]);
   const terrain = new Mesh(geometry(decoded.terrain), new MeshBasicMaterial({ map: image, side: DoubleSide }));
   terrain.name = far ? 'far-terrain' : `terrain-${decoded.tileId}`;
   root.add(terrain);
@@ -209,7 +208,8 @@ function distanceToBounds(bounds: UnityBounds, east: number, north: number): num
 }
 
 function overlayWorld(origin: UnityOrigin, point: readonly [number, number, number], lift = 2): Vector3 {
-  return new Vector3(origin[0] + point[0], origin[1] + point[2], origin[2] + point[1] + lift);
+  void origin;
+  return new Vector3(point[0], point[2], point[1] + lift);
 }
 
 function redrawOverlays(runtime: Runtime, points: readonly TiledScenePoint[], lines: readonly TiledSceneLine[]): void {
@@ -231,10 +231,11 @@ function redrawOverlays(runtime: Runtime, points: readonly TiledScenePoint[], li
 
 function frameCamera(runtime: Runtime, preset: TiledSceneViewPreset, focus?: readonly [number, number]): void {
   const bounds = runtime.catalog.lod_policy.far.bounds_l93_m;
-  const centre: readonly [number, number] = focus ?? [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2];
+  const absoluteCentre: readonly [number, number] = focus ?? [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2];
+  const centre: readonly [number, number] = [absoluteCentre[0] - runtime.origin[0], absoluteCentre[1] - runtime.origin[1]];
   const span = Math.hypot(bounds[2] - bounds[0], bounds[3] - bounds[1]);
   const distance = preset === 'near' ? 680 : preset === 'local' ? 2_650 : Math.max(12_000, span * 0.9);
-  const targetZ = runtime.origin[2] + 250;
+  const targetZ = 250;
   runtime.controls.target.set(centre[0], centre[1], targetZ);
   runtime.instance.view.camera.up.copy(WORLD_UP);
   runtime.instance.view.camera.position.set(centre[0] + distance * 0.62, centre[1] - distance * 0.72, targetZ + distance * 0.62);
@@ -291,8 +292,10 @@ export function TiledSpatialScene3D({
     const selectDetails = (east: number, north: number) => {
       if (!catalog || !instance || !controls || disposed) return;
       const distance = instance.view.camera.position.distanceTo(controls.target);
+      const absoluteEast = east + catalog.origin_l93_m[0];
+      const absoluteNorth = north + catalog.origin_l93_m[1];
       const wanted = distance > 3_000 ? [] : catalog.tiles
-        .map((tile) => ({ tile, distance: distanceToBounds(tile.bounds_l93_m, east, north) }))
+        .map((tile) => ({ tile, distance: distanceToBounds(tile.bounds_l93_m, absoluteEast, absoluteNorth) }))
         .filter((entry) => entry.distance <= catalog!.lod_policy.detail.preload_radius_m)
         .sort((left, right) => left.distance - right.distance || left.tile.id.localeCompare(right.tile.id))
         .slice(0, catalog.lod_policy.detail.maximum_resident_tile_count)
