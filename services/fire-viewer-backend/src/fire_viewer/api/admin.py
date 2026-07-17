@@ -383,7 +383,7 @@ def upgrade_database_schema(
     trace_id: TraceIdDep,
     _idempotency_key: IdempotencyKeyDep,
 ) -> AdminSchemaUpgradeResponse:
-    """Apply the single approved e6 -> d7 production migration chain."""
+    """Apply one transition from the approved e6 -> d7 migration chain."""
 
     _require_admin(actor)
     outcome = upgrade_unity_schema(session)

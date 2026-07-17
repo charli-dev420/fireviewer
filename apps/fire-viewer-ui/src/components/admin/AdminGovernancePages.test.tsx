@@ -79,7 +79,7 @@ describe('surfaces de gouvernance administrateur', () => {
     vi.stubGlobal('fetch', fetchMock);
     renderAdmin(<AdminSystemPage />);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Appliquer la migration Unity' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Appliquer le pas suivant' }));
 
     expect(await screen.findByText(/e6f3a1b8c420 → d7c5e3a1b920 appliquée/)).toBeVisible();
     expect(fetchMock).toHaveBeenCalledWith(

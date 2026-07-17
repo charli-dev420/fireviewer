@@ -13,6 +13,14 @@ from fire_viewer.domain.errors import ConflictError
 
 SOURCE_REVISION = "e6f3a1b8c420"
 TARGET_REVISION = "d7c5e3a1b920"
+APPROVED_TRANSITIONS = {
+    "e6f3a1b8c420": "f3b8c1d7a920",
+    "f3b8c1d7a920": "a4e9c2f7d610",
+    "a4e9c2f7d610": "b8d4f6a9c210",
+    "b8d4f6a9c210": "c9f1a7d4e620",
+    "c9f1a7d4e620": "d2a6e8f1b430",
+    "d2a6e8f1b430": "d7c5e3a1b920",
+}
 
 
 @dataclass(frozen=True)
@@ -43,22 +51,30 @@ def _current_revision(session: Session) -> str:
 
 def upgrade_unity_schema(session: Session) -> SchemaUpgradeOutcome:
     config = _migration_config()
-    heads = ScriptDirectory.from_config(config).get_heads()
+    scripts = ScriptDirectory.from_config(config)
+    heads = scripts.get_heads()
     if heads != [TARGET_REVISION]:
         raise RuntimeError("The packaged Alembic head does not match the approved target.")
 
     previous = _current_revision(session)
     if previous == TARGET_REVISION:
         return SchemaUpgradeOutcome(previous, previous, False)
-    if previous != SOURCE_REVISION:
+    next_revision = APPROVED_TRANSITIONS.get(previous)
+    if next_revision is None:
         raise ConflictError(
             "unexpected_database_revision",
-            f"Expected {SOURCE_REVISION} before the bounded production upgrade.",
+            "The database revision is outside the approved production upgrade chain.",
         )
+    next_script = scripts.get_revision(next_revision)
+    if next_script is None or next_script.down_revision != previous:
+        raise RuntimeError("The packaged Alembic chain does not match the approved transition.")
 
     session.rollback()
-    command.upgrade(config, TARGET_REVISION)
+    # One explicit revision per request keeps this exceptional maintenance
+    # operation within the serverless execution window. Every transition is
+    # still an actual Alembic migration; none is skipped or merely stamped.
+    command.upgrade(config, next_revision)
     current = _current_revision(session)
-    if current != TARGET_REVISION:
-        raise RuntimeError("Alembic did not reach the approved target revision.")
+    if current != next_revision:
+        raise RuntimeError("Alembic did not reach the approved next revision.")
     return SchemaUpgradeOutcome(previous, current, True)
