@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ACESFilmicToneMapping,
   AmbientLight,
+  Box3,
   BufferAttribute,
   BufferGeometry,
   Color,
@@ -9,6 +10,7 @@ import {
   CylinderGeometry,
   DoubleSide,
   DirectionalLight,
+  Frustum,
   Group,
   InstancedMesh,
   Line as ThreeLine,
@@ -71,7 +73,6 @@ PARAMETER["standard_parallel_1",49],PARAMETER["standard_parallel_2",44],PARAMETE
 PARAMETER["false_northing",6600000],UNIT["metre",1],AXIS["Easting",EAST],AXIS["Northing",NORTH],AUTHORITY["EPSG","2154"]]`;
 const WORLD_UP = new Vector3(0, 0, 1);
 const TREE_PALETTE = ['#274c2d', '#315c31', '#386534', '#1d442e', '#245037', '#2b5939'];
-const NEAR_DETAIL_DISTANCE_MULTIPLIER = 1.3;
 const DETAIL_LOAD_CONCURRENCY = 4;
 const DETAIL_CACHE_LIMIT = 64;
 const LOD_REFRESH_INTERVAL_MS = 80;
@@ -98,11 +99,13 @@ function disposeObject(root: Object3D): void {
   });
 }
 
-function geometry(data: UnityMeshData): BufferGeometry {
+function geometry(data: UnityMeshData, withNormals = false): BufferGeometry {
   const result = new BufferGeometry();
   result.setAttribute('position', new BufferAttribute(data.positions, 3));
   if (data.uv) result.setAttribute('uv', new BufferAttribute(data.uv, 2));
   result.setIndex(new BufferAttribute(data.indices, 1));
+  if (withNormals) result.computeVertexNormals();
+  result.computeBoundingBox();
   result.computeBoundingSphere();
   return result;
 }
@@ -114,12 +117,14 @@ function materialForSection(section: 'building' | 'road' | 'water', name: string
   return new MeshLambertMaterial({ color, side: DoubleSide });
 }
 
-function meshSection(root: Group, data: readonly UnityMeshData[], section: 'building' | 'road' | 'water'): void {
+function meshSection(root: Group, data: readonly UnityMeshData[], section: 'building' | 'road' | 'water'): Mesh[] {
+  const meshes: Mesh[] = [];
   for (const item of data) {
-    const mesh = new Mesh(geometry(item), materialForSection(section, item.name));
+    const mesh = new Mesh(geometry(item, true), materialForSection(section, item.name));
     mesh.name = `${section}-${item.name}`;
-    root.add(mesh);
+    root.add(mesh); meshes.push(mesh);
   }
+  return meshes;
 }
 
 function treeMeshes(data: UnityTileGeometry['trees']): Group {
@@ -191,7 +196,7 @@ async function buildTile(
   origin: UnityOrigin,
   signal: AbortSignal,
   far = false,
-): Promise<{ root: Group; terrain: Mesh }> {
+): Promise<{ root: Group; terrain: Mesh; roads: readonly Mesh[] }> {
   const [buffer, image] = await Promise.all([
     fetchAsset(resolveAsset(source, payload), payload, source.credentials ?? 'omit', signal),
     texture(resolveAsset(source, imagery), source.credentials ?? 'omit', signal),
@@ -207,13 +212,14 @@ async function buildTile(
   }));
   terrain.name = far ? 'far-terrain' : `terrain-${decoded.tileId}`;
   root.add(terrain);
+  let roads: readonly Mesh[] = [];
   if (!far) {
     meshSection(root, decoded.buildings, 'building');
-    meshSection(root, decoded.roads, 'road');
+    roads = meshSection(root, decoded.roads, 'road');
     meshSection(root, decoded.water, 'water');
     root.add(treeMeshes(decoded.trees));
   }
-  return { root, terrain };
+  return { root, terrain, roads };
 }
 
 function distanceToBounds(bounds: UnityBounds, east: number, north: number): number {
@@ -222,28 +228,41 @@ function distanceToBounds(bounds: UnityBounds, east: number, north: number): num
   return Math.hypot(dx, dy);
 }
 
-function cameraGroundBounds(
-  camera: Instance['view']['camera'],
-  targetZ: number,
-  origin: UnityOrigin,
-  maximumDepth: number,
-): UnityBounds {
+function cameraFrustum(camera: Instance['view']['camera']): Frustum {
   camera.updateMatrixWorld();
   camera.updateProjectionMatrix();
-  const points = ([-1, 1] as const).flatMap((y) => ([-1, 1] as const).map((x) => {
-    const direction = new Vector3(x, y, 1).unproject(camera).sub(camera.position).normalize();
-    const planeDistance = (targetZ - camera.position.z) / direction.z;
-    const distance = Number.isFinite(planeDistance) && planeDistance > 0 ? Math.min(planeDistance, maximumDepth) : maximumDepth;
-    const point = camera.position.clone().addScaledVector(direction, distance);
-    return [point.x + origin[0], point.y + origin[1]] as const;
-  }));
-  const east = points.map((point) => point[0]);
-  const north = points.map((point) => point[1]);
-  return [Math.min(...east), Math.min(...north), Math.max(...east), Math.max(...north)];
+  return new Frustum().setFromProjectionMatrix(new Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
 }
 
-function intersectsBounds(left: UnityBounds, right: UnityBounds): boolean {
-  return left[0] <= right[2] && left[2] >= right[0] && left[1] <= right[3] && left[3] >= right[1];
+function tileIntersectsCamera(
+  frustum: Frustum,
+  tile: UnityCatalogTile,
+  origin: UnityOrigin,
+  elevationRange: readonly [number, number],
+): boolean {
+  return frustum.intersectsBox(new Box3(
+    new Vector3(tile.bounds_l93_m[0] - origin[0], tile.bounds_l93_m[1] - origin[1], elevationRange[0]),
+    new Vector3(tile.bounds_l93_m[2] - origin[0], tile.bounds_l93_m[3] - origin[1], elevationRange[1] + 80),
+  ));
+}
+
+function nearestRoadPoint(target: Vector3, roads: readonly Mesh[], maximumDistance = Number.POSITIVE_INFINITY): Vector3 | null {
+  const visibleRoads = roads.filter((mesh) => mesh.parent?.visible);
+  if (!visibleRoads.length) return null;
+  const ray = new Raycaster(new Vector3(target.x, target.y, target.z + 10_000), new Vector3(0, 0, -1));
+  const direct = ray.intersectObjects(visibleRoads, false)[0]?.point;
+  if (direct) return direct;
+  let bestSquared = maximumDistance * maximumDistance;
+  let best: Vector3 | null = null;
+  for (const mesh of visibleRoads) {
+    const positions = mesh.geometry.getAttribute('position') as BufferAttribute;
+    for (let index = 0; index < positions.count; index += 1) {
+      const dx = positions.getX(index) - target.x; const dy = positions.getY(index) - target.y;
+      const squared = dx * dx + dy * dy;
+      if (squared < bestSquared) { bestSquared = squared; best = new Vector3(positions.getX(index), positions.getY(index), positions.getZ(index)); }
+    }
+  }
+  return best;
 }
 
 function overlayWorld(origin: UnityOrigin, point: readonly [number, number, number], lift = 2): Vector3 {
@@ -317,8 +336,9 @@ export function TiledSpatialScene3D({
     const abortController = new AbortController(); let disposed = false; let animationFrame = 0; let refreshTimer: number | null = null;
     let instance: Instance | null = null; let controls: MapControls | null = null; let farRoot: Group | null = null; let catalog: UnitySpatialCatalog | null = null;
     const details = new Map<string, Group>(); const pending = new Map<string, Promise<void>>(); const failed = new Set<string>();
-    const terrainMeshes: Mesh[] = []; let desiredIds = new Set<string>(); let desiredTiles: readonly UnityCatalogTile[] = []; const pressed = new Set<string>();
-    let mode: 'orbit' | 'fps' = 'orbit'; let yaw = 0; let pitch = -0.15; let previousFrame = performance.now(); let pointerDown: readonly [number, number] | null = null;
+    const terrainMeshes: Mesh[] = []; const roadMeshes: Mesh[] = []; let terrainElevationRange: readonly [number, number] = [-1_000, 5_000];
+    let desiredIds = new Set<string>(); let desiredTiles: readonly UnityCatalogTile[] = []; const pressed = new Set<string>();
+    let mode: 'orbit' | 'fps' = 'orbit'; let fpsAnchoredToRoad = false; let yaw = 0; let pitch = -0.15; let previousFrame = performance.now(); let pointerDown: readonly [number, number] | null = null;
 
     const updateState = () => setDetailState({ active: [...desiredIds].filter((id) => details.get(id)?.visible).length, expected: desiredIds.size, failures: failed.size });
     const publish = () => {
@@ -334,9 +354,9 @@ export function TiledSpatialScene3D({
         if (capacity <= 0) break;
         if (details.has(tile.id) || pending.has(tile.id) || failed.has(tile.id)) continue;
         capacity -= 1;
-        const loading = buildTile(source, tile.payload, tile.imagery, catalog.origin_l93_m, abortController.signal).then(async ({ root, terrain }) => {
+        const loading = buildTile(source, tile.payload, tile.imagery, catalog.origin_l93_m, abortController.signal).then(async ({ root, terrain, roads }) => {
           if (disposed || !instance) { disposeObject(root); return; }
-          root.visible = false; await instance.add(root); details.set(tile.id, root); terrainMeshes.push(terrain); publish();
+          root.visible = false; await instance.add(root); details.set(tile.id, root); terrainMeshes.push(terrain); roadMeshes.push(...roads); publish();
         }).catch((error: unknown) => { if (!disposed && !abortController.signal.aborted) { console.error(error); failed.add(tile.id); } }).finally(() => {
           pending.delete(tile.id); if (!disposed) { updateState(); window.setTimeout(fillDetailCapacity, 0); }
         });
@@ -348,17 +368,10 @@ export function TiledSpatialScene3D({
       if (!catalog || !instance || !controls || disposed) return;
       const absoluteEast = east + catalog.origin_l93_m[0];
       const absoluteNorth = north + catalog.origin_l93_m[1];
-      const nearDetailDistance = catalog.lod_policy.detail.publish_distance_m * NEAR_DETAIL_DISTANCE_MULTIPLIER;
-      const visibleBounds = cameraGroundBounds(
-        instance.view.camera,
-        controls.target.z,
-        catalog.origin_l93_m,
-        nearDetailDistance + catalog.lod_policy.detail.preload_radius_m,
-      );
+      const frustum = cameraFrustum(instance.view.camera);
       desiredTiles = catalog.tiles
-        .filter((tile) => intersectsBounds(tile.bounds_l93_m, visibleBounds))
+        .filter((tile) => tileIntersectsCamera(frustum, tile, catalog!.origin_l93_m, terrainElevationRange))
         .map((tile) => ({ tile, distance: distanceToBounds(tile.bounds_l93_m, absoluteEast, absoluteNorth) }))
-        .filter((entry) => entry.distance <= nearDetailDistance)
         .sort((left, right) => left.distance - right.distance || left.tile.id.localeCompare(right.tile.id))
         .map((entry) => entry.tile);
       desiredIds = new Set(desiredTiles.map((tile) => tile.id)); publish();
@@ -373,6 +386,8 @@ export function TiledSpatialScene3D({
         root.traverse((candidate) => {
           const index = terrainMeshes.indexOf(candidate as Mesh);
           if (index >= 0) terrainMeshes.splice(index, 1);
+          const roadIndex = roadMeshes.indexOf(candidate as Mesh);
+          if (roadIndex >= 0) roadMeshes.splice(roadIndex, 1);
         });
         instance.remove(root); disposeObject(root); details.delete(id);
       }
@@ -390,6 +405,13 @@ export function TiledSpatialScene3D({
       const direction = new Vector3(Math.sin(yaw) * Math.cos(pitch), Math.cos(yaw) * Math.cos(pitch), Math.sin(pitch));
       instance.view.camera.up.copy(WORLD_UP); instance.view.camera.lookAt(instance.view.camera.position.clone().add(direction));
     };
+    const placeFpsOnRoad = (target: Vector3) => {
+      if (!instance) return false;
+      const road = nearestRoadPoint(target, roadMeshes);
+      if (!road) return false;
+      instance.view.camera.position.set(road.x, road.y, road.z + 1.7); fpsAnchoredToRoad = true; orientFps(); scheduleRefresh();
+      return true;
+    };
     const animate = (now = performance.now()) => {
       const delta = Math.min((now - previousFrame) / 1_000, 0.05); previousFrame = now;
       const requested = propsRef.current.cameraMode;
@@ -401,30 +423,34 @@ export function TiledSpatialScene3D({
           forward.z = 0;
           if (forward.lengthSq() < 0.001) forward.set(0, 1, 0);
           forward.normalize();
-          const target = controls.target.clone();
-          const groundRay = new Raycaster(new Vector3(target.x, target.y, target.z + 10_000), new Vector3(0, 0, -1));
-          const ground = groundRay.intersectObjects(terrainMeshes.filter((mesh) => mesh.parent?.visible), false)[0]?.point.z ?? target.z;
-          instance.view.camera.position.set(target.x - forward.x * 45, target.y - forward.y * 45, ground + 8);
-          yaw = Math.atan2(forward.x, forward.y); pitch = -0.05; orientFps(); scheduleRefresh();
-        } else if (document.pointerLockElement) document.exitPointerLock();
+          yaw = Math.atan2(forward.x, forward.y); pitch = -0.06; fpsAnchoredToRoad = false;
+          placeFpsOnRoad(controls.target);
+        } else {
+          fpsAnchoredToRoad = false;
+          if (document.pointerLockElement) document.exitPointerLock();
+        }
       }
       if (controls) controls.enabled = mode === 'orbit';
       if (instance && mode === 'fps') {
-        const speed = (pressed.has('ShiftLeft') || pressed.has('ShiftRight') ? 1_100 : 380) * delta;
+        if (!fpsAnchoredToRoad && controls) placeFpsOnRoad(controls.target);
+        const speed = (pressed.has('ShiftLeft') || pressed.has('ShiftRight') ? 14 : 6) * delta;
         if (pressed.has('ArrowLeft')) yaw += 1.2 * delta; if (pressed.has('ArrowRight')) yaw -= 1.2 * delta;
         if (pressed.has('ArrowUp')) pitch = Math.min(1.45, pitch + 0.9 * delta); if (pressed.has('ArrowDown')) pitch = Math.max(-1.45, pitch - 0.9 * delta);
         const forward = new Vector3(Math.sin(yaw), Math.cos(yaw), 0); const right = new Vector3(Math.cos(yaw), -Math.sin(yaw), 0);
-        if (pressed.has('KeyW') || pressed.has('KeyZ')) instance.view.camera.position.addScaledVector(forward, speed);
-        if (pressed.has('KeyS')) instance.view.camera.position.addScaledVector(forward, -speed);
-        if (pressed.has('KeyA') || pressed.has('KeyQ')) instance.view.camera.position.addScaledVector(right, -speed);
-        if (pressed.has('KeyD')) instance.view.camera.position.addScaledVector(right, speed);
-        if (pressed.has('KeyE') || pressed.has('PageUp')) instance.view.camera.position.z += speed;
-        if (pressed.has('KeyC') || pressed.has('PageDown')) instance.view.camera.position.z -= speed;
+        const movement = new Vector3();
+        if (pressed.has('KeyW') || pressed.has('KeyZ')) movement.addScaledVector(forward, speed);
+        if (pressed.has('KeyS')) movement.addScaledVector(forward, -speed);
+        if (pressed.has('KeyA') || pressed.has('KeyQ')) movement.addScaledVector(right, -speed);
+        if (pressed.has('KeyD')) movement.addScaledVector(right, speed);
+        if (movement.lengthSq() > 0 && fpsAnchoredToRoad) {
+          const road = nearestRoadPoint(instance.view.camera.position.clone().add(movement), roadMeshes, 35);
+          if (road) instance.view.camera.position.set(road.x, road.y, road.z + 1.7);
+        }
         orientFps(); instance.notifyChange(instance.view.camera); scheduleRefresh();
       }
       animationFrame = requestAnimationFrame(animate);
     };
-    const keyDown = (event: KeyboardEvent) => { if (propsRef.current.cameraMode === 'fps') { pressed.add(event.code); if (event.code.startsWith('Arrow') || event.code.startsWith('Page')) event.preventDefault(); } };
+    const keyDown = (event: KeyboardEvent) => { if (propsRef.current.cameraMode === 'fps') { pressed.add(event.code); if (event.code.startsWith('Arrow')) event.preventDefault(); } };
     const keyUp = (event: KeyboardEvent) => pressed.delete(event.code);
     const mouseMove = (event: MouseEvent) => {
       if (propsRef.current.cameraMode !== 'fps' || document.pointerLockElement !== instance?.domElement) return;
@@ -450,7 +476,7 @@ export function TiledSpatialScene3D({
         catalog = parseUnitySpatialCatalog(await response.json());
         instance = new Instance({ target: host, crs: coordinateSystem(), backgroundColor: '#102429' });
         instance.renderer.toneMapping = ACESFilmicToneMapping;
-        instance.renderer.toneMappingExposure = 0.72;
+        instance.renderer.toneMappingExposure = 0.82;
         instance.view.camera.up.copy(WORLD_UP);
         controls = new MapControls(instance.view.camera, instance.domElement); controls.enableDamping = true; controls.dampingFactor = 0.12; controls.screenSpacePanning = false; controls.minDistance = 5; controls.zoomSpeed = 1.35;
         instance.view.setControls(controls); controls.addEventListener('change', scheduleRefresh);
@@ -461,6 +487,8 @@ export function TiledSpatialScene3D({
         await instance.add(lighting);
         const far = await buildTile(source, catalog.lod_policy.far.terrain, catalog.lod_policy.far.imagery, catalog.origin_l93_m, abortController.signal, true);
         if (disposed) { disposeObject(far.root); return; }
+        const farBounds = far.terrain.geometry.boundingBox;
+        if (farBounds) terrainElevationRange = [farBounds.min.z, farBounds.max.z];
         farRoot = far.root; terrainMeshes.push(far.terrain); await instance.add(farRoot);
         const overlays = new Group(); overlays.name = 'admin-spatial-overlays'; await instance.add(overlays);
         const runtime: Runtime = { instance, controls, overlays, origin: catalog.origin_l93_m, catalog };
@@ -485,7 +513,7 @@ export function TiledSpatialScene3D({
 
   const statusText = status === 'error' ? 'Scène Unity indisponible' : status === 'loading' ? 'Chargement de la scène Unity…' : `Scène Unity prête · ${detailState.active}/${detailState.expected} tuiles détaillées${detailState.failures ? ` · ${detailState.failures} échec(s)` : ''}`;
   return <div className={`incident-tiled-scene ${drawMode ? 'is-drawing' : ''}`}>
-    <div ref={hostRef} className="incident-tiled-scene__canvas" tabIndex={0} aria-label={cameraMode === 'fps' ? 'Scène Unity en vue FPS. Cliquez pour activer la souris. ZQSD ou WASD pour se déplacer, E et C pour monter ou descendre.' : 'Scène 3D Unity FireViewer en vue orbitale.'} />
+    <div ref={hostRef} className="incident-tiled-scene__canvas" tabIndex={0} aria-label={cameraMode === 'fps' ? 'Scène Unity en vue FPS piétonne contrainte aux routes et chemins. Cliquez pour activer la souris et utilisez ZQSD ou WASD.' : 'Scène 3D Unity FireViewer en vue orbitale.'} />
     <span className={`incident-tiled-scene__status is-${status}`} role="status">{statusText}</span>
   </div>;
 }
