@@ -78,6 +78,7 @@ const NEAR_DETAIL_DISTANCE_MULTIPLIER = 1.3;
 const DETAIL_LOAD_CONCURRENCY = 4;
 const DETAIL_CACHE_LIMIT = 64;
 const LOD_REFRESH_INTERVAL_MS = 80;
+const CAMERA_TERRAIN_CLAMP_INTERVAL_MS = 80;
 let lambert93: CoordinateSystem | null = null;
 
 function coordinateSystem(): CoordinateSystem {
@@ -376,7 +377,7 @@ export function TiledSpatialScene3D({
     const terrainMeshes: Mesh[] = []; const roadMeshes: Mesh[] = []; let terrainElevationRange: readonly [number, number] = [-1_000, 5_000];
     const tileSightPoints = new Map<string, readonly Vector3[]>();
     let desiredIds = new Set<string>(); let desiredTiles: readonly UnityCatalogTile[] = []; const pressed = new Set<string>();
-    let mode: 'orbit' | 'fps' = 'orbit'; let fpsAnchoredToRoad = false; let yaw = 0; let pitch = -0.15; let previousFrame = performance.now(); let pointerDown: readonly [number, number] | null = null;
+    let mode: 'orbit' | 'fps' = 'orbit'; let fpsAnchoredToRoad = false; let yaw = 0; let pitch = -0.15; let previousFrame = performance.now(); let previousTerrainClamp = 0; let pointerDown: readonly [number, number] | null = null;
 
     const updateState = () => setDetailState({ active: [...desiredIds].filter((id) => details.get(id)?.visible).length, expected: desiredIds.size, failures: failed.size });
     const sightPointsFor = (tile: UnityCatalogTile): readonly Vector3[] => {
@@ -489,6 +490,20 @@ export function TiledSpatialScene3D({
       yaw = Math.atan2(road.direction.x, road.direction.y); fpsAnchoredToRoad = true; orientFps(); scheduleRefresh();
       return true;
     };
+    const keepCameraAboveTerrain = (now: number) => {
+      if (!instance || now - previousTerrainClamp < CAMERA_TERRAIN_CLAMP_INTERVAL_MS) return false;
+      previousTerrainClamp = now;
+      const camera = instance.view.camera;
+      const ray = new Raycaster(
+        new Vector3(camera.position.x, camera.position.y, terrainElevationRange[1] + 2_000),
+        new Vector3(0, 0, -1),
+      );
+      const ground = ray.intersectObjects(terrainMeshes.filter((mesh) => mesh.parent?.visible), false)[0]?.point;
+      if (!ground) return false;
+      const clearance = mode === 'fps' ? 1.7 : 2;
+      if (camera.position.z >= ground.z + clearance) return false;
+      camera.position.z = ground.z + clearance; instance.notifyChange(camera); return true;
+    };
     const animate = (now = performance.now()) => {
       const delta = Math.min((now - previousFrame) / 1_000, 0.05); previousFrame = now;
       const requested = propsRef.current.cameraMode;
@@ -528,6 +543,7 @@ export function TiledSpatialScene3D({
         }
         orientFps(); instance.notifyChange(instance.view.camera); scheduleRefresh();
       }
+      if (keepCameraAboveTerrain(now) && mode === 'fps') orientFps();
       animationFrame = requestAnimationFrame(animate);
     };
     const keyDown = (event: KeyboardEvent) => { if (propsRef.current.cameraMode === 'fps') { pressed.add(event.code); if (event.code.startsWith('Arrow')) event.preventDefault(); } };
