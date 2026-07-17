@@ -112,7 +112,7 @@ Depuis la console Python de Blender :
 ```python
 FIREVIEWER_PACKAGE = r"D:\chemin\justin-global-control-v2.json.gz"
 FIREVIEWER_OUTPUT = r"D:\chemin\justin-global-control-v2.blend"
-exec(open(r"D:\Dev\project\fireviewer\tools\spatial-hybrid-zone\blender\build_control_scene.py", encoding="utf-8").read())
+exec(open(r"D:\chemin\vers\fireviewer\tools\spatial-hybrid-zone\blender\build_control_scene.py", encoding="utf-8").read())
 ```
 
 ## Détail global tuilé à 0,5 m

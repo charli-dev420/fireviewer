@@ -8,8 +8,14 @@ import shutil
 import subprocess
 from threading import Thread
 
-from fwtile import sha256_bytes
-from test_dotnet_remote_bridge import _detail_container_with_nonzero_origin
+from fwtile import (
+    build_container,
+    build_vector_sections,
+    encode_detail_terrain,
+    encode_tree_instances,
+    sha256_bytes,
+)
+from test_fwtile import _detail_vectors, _package
 
 
 ROOT = Path(__file__).resolve().parent
@@ -29,7 +35,32 @@ PNG_1X1 = bytes.fromhex(
 def _write_fixture() -> None:
     if FIXTURE.exists():
         shutil.rmtree(FIXTURE)
-    payload = _detail_container_with_nonzero_origin()
+    package = _package()
+    package["metadata"]["origin_l93_m"] = [0.0, 0.0, 320.0]
+    package["instances"]["values"] = [
+        # Inside the building only (outside the road and water triangles).
+        [1.1, 0.8, 101.25, 8.125, 0.2, 1, 30.25],
+        # Outside all three masks: this is the single rendered tree.
+        [1.5, 0.75, 105.4, 12.0, 0.2, 3, 359.99],
+    ]
+    bounds = package["metadata"]["bounds_l93_m"]
+    origin = package["metadata"]["origin_l93_m"]
+    terrain = encode_detail_terrain(package["terrain"], bounds, origin)
+    trees = encode_tree_instances(package, bounds, origin)
+    vectors = build_vector_sections(_detail_vectors(), bounds, origin)
+    payload = build_container(
+        kind="detail_tile",
+        tile_id="x0_y0_s2",
+        bounds_l93_m=bounds,
+        origin_l93_m=origin,
+        sections=[
+            ("terrain", *terrain),
+            ("trees", *trees),
+            ("buildings", *vectors["buildings"]),
+            ("roads", *vectors["roads"]),
+            ("water", *vectors["water"]),
+        ],
+    )
     payload_sha = sha256_bytes(payload)
     payload_url = f"detail/x0_y0_s2/x0_y0_s2.{payload_sha}.fwtile"
     payload_path = FIXTURE / Path(*payload_url.split("/"))

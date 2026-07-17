@@ -3,6 +3,7 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 
 namespace FireViewer.SpatialTiles.Editor
@@ -30,6 +31,7 @@ namespace FireViewer.SpatialTiles.Editor
             FwSpatialSceneBootstrap bootstrap = runtimeRoot.AddComponent<FwSpatialSceneBootstrap>();
 
             var cameraObject = new GameObject("FireViewer Camera");
+            cameraObject.tag = "MainCamera";
             Camera camera = cameraObject.AddComponent<Camera>();
             camera.nearClipPlane = 2f;
             camera.farClipPlane = 50_000f;
@@ -37,10 +39,13 @@ namespace FireViewer.SpatialTiles.Editor
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.12f, 0.15f, 0.17f);
             camera.allowHDR = true;
-            bootstrap.Configure(catalogUrl, camera, string.Empty);
+            // The editor scene is an explicit local validation harness.  A
+            // production host leaves this false until its authenticated
+            // session authorizes detailed navigation.
+            bootstrap.Configure(catalogUrl, camera, string.Empty, true, true);
             Transform target = runtimeRoot.transform.Find("Focus Target");
             camera.transform.SetParent(target, false);
-            camera.transform.localPosition = new Vector3(0f, 10_606f, -10_606f);
+            camera.transform.localPosition = new Vector3(0f, 8_485f, -8_485f);
             camera.transform.localRotation = Quaternion.Euler(35f, 0f, 0f);
 
             var lightObject = new GameObject("Sun");
@@ -58,7 +63,7 @@ namespace FireViewer.SpatialTiles.Editor
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath) ?? "Assets");
             EditorSceneManager.SaveScene(scene, ScenePath);
             Selection.activeGameObject = runtimeRoot;
-            Debug.Log($"FIREVIEWER_SPATIAL_DEMO_CREATED scene={ScenePath} catalog={catalogUrl} initialFocus=global viewDistanceM=15000");
+            Debug.Log($"FIREVIEWER_SPATIAL_DEMO_CREATED scene={ScenePath} catalog={catalogUrl} initialFocus=global viewDistanceM=12000 detailNavigationAuthorized=editor_validation_only adminFpsAuthorized=editor_validation_only");
         }
 
         private static string CommandLineValue(string name)

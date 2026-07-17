@@ -37,15 +37,26 @@ public static class FireViewerBridgeSmoke
             MeshFilter terrain = Array.Find(filters, item => item.gameObject.name == "Terrain");
             if (terrain == null || terrain.sharedMesh.vertexCount != 9 || terrain.sharedMesh.triangles.Length != 24)
                 throw new InvalidDataException("Unity terrain GameObject does not contain the expected 9-vertex/8-triangle mesh.");
-            if (geometry.Trees.Length != 2 || root.transform.Find("Trees (all detected instances)") == null)
-                throw new InvalidDataException("Unity did not materialize the complete tree instance component.");
+            Transform trees = root.transform.Find("Trees — detected crowns, operational LOD");
+            if (geometry.Trees.Length != 2 || builder.LastSourceTreeCount != 2 ||
+                builder.LastVisibleTreeCount != 1 || builder.LastMaskedTreeCount != 1 || trees == null)
+                throw new InvalidDataException(
+                    $"Unity vegetation masking is invalid: source={builder.LastSourceTreeCount}, " +
+                    $"visible={builder.LastVisibleTreeCount}, masked={builder.LastMaskedTreeCount}.");
+            MeshRenderer buildingRenderer = Array.Find(
+                root.GetComponentsInChildren<MeshRenderer>(true),
+                item => item.transform.parent != null && item.transform.parent.gameObject.name == "Buildings");
+            if (buildingRenderer == null || buildingRenderer.sharedMaterial.shader.name != "FireViewer/Operational Building")
+                throw new InvalidDataException("Unity did not apply the operational building shader.");
             if (geometry.Buildings.Length != 1 || geometry.Roads.Length != 1 || geometry.Water.Length != 1 || filters.Length < 4)
                 throw new InvalidDataException("Unity did not materialize all vector mesh sections.");
 
             Debug.Log(
                 $"FIREVIEWER_UNITY_HTTP_BRIDGE_OK tile={geometry.TileId} " +
                 $"terrainVertices={terrain.sharedMesh.vertexCount} terrainTriangles={terrain.sharedMesh.triangles.Length / 3} " +
-                $"trees={geometry.Trees.Length} meshFilters={filters.Length}");
+                $"treesSource={geometry.Trees.Length} treesVisible={builder.LastVisibleTreeCount} " +
+                $"treesMasked={builder.LastMaskedTreeCount} buildingShader={buildingRenderer.sharedMaterial.shader.name} " +
+                $"meshFilters={filters.Length}");
             Cleanup(root, texture, builder);
             EditorApplication.Exit(0);
         }

@@ -818,12 +818,16 @@ def validate_catalog(catalog: Mapping[str, Any]) -> None:
     policy = catalog.get("lod_policy", {}).get("detail", {})
     if int(policy.get("maximum_resident_tile_count", 0)) != 16:
         raise FWTileError("catalog must enforce the 16 tile global resident budget")
-    if float(policy.get("publish_distance_m", 0)) > float(
-        policy.get("preload_radius_m", 0)
-    ):
-        raise FWTileError("detail preload radius is smaller than publish distance")
+    if float(policy.get("publish_distance_m", 0)) != 600.0:
+        raise FWTileError("catalog must preserve the accepted 600 m publish distance")
+    if float(policy.get("preload_radius_m", 0)) != 750.0:
+        raise FWTileError("catalog must preserve the accepted 750 m preload radius")
     urls: set[str] = set()
     far = catalog.get("lod_policy", {}).get("far", {})
+    if far.get("terrain", {}).get("resolution_m") != [5.0, 5.0]:
+        raise FWTileError("catalog must preserve the accepted 5 m FAR terrain")
+    if far.get("imagery", {}).get("resolution_m") != 2.0:
+        raise FWTileError("catalog must preserve the accepted 2 m FAR imagery")
     for reference in (far.get("terrain"), far.get("imagery")):
         if not isinstance(reference, Mapping):
             raise FWTileError("catalog far LOD is incomplete")
@@ -954,6 +958,11 @@ def _parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifact-root", type=Path, default=DEFAULT_ARTIFACT_ROOT)
     parser.add_argument("--output-root", type=Path)
+    parser.add_argument("--production-manifest", type=Path)
+    parser.add_argument("--global-vector-package", type=Path)
+    parser.add_argument("--far-terrain", type=Path)
+    parser.add_argument("--far-imagery", type=Path)
+    parser.add_argument("--detail-zones", type=Path, default=DETAIL_ZONE_CONTRACT_PATH)
     selection = parser.add_mutually_exclusive_group(required=True)
     selection.add_argument("--tile-id", action="append")
     selection.add_argument("--all-ready", action="store_true")
@@ -970,17 +979,33 @@ def main(argv: Sequence[str] | None = None) -> int:
         else artifact_root / "unity-remote-catalog"
     )
     context = create_context(
-        artifact_root / "global-05m/production-manifest.json",
-        artifact_root / "blender/justin-global-control-v5-vector-lod.json.gz",
+        (
+            arguments.production_manifest.resolve()
+            if arguments.production_manifest
+            else artifact_root / "global-05m/production-manifest.json"
+        ),
+        (
+            arguments.global_vector_package.resolve()
+            if arguments.global_vector_package
+            else artifact_root / "blender/justin-global-control-v5-vector-lod.json.gz"
+        ),
         output_root,
     )
     far = export_far_assets(
         context,
-        artifact_root / "terrain/mnt-global.cog.tif",
-        artifact_root / "blender/justin-ign-orthophoto-2m-display-v2.jpg",
+        (
+            arguments.far_terrain.resolve()
+            if arguments.far_terrain
+            else artifact_root / "terrain/mnt-global.cog.tif"
+        ),
+        (
+            arguments.far_imagery.resolve()
+            if arguments.far_imagery
+            else artifact_root / "blender/justin-ign-orthophoto-2m-display-v2.jpg"
+        ),
         imagery_resolution_m=arguments.far_imagery_resolution_m,
     )
-    detail_zones = _load_detail_zone_bounds()
+    detail_zones = _load_detail_zone_bounds(arguments.detail_zones.resolve())
     ready = _ready_tiles(context, detail_zones=detail_zones)
     if arguments.all_ready:
         selected = ready
@@ -1001,9 +1026,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         records.append(export_tile(context, tile))
         pending_priority_ids.discard(str(tile["id"]))
         if not pending_priority_ids:
-            # Publish a valid partial catalog as soon as Montmaur, Barsac and
-            # Ausson are present. The same atomic path is replaced by the final
-            # 475-tile catalog when the remaining deterministic order finishes.
+            # Publish a valid partial catalog as soon as the configured
+            # attention zones are present. The same atomic path is replaced by
+            # the final catalog when the deterministic order finishes.
             write_catalog(context, far)
             pending_priority_ids.add("__checkpoint_written__")
     catalog = write_catalog(context, far)

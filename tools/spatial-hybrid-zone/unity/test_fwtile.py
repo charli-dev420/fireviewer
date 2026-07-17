@@ -427,6 +427,11 @@ def test_catalog_has_two_lods_and_enforces_global_budget(tmp_path: Path) -> None
     with pytest.raises(FWTileError, match="16 tile"):
         validate_catalog(catalog)
 
+    catalog = build_catalog(context, far)
+    catalog["lod_policy"]["detail"]["publish_distance_m"] = 601.0
+    with pytest.raises(FWTileError, match="600 m"):
+        validate_catalog(catalog)
+
 
 def test_detail_zones_are_exported_first_in_contract_order() -> None:
     zones = [

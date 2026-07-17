@@ -1443,7 +1443,14 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--origin", type=float, nargs=3, default=DEFAULT_ORIGIN)
     parser.add_argument("--output-tile-size-m", type=int, default=500)
     parser.add_argument("--halo-m", type=float, default=10.0)
-    parser.add_argument("--expected-source-tile-count", type=int, default=131)
+    parser.add_argument(
+        "--expected-source-tile-count",
+        type=int,
+        help=(
+            "Optional locked IGN 1 km source-tile count. Omit for a new AOI; "
+            "set it after reviewing the written plan to detect later AOI drift."
+        ),
+    )
     parser.add_argument("--manifest-name", default="production-manifest.json")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--exclude-polygons", type=Path, action="append", default=[])

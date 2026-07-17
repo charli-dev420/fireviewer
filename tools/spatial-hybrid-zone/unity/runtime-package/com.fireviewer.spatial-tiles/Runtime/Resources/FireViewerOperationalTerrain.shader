@@ -62,15 +62,16 @@ Shader "FireViewer/Operational Terrain"
             {
                 if (_ClipDetailFootprints > 0.5)
                 {
-                    [unroll]
-                    for (int index = 0; index < 16; index++)
+                    float outside = 1.0;
+                    [loop]
+                    for (int index = 0; index < _FwDetailBoundsCount; index++)
                     {
-                        if (index >= _FwDetailBoundsCount) break;
                         float4 bounds = _FwDetailBounds[index];
-                        if (input.localXZ.x >= bounds.x && input.localXZ.x <= bounds.z &&
-                            input.localXZ.y >= bounds.y && input.localXZ.y <= bounds.w)
-                            discard;
+                        float inside = step(bounds.x, input.localXZ.x) * step(input.localXZ.x, bounds.z) *
+                            step(bounds.y, input.localXZ.y) * step(input.localXZ.y, bounds.w);
+                        outside *= 1.0 - inside;
                     }
+                    clip(outside - 0.5);
                 }
 
                 fixed3 colour = tex2D(_MainTex, input.uv).rgb * _Tint.rgb;
