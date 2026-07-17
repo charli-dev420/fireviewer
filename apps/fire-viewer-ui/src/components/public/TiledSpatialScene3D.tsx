@@ -75,7 +75,6 @@ PARAMETER["standard_parallel_1",49],PARAMETER["standard_parallel_2",44],PARAMETE
 PARAMETER["false_northing",6600000],UNIT["metre",1],AXIS["Easting",EAST],AXIS["Northing",NORTH],AUTHORITY["EPSG","2154"]]`;
 const WORLD_UP = new Vector3(0, 0, 1);
 const TREE_PALETTE = ['#274c2d', '#315c31', '#386534', '#1d442e', '#245037', '#2b5939'];
-const NEAR_DETAIL_DISTANCE_MULTIPLIER = 1.3;
 const DETAIL_LOAD_CONCURRENCY = 4;
 const DETAIL_CACHE_LIMIT = 64;
 const LOD_REFRESH_INTERVAL_MS = 80;
@@ -447,11 +446,9 @@ export function TiledSpatialScene3D({
       const absoluteEast = east + catalog.origin_l93_m[0];
       const absoluteNorth = north + catalog.origin_l93_m[1];
       const frustum = cameraFrustum(instance.view.camera);
-      const nearDetailDistance = catalog.lod_policy.detail.publish_distance_m * NEAR_DETAIL_DISTANCE_MULTIPLIER;
       desiredTiles = propsRef.current.detailLodEnabled ? catalog.tiles
         .filter((tile) => tileIntersectsCamera(frustum, tile, catalog!.origin_l93_m, terrainElevationRange))
         .map((tile) => ({ tile, distance: tileVolume(tile, catalog!.origin_l93_m, terrainElevationRange).distanceToPoint(instance!.view.camera.position) }))
-        .filter((entry) => entry.distance <= nearDetailDistance)
         .filter((entry) => tileHasTerrainLineOfSight(entry.tile))
         .sort((left, right) => left.distance - right.distance || left.tile.id.localeCompare(right.tile.id))
         .map((entry) => entry.tile) : [];
