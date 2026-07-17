@@ -289,6 +289,11 @@ function nearestRoadPoint(target: Vector3, roads: readonly Mesh[], maximumDistan
   return { point: best.point, direction: new Vector3(0, 1, 0) };
 }
 
+function terrainPointAt(target: Vector3, terrains: readonly Mesh[]): Vector3 | null {
+  const ray = new Raycaster(new Vector3(target.x, target.y, target.z + 10_000), new Vector3(0, 0, -1));
+  return ray.intersectObjects(terrains.filter((mesh) => mesh.parent?.visible), false)[0]?.point ?? null;
+}
+
 function overlayWorld(origin: UnityOrigin, point: readonly [number, number, number], lift = 2): Vector3 {
   void origin;
   return new Vector3(point[0], point[2], point[1] + lift);
@@ -433,7 +438,8 @@ export function TiledSpatialScene3D({
       if (!instance) return false;
       const road = nearestRoadPoint(target, roadMeshes);
       if (!road) return false;
-      instance.view.camera.position.set(road.point.x, road.point.y, road.point.z + 1.7);
+      const ground = terrainPointAt(road.point, terrainMeshes) ?? road.point;
+      instance.view.camera.position.set(road.point.x, road.point.y, ground.z + 1.7);
       yaw = Math.atan2(road.direction.x, road.direction.y); fpsAnchoredToRoad = true; orientFps(); scheduleRefresh();
       return true;
     };
@@ -448,7 +454,7 @@ export function TiledSpatialScene3D({
           forward.z = 0;
           if (forward.lengthSq() < 0.001) forward.set(0, 1, 0);
           forward.normalize();
-          yaw = Math.atan2(forward.x, forward.y); pitch = -0.06; fpsAnchoredToRoad = false;
+          yaw = Math.atan2(forward.x, forward.y); pitch = 0; fpsAnchoredToRoad = false;
           placeFpsOnRoad(controls.target);
         } else {
           fpsAnchoredToRoad = false;
@@ -469,7 +475,10 @@ export function TiledSpatialScene3D({
         if (pressed.has('KeyD')) movement.addScaledVector(right, speed);
         if (movement.lengthSq() > 0 && fpsAnchoredToRoad) {
           const road = nearestRoadPoint(instance.view.camera.position.clone().add(movement), roadMeshes, 35);
-          if (road) instance.view.camera.position.set(road.point.x, road.point.y, road.point.z + 1.7);
+          if (road) {
+            const ground = terrainPointAt(road.point, terrainMeshes) ?? road.point;
+            instance.view.camera.position.set(road.point.x, road.point.y, ground.z + 1.7);
+          }
         }
         orientFps(); instance.notifyChange(instance.view.camera); scheduleRefresh();
       }
