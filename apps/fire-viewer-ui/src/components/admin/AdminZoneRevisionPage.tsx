@@ -49,7 +49,8 @@ export function AdminZoneRevisionPage({
   );
 
   async function choosePackage(event: ChangeEvent<HTMLInputElement>) {
-    const files = event.currentTarget.files;
+    const input = event.currentTarget;
+    const files = input.files;
     setPrepared(null);
     setProgress(null);
     setMessage(null);
@@ -60,7 +61,7 @@ export function AdminZoneRevisionPage({
     } catch (error) {
       setSelectionError(error instanceof Error ? error.message : 'Le dossier sélectionné est invalide.');
     } finally {
-      event.currentTarget.value = '';
+      input.value = '';
     }
   }
 
@@ -250,3 +251,4 @@ export function AdminZoneRevisionPage({
     </section>
   );
 }
+
