@@ -63,6 +63,7 @@ interface Runtime {
   readonly overlays: Group;
   readonly origin: UnityOrigin;
   readonly catalog: UnitySpatialCatalog;
+  readonly refreshDetails: () => void;
 }
 
 const LAMBERT93_WKT = `
@@ -73,6 +74,7 @@ PARAMETER["standard_parallel_1",49],PARAMETER["standard_parallel_2",44],PARAMETE
 PARAMETER["false_northing",6600000],UNIT["metre",1],AXIS["Easting",EAST],AXIS["Northing",NORTH],AUTHORITY["EPSG","2154"]]`;
 const WORLD_UP = new Vector3(0, 0, 1);
 const TREE_PALETTE = ['#274c2d', '#315c31', '#386534', '#1d442e', '#245037', '#2b5939'];
+const NEAR_DETAIL_DISTANCE_MULTIPLIER = 1.3;
 const DETAIL_LOAD_CONCURRENCY = 4;
 const DETAIL_CACHE_LIMIT = 64;
 const LOD_REFRESH_INTERVAL_MS = 80;
@@ -240,10 +242,14 @@ function tileIntersectsCamera(
   origin: UnityOrigin,
   elevationRange: readonly [number, number],
 ): boolean {
-  return frustum.intersectsBox(new Box3(
+  return frustum.intersectsBox(tileVolume(tile, origin, elevationRange));
+}
+
+function tileVolume(tile: UnityCatalogTile, origin: UnityOrigin, elevationRange: readonly [number, number]): Box3 {
+  return new Box3(
     new Vector3(tile.bounds_l93_m[0] - origin[0], tile.bounds_l93_m[1] - origin[1], elevationRange[0]),
     new Vector3(tile.bounds_l93_m[2] - origin[0], tile.bounds_l93_m[3] - origin[1], elevationRange[1] + 80),
-  ));
+  );
 }
 
 interface RoadSnap { readonly point: Vector3; readonly direction: Vector3; }
@@ -351,13 +357,15 @@ export function TiledSpatialScene3D({
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const runtimeRef = useRef<Runtime | null>(null);
-  const propsRef = useRef({ overlayPoints, overlayLines, onPick, drawMode, cameraMode, viewPreset });
+  const [detailLodEnabled, setDetailLodEnabled] = useState(true);
+  const propsRef = useRef({ overlayPoints, overlayLines, onPick, drawMode, cameraMode, detailLodEnabled, viewPreset });
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [detailState, setDetailState] = useState({ active: 0, expected: 0, failures: 0 });
-  propsRef.current = { overlayPoints, overlayLines, onPick, drawMode, cameraMode, viewPreset };
+  propsRef.current = { overlayPoints, overlayLines, onPick, drawMode, cameraMode, detailLodEnabled, viewPreset };
 
   useEffect(() => { const runtime = runtimeRef.current; if (runtime) redrawOverlays(runtime, overlayPoints, overlayLines); }, [overlayPoints, overlayLines]);
   useEffect(() => { const runtime = runtimeRef.current; if (runtime) frameCamera(runtime, viewPreset); }, [viewPreset]);
+  useEffect(() => { runtimeRef.current?.refreshDetails(); }, [detailLodEnabled]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -398,11 +406,13 @@ export function TiledSpatialScene3D({
       const absoluteEast = east + catalog.origin_l93_m[0];
       const absoluteNorth = north + catalog.origin_l93_m[1];
       const frustum = cameraFrustum(instance.view.camera);
-      desiredTiles = catalog.tiles
+      const nearDetailDistance = catalog.lod_policy.detail.publish_distance_m * NEAR_DETAIL_DISTANCE_MULTIPLIER;
+      desiredTiles = propsRef.current.detailLodEnabled ? catalog.tiles
         .filter((tile) => tileIntersectsCamera(frustum, tile, catalog!.origin_l93_m, terrainElevationRange))
-        .map((tile) => ({ tile, distance: distanceToBounds(tile.bounds_l93_m, absoluteEast, absoluteNorth) }))
+        .map((tile) => ({ tile, distance: tileVolume(tile, catalog!.origin_l93_m, terrainElevationRange).distanceToPoint(instance!.view.camera.position) }))
+        .filter((entry) => entry.distance <= nearDetailDistance)
         .sort((left, right) => left.distance - right.distance || left.tile.id.localeCompare(right.tile.id))
-        .map((entry) => entry.tile);
+        .map((entry) => entry.tile) : [];
       desiredIds = new Set(desiredTiles.map((tile) => tile.id)); publish();
       const cachedOutsideView = [...details.entries()]
         .filter(([id]) => !desiredIds.has(id))
@@ -525,7 +535,7 @@ export function TiledSpatialScene3D({
         if (farBounds) terrainElevationRange = [farBounds.min.z, farBounds.max.z];
         farRoot = far.root; farRoot.position.z = -3; terrainMeshes.push(far.terrain); await instance.add(farRoot);
         const overlays = new Group(); overlays.name = 'admin-spatial-overlays'; await instance.add(overlays);
-        const runtime: Runtime = { instance, controls, overlays, origin: catalog.origin_l93_m, catalog };
+        const runtime: Runtime = { instance, controls, overlays, origin: catalog.origin_l93_m, catalog, refreshDetails: scheduleRefresh };
         runtimeRef.current = runtime; redrawOverlays(runtime, propsRef.current.overlayPoints, propsRef.current.overlayLines);
         let focus: readonly [number, number] | undefined;
         if (overlayOriginWgs84) focus = proj4('EPSG:4326', 'EPSG:2154', [overlayOriginWgs84[0], overlayOriginWgs84[1]]) as [number, number];
@@ -545,9 +555,10 @@ export function TiledSpatialScene3D({
     };
   }, [source.catalogUrl, source.credentials, source.files, overlayOriginWgs84]);
 
-  const statusText = status === 'error' ? 'Scène Unity indisponible' : status === 'loading' ? 'Chargement de la scène Unity…' : `Scène Unity prête · ${detailState.active}/${detailState.expected} tuiles détaillées${detailState.failures ? ` · ${detailState.failures} échec(s)` : ''}`;
+  const statusText = status === 'error' ? 'Scène Unity indisponible' : status === 'loading' ? 'Chargement de la scène Unity…' : !detailLodEnabled ? 'Scène Unity prête · FAR seul · LOD détaillé désactivé' : `Scène Unity prête · ${detailState.active}/${detailState.expected} tuiles détaillées${detailState.failures ? ` · ${detailState.failures} échec(s)` : ''}`;
   return <div className={`incident-tiled-scene ${drawMode ? 'is-drawing' : ''}`}>
     <div ref={hostRef} className="incident-tiled-scene__canvas" tabIndex={0} aria-label={cameraMode === 'fps' ? 'Scène Unity en vue FPS piétonne contrainte aux routes et chemins. Cliquez pour activer la souris et utilisez ZQSD ou WASD.' : 'Scène 3D Unity FireViewer en vue orbitale.'} />
+    <button type="button" className="incident-tiled-scene__lod-toggle" aria-pressed={detailLodEnabled} onClick={() => setDetailLodEnabled((enabled) => !enabled)}>{detailLodEnabled ? 'Désactiver le LOD' : 'Activer le LOD'}</button>
     <span className={`incident-tiled-scene__status is-${status}`} role="status">{statusText}</span>
   </div>;
 }
