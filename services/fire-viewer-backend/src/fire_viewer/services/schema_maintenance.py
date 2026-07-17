@@ -73,19 +73,7 @@ def upgrade_unity_schema(session: Session) -> SchemaUpgradeOutcome:
     # One explicit revision per request keeps this exceptional maintenance
     # operation within the serverless execution window. Every transition is
     # still an actual Alembic migration; none is skipped or merely stamped.
-    try:
-        command.upgrade(config, next_revision)
-    except Exception as exc:
-        # Alembic replaces the application logging configuration while it is
-        # running. Emit this temporary, bounded diagnostic before the global
-        # handler converts the failure to the generic admin problem response.
-        print(
-            "bounded_schema_transition_failed "
-            f"previous={previous} next={next_revision} "
-            f"error_type={type(exc).__name__} error={exc}",
-            flush=True,
-        )
-        raise
+    command.upgrade(config, next_revision)
     current = _current_revision(session)
     if current != next_revision:
         raise RuntimeError("Alembic did not reach the approved next revision.")

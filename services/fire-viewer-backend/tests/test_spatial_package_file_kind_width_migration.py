@@ -48,3 +48,15 @@ def test_repair_migration_emits_explicit_postgresql_width_change() -> None:
         "ALTER TABLE spatial_package_file ALTER COLUMN kind TYPE VARCHAR(9);"
         in output.getvalue()
     )
+
+
+def test_tiled_manifest_migration_emits_valid_postgresql_function_sql() -> None:
+    config = _config("postgresql+psycopg://user:password@localhost/fireviewer")
+    output = io.StringIO()
+
+    with redirect_stdout(output):
+        command.upgrade(config, "c9f1a7d4e620:d2a6e8f1b430", sql=True)
+
+    sql = output.getvalue()
+    assert "CREATE OR REPLACE FUNCTION fire_viewer_manifest_package_valid()" in sql
+    assert "# noqa" not in sql

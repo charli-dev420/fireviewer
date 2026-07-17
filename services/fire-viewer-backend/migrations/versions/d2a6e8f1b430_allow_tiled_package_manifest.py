@@ -78,7 +78,7 @@ def _replace_package_validation(*, allow_package_without_asset: bool) -> None:
 
     if dialect == "postgresql":
         optional_asset = "NEW.asset_id IS NULL OR " if allow_package_without_asset else ""
-        validation_sql = f"""  # noqa: S608
+        validation_sql = f"""
             CREATE OR REPLACE FUNCTION fire_viewer_manifest_package_valid() RETURNS trigger AS $$
             BEGIN
                 IF NEW.spatial_package_id IS NOT NULL AND NOT EXISTS (
