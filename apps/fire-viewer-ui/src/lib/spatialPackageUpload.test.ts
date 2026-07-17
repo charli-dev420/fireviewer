@@ -282,4 +282,47 @@ describe('envoi direct vers Vercel Blob', () => {
     expect(uploader).toHaveBeenCalledTimes(3);
     expect(api.finalizeSpatialPackageFromBlob).not.toHaveBeenCalled();
   });
+
+  it('réessaie uniquement la finalisation sans renvoyer les objets', async () => {
+    const prepared: PreparedSpatialPackage = {
+      packageId: 'pkg-finalization-r2',
+      assetCount: 1,
+      files: [{
+        path: 'assets/final.fwtile',
+        file: new File(['final'], 'final.fwtile'),
+        contentType: 'application/vnd.fireviewer.tile',
+      }],
+      totalSizeBytes: 5,
+    };
+    const finalize = vi.fn()
+      .mockRejectedValueOnce(new Error('service momentanément indisponible'))
+      .mockResolvedValue({ package_id: prepared.packageId, object_count: 1 });
+    const api = {
+      createSpatialPackageUploadGrant: vi.fn().mockResolvedValue({
+        upload_id: UPLOAD_ID,
+        pathname_prefix: `packages/${UPLOAD_ID}`,
+        upload_grant: 'grant-signe',
+      }),
+      getBlobUploadTokenUrl: () => 'https://api.example.test/api/v1/admin/blob-upload-token',
+      finalizeSpatialPackageFromBlob: finalize,
+    } as unknown as AdminApiClient;
+    const uploader = vi.fn(async (pathname: string, _file: File, options: Parameters<BlobUploader>[2]) => ({
+      pathname,
+      contentType: options.contentType,
+    }));
+
+    await uploadPreparedSpatialPackage(
+      api,
+      ZONE_ID,
+      REVISION,
+      prepared,
+      'Finalisation résiliente.',
+      'idempotency-finalization',
+      vi.fn(),
+      { uploader, finalizationAttempts: 2, finalizationRetryDelayMs: 0 },
+    );
+
+    expect(uploader).toHaveBeenCalledTimes(1);
+    expect(finalize).toHaveBeenCalledTimes(2);
+  });
 });

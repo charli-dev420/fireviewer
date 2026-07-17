@@ -13,6 +13,8 @@ const REQUIRED_PATHS = ['package-manifest.json', 'catalog.json'] as const;
 const DEFAULT_UPLOAD_CONCURRENCY = 6;
 const DEFAULT_UPLOAD_ATTEMPTS = 3;
 const DEFAULT_RETRY_DELAY_MS = 400;
+const DEFAULT_FINALIZATION_ATTEMPTS = 4;
+const DEFAULT_FINALIZATION_RETRY_DELAY_MS = 2_000;
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
   '.json': 'application/json',
   '.jpg': 'image/jpeg',
@@ -304,6 +306,8 @@ export async function uploadPreparedSpatialPackage(
     readonly concurrency?: number;
     readonly uploadAttempts?: number;
     readonly retryDelayMs?: number;
+    readonly finalizationAttempts?: number;
+    readonly finalizationRetryDelayMs?: number;
   } = {},
 ): Promise<AdminSpatialPackageImport> {
   const grant: AdminBlobUploadGrant = await api.createSpatialPackageUploadGrant(
@@ -320,6 +324,14 @@ export async function uploadPreparedSpatialPackage(
   const concurrency = Math.max(1, Math.min(8, Math.trunc(options.concurrency ?? DEFAULT_UPLOAD_CONCURRENCY)));
   const uploadAttempts = Math.max(1, Math.min(5, Math.trunc(options.uploadAttempts ?? DEFAULT_UPLOAD_ATTEMPTS)));
   const retryDelayMs = Math.max(0, Math.trunc(options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS));
+  const finalizationAttempts = Math.max(
+    1,
+    Math.min(6, Math.trunc(options.finalizationAttempts ?? DEFAULT_FINALIZATION_ATTEMPTS)),
+  );
+  const finalizationRetryDelayMs = Math.max(
+    0,
+    Math.trunc(options.finalizationRetryDelayMs ?? DEFAULT_FINALIZATION_RETRY_DELAY_MS),
+  );
   const uploaded = new Array<AdminBlobObjectReference | undefined>(prepared.files.length);
   const inFlightBytes = new Array<number>(prepared.files.length).fill(0);
   let uploadedBytes = 0;
@@ -425,15 +437,29 @@ export async function uploadPreparedSpatialPackage(
     totalSizeBytes: prepared.totalSizeBytes,
     percentage: 100,
   });
-  return api.finalizeSpatialPackageFromBlob(
-    zoneId,
-    revision,
-    {
-      upload_id: grant.upload_id,
-      package_id: prepared.packageId,
-      reason,
-      objects: finalizedObjects,
-    },
-    { idempotencyKey, signal: options.signal },
+  let finalizationError: unknown = null;
+  for (let attempt = 1; attempt <= finalizationAttempts; attempt += 1) {
+    try {
+      return await api.finalizeSpatialPackageFromBlob(
+        zoneId,
+        revision,
+        {
+          upload_id: grant.upload_id,
+          package_id: prepared.packageId,
+          reason,
+          objects: finalizedObjects,
+        },
+        { idempotencyKey, signal: options.signal },
+      );
+    } catch (error) {
+      finalizationError = error;
+      if (isAbortError(error) || attempt === finalizationAttempts) break;
+      await retryDelay(finalizationRetryDelayMs, attempt, options.signal);
+    }
+  }
+  if (isAbortError(finalizationError)) throw finalizationError;
+  throw new Error(
+    `Finalisation du package impossible après ${finalizationAttempts} tentatives : ${errorMessage(finalizationError)}.`,
+    { cause: finalizationError },
   );
 }
