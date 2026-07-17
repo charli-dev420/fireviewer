@@ -34,7 +34,8 @@ export function AdminNewZoneRevisionPage({ zoneId }: { readonly zoneId: string }
   const [error, setError] = useState<string | null>(null);
   const [createdRevision, setCreatedRevision] = useState<number | null>(null);
   const set = (field: keyof RevisionForm) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setForm((current) => ({ ...current, [field]: event.currentTarget.value }));
+    const value = event.currentTarget.value;
+    setForm((current) => ({ ...current, [field]: value }));
     setError(null);
   };
 
