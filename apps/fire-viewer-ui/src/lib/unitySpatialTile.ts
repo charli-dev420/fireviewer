@@ -299,7 +299,7 @@ function decodeTerrain(raw: Uint8Array, metadata: SectionMetadata, origin: Unity
     const north = detail ? bounds[3] - row * spacing[1] : bounds[3] - (row + 0.5) * spacing[1];
     positions[sampledIndex * 3] = east - origin[0];
     positions[sampledIndex * 3 + 1] = north - origin[1];
-    positions[sampledIndex * 3 + 2] = quantized(u16(view, index * 2), metadata.elevation_quantization);
+    positions[sampledIndex * 3 + 2] = quantized(u16(view, index * 2), metadata.elevation_quantization) - origin[2];
     uv[sampledIndex * 2] = detail ? column / (columns - 1) : (column + 0.5) / columns;
     uv[sampledIndex * 2 + 1] = detail ? 1 - row / (rows - 1) : 1 - (row + 0.5) / rows;
     if (sampledValid && valid) sampledValid[sampledIndex] = valid[index]!;
@@ -319,7 +319,7 @@ function decodeTrees(raw: Uint8Array, metadata: SectionMetadata, origin: UnityOr
     const offset = index * stride;
     positions[index * 3] = metadata.position_origin_l93_m[0] + u32(view, offset) / 1000 - origin[0];
     positions[index * 3 + 1] = metadata.position_origin_l93_m[1] + u32(view, offset + 4) / 1000 - origin[1];
-    positions[index * 3 + 2] = i32(view, offset + 8) / 1000;
+    positions[index * 3 + 2] = i32(view, offset + 8) / 1000 - origin[2];
     heights[index] = u16(view, offset + 12) * dimensionScale; crowns[index] = u16(view, offset + 14) * dimensionScale;
     variants[index] = raw[offset + 16]!; rotations[index] = u16(view, offset + 17) / 100;
   }
@@ -337,7 +337,7 @@ function decodeMeshes(raw: Uint8Array, metadata: SectionMetadata, origin: UnityO
       const offset = mesh.vertex_offset_bytes + index * 6;
       positions[index * 3] = (q.east_minimum_m ?? 0) + u16(view, offset) * (q.east_step_m ?? 0) - origin[0];
       positions[index * 3 + 1] = (q.north_minimum_m ?? 0) + u16(view, offset + 2) * (q.north_step_m ?? 0) - origin[1];
-      positions[index * 3 + 2] = (q.up_minimum_m ?? 0) + u16(view, offset + 4) * (q.up_step_m ?? 0);
+      positions[index * 3 + 2] = (q.up_minimum_m ?? 0) + u16(view, offset + 4) * (q.up_step_m ?? 0) - origin[2];
     }
     const indices = new Uint32Array(mesh.triangle_count * 3);
     for (let index = 0; index < indices.length; index += 1) {
