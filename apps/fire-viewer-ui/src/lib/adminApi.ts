@@ -151,6 +151,7 @@ export interface AdminOperationalProfile {
 export interface AdminGlobalAuditEvent { readonly event_id: string; readonly occurred_at: string; readonly action: string; readonly target_type: string; readonly target_id: string; readonly actor_type: string; readonly actor_id: string; readonly reason: string; readonly trace_id: string; }
 export interface AdminRoles { readonly actor_id: string; readonly actor_type: string; readonly assigned_roles: readonly string[]; readonly identity_management: string; readonly catalog: readonly { role: string; description: string; capabilities: readonly string[] }[]; }
 export interface AdminSystemStatus { readonly checked_at: string; readonly application: { name: string; version: string; environment: string; authentication_mode: string }; readonly database: { dialect: string; reachable: boolean }; readonly queues: { jobs_active: number; jobs_quarantined: number; outbox_pending: number; outbox_with_error: number; reports_pending: number }; readonly assets: { packages_draft: number; packages_verified: number; packages_previewable: number; packages_published: number; packages_withdrawn_or_revoked: number }; readonly audit_event_count: number; readonly worker_heartbeat: string; }
+export interface AdminSchemaUpgradeResult { readonly previous_revision: string; readonly current_revision: string; readonly applied: boolean; readonly trace_id: string; }
 export interface AdminConfiguration { readonly environment: string; readonly authentication_mode: string; readonly identity_management: string; readonly matching: { policy_id: string; create_below: number; auto_attach_above: number; min_margin: number; max_candidate_distance_m: number; max_incident_uncertainty_m: number; max_candidates: number }; readonly public: { report_rate_limit_per_day: number; idempotency_retention_hours: number; public_notice: string }; readonly storage: { archive_max_bytes: number; unpacked_max_bytes: number; archive_max_files: number; manifest_max_bytes: number }; }
 
 export interface AdminOperationalMapModel {
@@ -1454,6 +1455,18 @@ export class AdminApiClient {
 
   async getRoles(options: AdminRequestOptions = {}): Promise<AdminRoles> { const payload = await this.request('/roles', { method: 'GET' }, options); try { return parseRoles(payload); } catch { throw new AdminApiError('parse', 'Les rôles sont invalides.'); } }
   async getSystemStatus(options: AdminRequestOptions = {}): Promise<AdminSystemStatus> { const payload = await this.request('/system', { method: 'GET' }, options); try { return parseSystem(payload); } catch { throw new AdminApiError('parse', 'L’état système est invalide.'); } }
+  async upgradeDatabaseSchema(options: AdminRequestOptions): Promise<AdminSchemaUpgradeResult> {
+    const payload = await this.postJson('/system/schema-upgrade', { reason: 'Correction bornée du schéma Unity spatial en production.' }, options);
+    if (!isRecord(payload) || !hasExactKeys(payload, ['previous_revision', 'current_revision', 'applied', 'trace_id']) || typeof payload.applied !== 'boolean') {
+      throw new AdminApiError('parse', 'La réponse de migration du schéma est invalide.');
+    }
+    return {
+      previous_revision: readString(payload.previous_revision, 'previous_revision', { max: 32 })!,
+      current_revision: readString(payload.current_revision, 'current_revision', { max: 32 })!,
+      applied: payload.applied,
+      trace_id: readString(payload.trace_id, 'trace_id', { max: 128 })!,
+    };
+  }
   async getConfiguration(options: AdminRequestOptions = {}): Promise<AdminConfiguration> { const payload = await this.request('/configuration', { method: 'GET' }, options); try { return parseConfiguration(payload); } catch { throw new AdminApiError('parse', 'La configuration est invalide.'); } }
 
   async listPublications(options: AdminRequestOptions = {}): Promise<readonly AdminPublication[]> {
