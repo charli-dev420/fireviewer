@@ -168,7 +168,7 @@ function adminFetchResponse(input: RequestInfo | URL): Response {
     return jsonResponse({ revision: 2, spatial_profile_version: '2.0', origin_l93_ngf: [870000, 6410000, 190], horizontal_crs: 'EPSG:2154', vertical_crs: 'EPSG:5720', ground_model: 'MNT_LIDAR_HD', ground_resolution_m: 0.5, surface_height_reference: 'MNS_RELATIVE_TO_MNT', origin_wgs84: [5.1, 44.8, 240], local_frame: 'ENU', meters_per_unit: 1, vertical_datum: 'NGF-IGN69', bounds_m: { east: [-20, 20], north: [-20, 20], up: [0, 120] } });
   }
   if (url.pathname === '/api/v1/admin/zones/ALPES-TEST/revisions/2/preview') {
-    return jsonResponse({ zone_id: 'ALPES-TEST', revision: 2, preview_scope: 'private-admin', package_id: null, package_state: null, publication_id: null, publication_state: null, publication_active: false, verification_report: {}, preview_package_ids: [], files: [] });
+    return jsonResponse({ zone_id: 'ALPES-TEST', revision: 2, preview_scope: 'private-admin', package_id: null, package_state: null, publication_id: null, publication_state: null, publication_active: false, verification_report: {}, preview_package_ids: [], scene: null, files: [] });
   }
   const detail = url.pathname.match(/^\/api\/v1\/admin\/zones\/([A-Z0-9-]+)$/);
   if (detail) return jsonResponse(adminDetail(detail[1]));

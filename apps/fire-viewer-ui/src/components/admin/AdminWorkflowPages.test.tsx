@@ -10,6 +10,12 @@ import { AdminNewZonePage } from './AdminNewZonePage';
 import { AdminSpatialMatchingPage } from './AdminSpatialMatchingPage';
 import { AdminZonePrivatePreviewPage } from './AdminZonePrivatePreviewPage';
 
+vi.mock('../public/TiledSpatialScene3D', () => ({
+  TiledSpatialScene3D: ({ cameraMode, source }: { readonly cameraMode: string; readonly source: { readonly credentials?: string } }) => (
+    <div>Scène Unity {cameraMode} · accès {source.credentials}</div>
+  ),
+}));
+
 const API_ORIGIN = 'http://localhost:8000';
 const SESSION = { token: 'admin-ui-test-token' };
 
@@ -194,7 +200,8 @@ describe('pages de workflow administrateur', () => {
       publication_active: false,
       verification_report: { status: 'verified' },
       preview_package_ids: ['pkg-zone-r2'],
-      files: [{ kind: 'preview_png', sha256: 'a'.repeat(64), size_bytes: 128, media_type: 'image/png' }],
+      scene: null,
+      files: [{ file_id: 1, path: 'assets/preview.png', kind: 'PNG', sha256: 'a'.repeat(64), size_bytes: 128, media_type: 'image/png' }],
     };
     const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
       const url = String(input);
@@ -232,6 +239,28 @@ describe('pages de workflow administrateur', () => {
       reason: 'Publication après validation visuelle privée.',
       admin_password: 'correct horse battery staple',
     });
+  });
+
+  it('affiche le vrai loader Unity privé et ses contrôles de caméra', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(response({
+      zone_id: 'TEST-ZONE-01', revision: 2, preview_scope: 'private-admin',
+      package_id: 'pkg-unity-r2', package_state: 'PREVIEWABLE',
+      publication_id: 'publication-unity', publication_state: 'PREVIEWABLE', publication_active: false,
+      verification_report: { status: 'passed', scene_kind: 'remote_tiles' },
+      preview_package_ids: ['pkg-unity-r2'],
+      scene: {
+        catalog_url: '/api/v1/admin/zones/TEST-ZONE-01/revisions/2/preview/packages/pkg-unity-r2/catalog',
+        files: { 'assets/far/global.fwterrain': '/api/v2/admin/packages/pkg-unity-r2/files/1' },
+      },
+      files: [{ file_id: 1, path: 'assets/far/global.fwterrain', kind: 'FWTERRAIN', sha256: 'a'.repeat(64), size_bytes: 128, media_type: 'application/vnd.fireviewer.terrain' }],
+    })));
+    const user = userEvent.setup();
+    renderAdmin(<AdminZonePrivatePreviewPage zoneId="TEST-ZONE-01" revision={2} />);
+
+    expect(await screen.findByText('Scène Unity orbit · accès include')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Vue FPS' }));
+    expect(await screen.findByText('Scène Unity fps · accès include')).toBeVisible();
   });
 
 });

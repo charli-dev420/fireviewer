@@ -377,7 +377,7 @@ def _assert_required_preview_files(package: SpatialPackage) -> None:
         SpatialPackageFileKind.FWTERRAIN,
     }
     required = (
-        {SpatialPackageFileKind.PNG, *tiled_kinds}
+        {*tiled_kinds, SpatialPackageFileKind.JPEG}
         if kinds.intersection(tiled_kinds)
         else {SpatialPackageFileKind.PNG, SpatialPackageFileKind.GLB}
     )

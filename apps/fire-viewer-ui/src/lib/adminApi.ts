@@ -315,7 +315,8 @@ export interface AdminZonePrivatePreview {
   readonly publication_active: boolean;
   readonly verification_report: Readonly<Record<string, unknown>>;
   readonly preview_package_ids: readonly string[];
-  readonly files: readonly { readonly kind: string; readonly sha256: string; readonly size_bytes: number; readonly media_type: string }[];
+  readonly scene: { readonly catalog_url: string; readonly files: Readonly<Record<string, string>> } | null;
+  readonly files: readonly { readonly file_id: number; readonly path: string | null; readonly kind: string; readonly sha256: string; readonly size_bytes: number; readonly media_type: string }[];
 }
 
 export interface AdminSpatialPackageImport {
@@ -593,10 +594,18 @@ function parseBlobUploadGrant(value: unknown): AdminBlobUploadGrant {
 }
 
 function parseZonePrivatePreview(value: unknown): AdminZonePrivatePreview {
-  if (!isRecord(value) || !hasExactKeys(value, ['zone_id', 'revision', 'preview_scope', 'package_id', 'package_state', 'publication_id', 'publication_state', 'publication_active', 'verification_report', 'preview_package_ids', 'files']) || !isRecord(value.verification_report) || !Array.isArray(value.preview_package_ids) || !Array.isArray(value.files) || typeof value.publication_active !== 'boolean') throw new Error('Aperçu privé invalide.');
+  if (!isRecord(value) || !hasExactKeys(value, ['zone_id', 'revision', 'preview_scope', 'package_id', 'package_state', 'publication_id', 'publication_state', 'publication_active', 'verification_report', 'preview_package_ids', 'scene', 'files']) || !isRecord(value.verification_report) || !Array.isArray(value.preview_package_ids) || !Array.isArray(value.files) || typeof value.publication_active !== 'boolean') throw new Error('Aperçu privé invalide.');
   const previewPackageIds = value.preview_package_ids.map((item) => readString(item, 'preview_package_ids', { max: 96 })!);
   if (new Set(previewPackageIds).size !== previewPackageIds.length) throw new Error('Aperçu privé invalide.');
-  return { zone_id: readString(value.zone_id, 'zone_id', { max: 64 })!, revision: readPositiveInteger(value.revision, 'revision'), preview_scope: readEnum(value.preview_scope, 'preview_scope', ['private-admin']), package_id: readString(value.package_id, 'package_id', { nullable: true, max: 128 }), package_state: readString(value.package_state, 'package_state', { nullable: true, max: 64 }), publication_id: readString(value.publication_id, 'publication_id', { nullable: true, max: 128 }), publication_state: readString(value.publication_state, 'publication_state', { nullable: true, max: 64 }), publication_active: value.publication_active, verification_report: value.verification_report, preview_package_ids: previewPackageIds, files: value.files.map((file) => { if (!isRecord(file) || !hasExactKeys(file, ['kind', 'sha256', 'size_bytes', 'media_type'])) throw new Error('Fichier preview invalide.'); return { kind: readString(file.kind, 'kind', { max: 64 })!, sha256: readString(file.sha256, 'sha256', { max: 64 })!, size_bytes: readPositiveInteger(file.size_bytes, 'size_bytes'), media_type: readString(file.media_type, 'media_type', { max: 128 })! }; }) };
+  let scene: AdminZonePrivatePreview['scene'] = null;
+  if (value.scene !== null) {
+    if (!isRecord(value.scene) || !hasExactKeys(value.scene, ['catalog_url', 'files']) || !isRecord(value.scene.files)) throw new Error('Scène privée invalide.');
+    scene = {
+      catalog_url: readString(value.scene.catalog_url, 'catalog_url', { max: 2_048 })!,
+      files: Object.fromEntries(Object.entries(value.scene.files).map(([path, url]) => [path, readString(url, `scene.files.${path}`, { max: 2_048 })!])),
+    };
+  }
+  return { zone_id: readString(value.zone_id, 'zone_id', { max: 64 })!, revision: readPositiveInteger(value.revision, 'revision'), preview_scope: readEnum(value.preview_scope, 'preview_scope', ['private-admin']), package_id: readString(value.package_id, 'package_id', { nullable: true, max: 128 }), package_state: readString(value.package_state, 'package_state', { nullable: true, max: 64 }), publication_id: readString(value.publication_id, 'publication_id', { nullable: true, max: 128 }), publication_state: readString(value.publication_state, 'publication_state', { nullable: true, max: 64 }), publication_active: value.publication_active, verification_report: value.verification_report, preview_package_ids: previewPackageIds, scene, files: value.files.map((file) => { if (!isRecord(file) || !hasExactKeys(file, ['file_id', 'path', 'kind', 'sha256', 'size_bytes', 'media_type'])) throw new Error('Fichier preview invalide.'); return { file_id: readPositiveInteger(file.file_id, 'file_id'), path: readString(file.path, 'path', { nullable: true, max: 512 }), kind: readString(file.kind, 'kind', { max: 64 })!, sha256: readString(file.sha256, 'sha256', { max: 64 })!, size_bytes: readPositiveInteger(file.size_bytes, 'size_bytes'), media_type: readString(file.media_type, 'media_type', { max: 128 })! }; }) };
 }
 
 function parseSpatialPackagePublication(value: unknown): AdminSpatialPackagePublication {

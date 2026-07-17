@@ -43,6 +43,7 @@ import {
 export interface TiledSceneSource {
   readonly catalogUrl: string;
   readonly files: Readonly<Record<string, string>>;
+  readonly credentials?: RequestCredentials;
 }
 
 export interface TiledScenePoint { readonly position: readonly [number, number, number]; readonly color: string; }
@@ -140,14 +141,27 @@ function treeMeshes(data: UnityTileGeometry['trees']): Group {
   return root;
 }
 
-async function texture(url: string): Promise<Texture> {
-  const result = await new TextureLoader().loadAsync(url);
+async function texture(url: string, credentials: RequestCredentials, signal: AbortSignal): Promise<Texture> {
+  let source = url;
+  let objectUrl: string | null = null;
+  if (credentials !== 'omit') {
+    const response = await fetch(url, { cache: 'force-cache', credentials, signal });
+    if (!response.ok) throw new Error(`Texture Unity inaccessible (${response.status}).`);
+    objectUrl = URL.createObjectURL(await response.blob());
+    source = objectUrl;
+  }
+  let result: Texture;
+  try {
+    result = await new TextureLoader().loadAsync(source);
+  } finally {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+  }
   result.colorSpace = SRGBColorSpace;
   return result;
 }
 
-async function fetchAsset(url: string, reference: UnityAssetReference, signal: AbortSignal): Promise<ArrayBuffer> {
-  const response = await fetch(url, { cache: 'force-cache', credentials: 'omit', signal });
+async function fetchAsset(url: string, reference: UnityAssetReference, credentials: RequestCredentials, signal: AbortSignal): Promise<ArrayBuffer> {
+  const response = await fetch(url, { cache: 'force-cache', credentials, signal });
   if (!response.ok) throw new Error(`Asset Unity inaccessible (${response.status}).`);
   const result = await response.arrayBuffer();
   if (result.byteLength !== reference.byte_count) throw new Error(`Taille incohérente pour ${assetPath(reference)}.`);
@@ -170,8 +184,8 @@ async function buildTile(
   far = false,
 ): Promise<{ root: Group; terrain: Mesh }> {
   const [buffer, image] = await Promise.all([
-    fetchAsset(resolveAsset(source, payload), payload, signal),
-    texture(resolveAsset(source, imagery)),
+    fetchAsset(resolveAsset(source, payload), payload, source.credentials ?? 'omit', signal),
+    texture(resolveAsset(source, imagery), source.credentials ?? 'omit', signal),
   ]);
   const decoded = await decodeUnityTile(buffer, origin, far ? 5 : 1);
   const root = new Group(); root.name = far ? 'Unity FAR terrain' : `Unity detail ${decoded.tileId}`;
@@ -357,7 +371,7 @@ export function TiledSpatialScene3D({
 
     const mount = async () => {
       try {
-        const response = await fetch(source.catalogUrl, { cache: 'no-store', credentials: 'omit', signal: abortController.signal });
+        const response = await fetch(source.catalogUrl, { cache: 'no-store', credentials: source.credentials ?? 'omit', signal: abortController.signal });
         if (!response.ok) throw new Error(`Catalogue Unity inaccessible (${response.status}).`);
         catalog = parseUnitySpatialCatalog(await response.json());
         instance = new Instance({ target: host, crs: coordinateSystem(), backgroundColor: '#102429' });
@@ -387,7 +401,7 @@ export function TiledSpatialScene3D({
       if (instance) { instance.domElement.removeEventListener('pointerdown', pointerDownHandler); instance.domElement.removeEventListener('pointerup', pointerUpHandler); }
       controls?.dispose(); for (const root of details.values()) disposeObject(root); if (farRoot) disposeObject(farRoot); instance?.dispose();
     };
-  }, [source.catalogUrl, source.files, overlayOriginWgs84]);
+  }, [source.catalogUrl, source.credentials, source.files, overlayOriginWgs84]);
 
   const statusText = status === 'error' ? 'Scène Unity indisponible' : status === 'loading' ? 'Chargement de la scène Unity…' : `Scène Unity prête · ${detailState.active}/${detailState.expected} tuiles détaillées${detailState.failures ? ` · ${detailState.failures} échec(s)` : ''}`;
   return <div className={`incident-tiled-scene ${drawMode ? 'is-drawing' : ''}`}>

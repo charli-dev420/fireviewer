@@ -26,7 +26,12 @@ from fire_viewer.db.models import (
     SpatialZoneRevision,
     ZonePublication,
 )
-from fire_viewer.domain.enums import PublicReportState, ZonePublicationState
+from fire_viewer.domain.enums import (
+    PublicReportState,
+    SpatialPackageFileKind,
+    SpatialPackageState,
+    ZonePublicationState,
+)
 from fire_viewer.domain.errors import (
     ConflictError,
     NotFoundError,
@@ -146,6 +151,7 @@ from fire_viewer.services.zone_workflow import (
     update_zone,
 )
 from fire_viewer.storage import build_object_store
+from fire_viewer.storage.object_store import ObjectStorageError
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -171,10 +177,17 @@ class AdminAuthStatus(StrictModel):
 
 
 class AdminPrivatePreviewFile(StrictModel):
+    file_id: int
+    path: str | None
     kind: str
     sha256: str
     size_bytes: int
     media_type: str
+
+
+class AdminPrivatePreviewScene(StrictModel):
+    catalog_url: str
+    files: dict[str, str]
 
 
 class AdminPrivatePreviewResponse(StrictModel):
@@ -188,6 +201,7 @@ class AdminPrivatePreviewResponse(StrictModel):
     publication_active: bool
     verification_report: dict[str, object]
     preview_package_ids: list[str] = Field(default_factory=list)
+    scene: AdminPrivatePreviewScene | None = None
     files: list[AdminPrivatePreviewFile] = Field(default_factory=list)
 
 
@@ -1048,6 +1062,31 @@ def get_private_preview(
         if package
         else None
     )
+    tiled = bool(
+        package
+        and {SpatialPackageFileKind.FWTILE, SpatialPackageFileKind.FWTERRAIN}.issubset(
+            {item.kind for item in package.files}
+        )
+    )
+    scene = (
+        AdminPrivatePreviewScene(
+            catalog_url=(
+                f"/api/v1/admin/zones/{zone_id}/revisions/{revision}/preview/"
+                f"packages/{package.package_id}/catalog"
+            ),
+            files={
+                str(item.provenance["catalog_path"]): (
+                    f"/api/v2/admin/packages/{package.package_id}/files/{item.id}"
+                )
+                for item in package.files
+                if item.provenance.get("catalog_path")
+            },
+        )
+        if package
+        and tiled
+        and package.state in {SpatialPackageState.PREVIEWABLE, SpatialPackageState.PUBLISHED}
+        else None
+    )
     return AdminPrivatePreviewResponse(
         zone_id=zone_id,
         revision=revision,
@@ -1061,8 +1100,15 @@ def get_private_preview(
         preview_package_ids=[
             item.package_id for item in packages if str(item.state) in {"PREVIEWABLE", "PUBLISHED"}
         ],
+        scene=scene,
         files=[
             AdminPrivatePreviewFile(
+                file_id=file.id,
+                path=(
+                    str(file.provenance["catalog_path"])
+                    if file.provenance.get("catalog_path")
+                    else None
+                ),
                 kind=str(file.kind),
                 sha256=file.sha256,
                 size_bytes=file.size_bytes,
@@ -1070,6 +1116,65 @@ def get_private_preview(
             )
             for file in (package.files if package else [])
         ],
+    )
+
+
+@router.get(
+    "/zones/{zone_id}/revisions/{revision}/preview/packages/{package_id}/catalog"
+)
+def get_private_preview_catalog(
+    zone_id: ZoneIdPath,
+    revision: RevisionPath,
+    package_id: Annotated[str, Path(min_length=3, max_length=96)],
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> Response:
+    _require_admin(actor)
+    package = session.execute(
+        select(SpatialPackage)
+        .join(
+            SpatialZoneRevision,
+            SpatialPackage.spatial_zone_revision_id == SpatialZoneRevision.id,
+        )
+        .join(SpatialZone, SpatialZoneRevision.spatial_zone_id == SpatialZone.id)
+        .where(
+            SpatialZone.zone_id == zone_id,
+            SpatialZoneRevision.revision == revision,
+            SpatialPackage.package_id == package_id,
+        )
+    ).scalar_one_or_none()
+    if package is None:
+        raise NotFoundError("spatial_package", package_id)
+    if package.state not in {SpatialPackageState.PREVIEWABLE, SpatialPackageState.PUBLISHED}:
+        raise ConflictError(
+            "spatial_package_preview_not_enabled",
+            "Private tiled preview requires a previewable package.",
+        )
+    try:
+        content = build_object_store(settings).read_bytes(
+            f"{package.storage_uri.rstrip('/')}/catalog.json"
+        )
+    except ObjectStorageError as exc:
+        raise NotFoundError("spatial_package_catalog", package_id) from exc
+    digest = hashlib.sha256(content).hexdigest()
+    expected_digest = str(package.provenance.get("catalog_sha256", ""))
+    expected_size = package.provenance.get("catalog_size_bytes")
+    if (expected_digest and expected_digest != digest) or (
+        isinstance(expected_size, int) and expected_size != len(content)
+    ):
+        raise ConflictError(
+            "spatial_package_catalog_changed",
+            "The private catalog no longer matches the immutable package registry.",
+        )
+    return Response(
+        content=content,
+        media_type="application/json",
+        headers={
+            "Cache-Control": "private, no-store",
+            "Content-Disposition": "inline",
+            "ETag": f'"{digest}"',
+        },
     )
 
 

@@ -66,12 +66,20 @@ def _seed_draft_package(
             + (
                 [
                     SpatialPackageFile(
+                        kind=SpatialPackageFileKind.JPEG,
+                        uri=f"s3://private/{package_id}/far/global.jpg",
+                        sha256="e" * 64,
+                        size_bytes=2048,
+                        media_type="image/jpeg",
+                        provenance={"catalog_path": "assets/far/global.jpg"},
+                    ),
+                    SpatialPackageFile(
                         kind=SpatialPackageFileKind.FWTILE,
                         uri=f"s3://private/{package_id}/detail/tile.fwtile",
                         sha256="c" * 64,
                         size_bytes=2048,
                         media_type="application/vnd.fireviewer.tile",
-                        provenance={},
+                        provenance={"catalog_path": "assets/detail/tile.fwtile"},
                     ),
                     *(
                         [
@@ -81,7 +89,7 @@ def _seed_draft_package(
                                 sha256="d" * 64,
                                 size_bytes=2048,
                                 media_type="application/vnd.fireviewer.terrain",
-                                provenance={},
+                                provenance={"catalog_path": "assets/far/global.fwterrain"},
                             )
                         ]
                         if include_fwterrain
@@ -174,8 +182,13 @@ def test_admin_rejects_preview_when_the_registered_package_has_no_png(client, se
     assert response.json()["type"] == "urn:fire-viewer:error:spatial_package_missing_preview_assets"
 
 
-def test_admin_validates_remote_tiles_without_requiring_a_glb(client, session) -> None:
-    _seed_draft_package(session, package_id="pkg-remote-tiles", tiled=True)
+def test_admin_validates_remote_tiles_without_requiring_a_glb_or_png(client, session) -> None:
+    _seed_draft_package(
+        session,
+        package_id="pkg-remote-tiles",
+        tiled=True,
+        include_png=False,
+    )
     base = "/api/v1/admin/zones/PACKAGE-WORKFLOW-01/revisions/1"
 
     validation = client.post(
@@ -190,6 +203,23 @@ def test_admin_validates_remote_tiles_without_requiring_a_glb(client, session) -
         headers=_headers("package-workflow-remote-preview-0001"),
     )
     assert preview.status_code == 200, preview.text
+    descriptor = client.get(f"{base}/preview")
+    assert descriptor.status_code == 200
+    assert descriptor.json()["scene"] == {
+        "catalog_url": (
+            "/api/v1/admin/zones/PACKAGE-WORKFLOW-01/revisions/1/preview/"
+            "packages/pkg-remote-tiles/catalog"
+        ),
+        "files": {
+            "assets/detail/tile.fwtile": (
+                "/api/v2/admin/packages/pkg-remote-tiles/files/2"
+            ),
+            "assets/far/global.fwterrain": (
+                "/api/v2/admin/packages/pkg-remote-tiles/files/3"
+            ),
+            "assets/far/global.jpg": "/api/v2/admin/packages/pkg-remote-tiles/files/1",
+        },
+    }
 
 
 def test_admin_rejects_an_incomplete_remote_tile_profile(client, session) -> None:
