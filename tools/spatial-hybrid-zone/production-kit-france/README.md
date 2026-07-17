@@ -97,7 +97,10 @@ Copier `zone.example.json`, puis modifier :
 - les chemins futurs `unity_validation_receipt` et `unity_preview_png` ; ils
   peuvent etre absents pendant la production mais deviennent obligatoires pour
   l'etape `site_upload` ;
-- le chemin de Blender, ou `build_blender_scene: false` pour sauter le `.blend`.
+- le chemin de Blender, ou `build_blender_scene: false` pour sauter le `.blend` ;
+- `near_lod_enabled: false` pour une grande zone : aucun téléchargement 0,2 m,
+  imagerie de détail plafonnée à 0,5 m et runtime Unity contraint au LOD `mid`
+  même à courte distance.
 
 Ne reutilisez pas le meme `artifact_root` apres avoir change la configuration :
 le hash de contrat bloque volontairement le melange de deux productions.

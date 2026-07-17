@@ -27,3 +27,7 @@ ne sont déclenchés par ces commandes.
 Le dry-run gelé pour cette V1 attend `208` dalles source LiDAR HD et `756`
 tuiles de sortie de 500 m. Une variation est bloquante et impose une nouvelle
 revue du plan avant téléchargement.
+
+La zone couvre plus de 170 km² : `near_lod_enabled` est désactivé. Le package
+ne télécharge ni ne publie les orthophotos 0,2 m et le runtime reste au profil
+`mid` 0,5 m à courte distance.

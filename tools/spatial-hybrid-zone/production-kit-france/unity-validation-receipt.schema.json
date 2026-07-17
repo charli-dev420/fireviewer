@@ -40,7 +40,7 @@
         "terrain_grounding",
         "vegetation_exclusions",
         "lod_streaming",
-        "near_buildings",
+        "detail_buildings",
         "no_blocking_visual_artifacts"
       ],
       "properties": {
@@ -48,7 +48,7 @@
         "terrain_grounding": {"type": "boolean"},
         "vegetation_exclusions": {"type": "boolean"},
         "lod_streaming": {"type": "boolean"},
-        "near_buildings": {"type": "boolean"},
+        "detail_buildings": {"type": "boolean"},
         "no_blocking_visual_artifacts": {"type": "boolean"}
       }
     }

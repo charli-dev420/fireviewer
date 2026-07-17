@@ -100,6 +100,8 @@ Console.WriteLine(JsonSerializer.Serialize(new
     band_over_750 = FwSpatialLodPlanner.ClassifyBand(750.001d),
     band_3000 = FwSpatialLodPlanner.ClassifyBand(3000d),
     band_over_3000 = FwSpatialLodPlanner.ClassifyBand(3000.001d),
+    catalog_near_disabled = catalog.lod_policy.detail.near_disabled,
+    band_300_near_disabled = FwSpatialLodPlanner.ClassifyBand(300d, catalog.lod_policy.detail.near_disabled),
     budget_clamped_tiles = clampedPlan.Tiles.Length,
     budget_clamped_without_blocking = !clampedPlan.IsBlocked,
     partial_published = partialPublished,

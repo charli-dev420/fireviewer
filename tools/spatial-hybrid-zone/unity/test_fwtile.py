@@ -296,7 +296,9 @@ def _write_json(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value), encoding="utf-8")
 
 
-def _export_fixture(tmp_path: Path, *, include_image: bool = True):
+def _export_fixture(
+    tmp_path: Path, *, include_image: bool = True, near_lod_disabled: bool = False
+):
     manifest_dir = tmp_path / "global-05m"
     tile_id = "x0_y0_s2"
     tile_dir = manifest_dir / "tiles" / tile_id
@@ -314,6 +316,11 @@ def _export_fixture(tmp_path: Path, *, include_image: bool = True):
             "byte_count": mid_path.stat().st_size,
         },
         "near_orthophoto_image": {
+            "path": f"tiles/{tile_id}/ortho.jpg",
+            "sha256": sha256_file(image_path) if include_image else "0" * 64,
+            "byte_count": image_path.stat().st_size if include_image else 1,
+        },
+        "orthophoto_image": {
             "path": f"tiles/{tile_id}/ortho.jpg",
             "sha256": sha256_file(image_path) if include_image else "0" * 64,
             "byte_count": image_path.stat().st_size if include_image else 1,
@@ -348,7 +355,11 @@ def _export_fixture(tmp_path: Path, *, include_image: bool = True):
         return _detail_vectors()
 
     context = create_context(
-        manifest_path, global_path, tmp_path / "remote", vector_builder=builder
+        manifest_path,
+        global_path,
+        tmp_path / "remote",
+        near_lod_disabled=near_lod_disabled,
+        vector_builder=builder,
     )
     return context, manifest["tiles"][0], calls
 
@@ -422,6 +433,7 @@ def test_catalog_has_two_lods_and_enforces_global_budget(tmp_path: Path) -> None
     catalog = build_catalog(context, far)
     assert catalog["lod_policy"]["far"]["role"] == "always_available_global_fallback"
     assert catalog["lod_policy"]["detail"]["maximum_resident_tile_count"] == 16
+    assert catalog["lod_policy"]["detail"]["near_disabled"] is False
     assert catalog["exported_detail_tile_count"] == 1
     catalog["lod_policy"]["detail"]["maximum_resident_tile_count"] = 17
     with pytest.raises(FWTileError, match="16 tile"):
@@ -431,6 +443,36 @@ def test_catalog_has_two_lods_and_enforces_global_budget(tmp_path: Path) -> None
     catalog["lod_policy"]["detail"]["publish_distance_m"] = 601.0
     with pytest.raises(FWTileError, match="600 m"):
         validate_catalog(catalog)
+
+
+def test_disabled_near_lod_keeps_mid_imagery_and_declares_policy(
+    tmp_path: Path,
+) -> None:
+    context, tile, _calls = _export_fixture(tmp_path, near_lod_disabled=True)
+    record = export_tile(context, tile)
+    digest = "a" * 64
+    catalog = build_catalog(
+        context,
+        {
+            "terrain": {
+                "url": "far/global.fwterrain",
+                "sha256": digest,
+                "byte_count": 10,
+                "resolution_m": [5.0, 5.0],
+            },
+            "imagery": {
+                "url": "far/global.jpg",
+                "sha256": digest,
+                "byte_count": 10,
+                "resolution_m": 2.0,
+            },
+            "bounds_l93_m": [0.0, 0.0, 2.0, 2.0],
+        },
+    )
+
+    assert record["imagery"]["resolution_m"] == 0.5
+    assert catalog["lod_policy"]["detail"]["near_disabled"] is True
+    validate_catalog(catalog)
 
 
 def test_detail_zones_are_exported_first_in_contract_order() -> None:

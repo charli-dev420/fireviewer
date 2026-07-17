@@ -15,7 +15,7 @@
     "terrain_grounding": false,
     "vegetation_exclusions": false,
     "lod_streaming": false,
-    "near_buildings": false,
+    "detail_buildings": false,
     "no_blocking_visual_artifacts": false
   }
 }

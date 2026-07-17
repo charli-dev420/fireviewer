@@ -27,7 +27,7 @@ UNITY_CHECKLIST_IDS = (
     "terrain_grounding",
     "vegetation_exclusions",
     "lod_streaming",
-    "near_buildings",
+    "detail_buildings",
     "no_blocking_visual_artifacts",
 )
 

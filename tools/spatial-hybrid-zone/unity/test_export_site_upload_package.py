@@ -66,7 +66,7 @@ def _manual_validation(
                     "terrain_grounding": True,
                     "vegetation_exclusions": True,
                     "lod_streaming": True,
-                    "near_buildings": True,
+                    "detail_buildings": True,
                     "no_blocking_visual_artifacts": True,
                 },
             }
