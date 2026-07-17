@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  ACESFilmicToneMapping,
+  AmbientLight,
   BufferAttribute,
   BufferGeometry,
   Color,
   ConeGeometry,
   CylinderGeometry,
   DoubleSide,
+  DirectionalLight,
   Group,
   InstancedMesh,
   Line as ThreeLine,
@@ -14,6 +17,7 @@ import {
   Matrix4,
   Mesh,
   MeshBasicMaterial,
+  MeshLambertMaterial,
   Quaternion,
   Raycaster,
   SphereGeometry,
@@ -69,6 +73,8 @@ const WORLD_UP = new Vector3(0, 0, 1);
 const TREE_PALETTE = ['#274c2d', '#315c31', '#386534', '#1d442e', '#245037', '#2b5939'];
 const NEAR_DETAIL_DISTANCE_MULTIPLIER = 1.3;
 const DETAIL_LOAD_CONCURRENCY = 4;
+const DETAIL_CACHE_LIMIT = 64;
+const LOD_REFRESH_INTERVAL_MS = 80;
 let lambert93: CoordinateSystem | null = null;
 
 function coordinateSystem(): CoordinateSystem {
@@ -101,11 +107,11 @@ function geometry(data: UnityMeshData): BufferGeometry {
   return result;
 }
 
-function materialForSection(section: 'building' | 'road' | 'water', name: string): MeshBasicMaterial {
-  let color = '#9d8f79';
+function materialForSection(section: 'building' | 'road' | 'water', name: string): MeshLambertMaterial {
+  let color = '#746b5c';
   if (section === 'road') color = name.includes('marking') ? '#c2b891' : name.includes('shoulder') ? '#615b51' : '#4d4f4d';
   if (section === 'water') color = name.includes('surface') ? '#194d66' : '#1f5a73';
-  return new MeshBasicMaterial({ color, side: DoubleSide });
+  return new MeshLambertMaterial({ color, side: DoubleSide });
 }
 
 function meshSection(root: Group, data: readonly UnityMeshData[], section: 'building' | 'road' | 'water'): void {
@@ -125,8 +131,8 @@ function treeMeshes(data: UnityTileGeometry['trees']): Group {
   crownGeometry.rotateX(Math.PI / 2);
   const trunkGeometry = new CylinderGeometry(0.06, 0.09, 0.56, 6);
   trunkGeometry.rotateX(Math.PI / 2);
-  const crowns = new InstancedMesh(crownGeometry, new MeshBasicMaterial({ color: '#ffffff' }), count);
-  const trunks = new InstancedMesh(trunkGeometry, new MeshBasicMaterial({ color: '#38291b' }), count);
+  const crowns = new InstancedMesh(crownGeometry, new MeshLambertMaterial({ color: '#ffffff' }), count);
+  const trunks = new InstancedMesh(trunkGeometry, new MeshLambertMaterial({ color: '#38291b' }), count);
   const matrix = new Matrix4(); const rotation = new Quaternion(); const position = new Vector3(); const scale = new Vector3();
   for (let index = 0; index < count; index += 1) {
     const x = data.positions[index * 3]!; const y = data.positions[index * 3 + 1]!; const z = data.positions[index * 3 + 2]!;
@@ -329,7 +335,7 @@ export function TiledSpatialScene3D({
         if (details.has(tile.id) || pending.has(tile.id) || failed.has(tile.id)) continue;
         capacity -= 1;
         const loading = buildTile(source, tile.payload, tile.imagery, catalog.origin_l93_m, abortController.signal).then(async ({ root, terrain }) => {
-          if (disposed || !desiredIds.has(tile.id) || !instance) { disposeObject(root); return; }
+          if (disposed || !instance) { disposeObject(root); return; }
           root.visible = false; await instance.add(root); details.set(tile.id, root); terrainMeshes.push(terrain); publish();
         }).catch((error: unknown) => { if (!disposed && !abortController.signal.aborted) { console.error(error); failed.add(tile.id); } }).finally(() => {
           pending.delete(tile.id); if (!disposed) { updateState(); window.setTimeout(fillDetailCapacity, 0); }
@@ -356,7 +362,14 @@ export function TiledSpatialScene3D({
         .sort((left, right) => left.distance - right.distance || left.tile.id.localeCompare(right.tile.id))
         .map((entry) => entry.tile);
       desiredIds = new Set(desiredTiles.map((tile) => tile.id)); publish();
-      for (const [id, root] of details) if (!desiredIds.has(id)) {
+      const cachedOutsideView = [...details.entries()]
+        .filter(([id]) => !desiredIds.has(id))
+        .map(([id, root]) => {
+          const tile = catalog?.tiles.find((candidate) => candidate.id === id);
+          return { id, root, distance: tile ? distanceToBounds(tile.bounds_l93_m, absoluteEast, absoluteNorth) : Number.POSITIVE_INFINITY };
+        })
+        .sort((left, right) => right.distance - left.distance);
+      for (const { id, root } of cachedOutsideView.slice(0, Math.max(0, details.size - DETAIL_CACHE_LIMIT))) {
         root.traverse((candidate) => {
           const index = terrainMeshes.indexOf(candidate as Mesh);
           if (index >= 0) terrainMeshes.splice(index, 1);
@@ -366,11 +379,11 @@ export function TiledSpatialScene3D({
       fillDetailCapacity();
     };
     const scheduleRefresh = () => {
-      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      if (refreshTimer !== null) return;
       refreshTimer = window.setTimeout(() => {
         refreshTimer = null; if (!instance || !controls) return;
         const focus = mode === 'fps' ? instance.view.camera.position : controls.target; selectDetails(focus.x, focus.y);
-      }, 120);
+      }, LOD_REFRESH_INTERVAL_MS);
     };
     const orientFps = () => {
       if (!instance) return;
@@ -382,8 +395,18 @@ export function TiledSpatialScene3D({
       const requested = propsRef.current.cameraMode;
       if (requested !== mode) {
         mode = requested;
-        if (mode === 'fps' && instance) { host.focus({ preventScroll: true }); const direction = instance.view.camera.getWorldDirection(new Vector3()); yaw = Math.atan2(direction.x, direction.y); pitch = Math.asin(direction.z); }
-        else if (document.pointerLockElement) document.exitPointerLock();
+        if (mode === 'fps' && instance && controls) {
+          host.focus({ preventScroll: true });
+          const forward = instance.view.camera.getWorldDirection(new Vector3());
+          forward.z = 0;
+          if (forward.lengthSq() < 0.001) forward.set(0, 1, 0);
+          forward.normalize();
+          const target = controls.target.clone();
+          const groundRay = new Raycaster(new Vector3(target.x, target.y, target.z + 10_000), new Vector3(0, 0, -1));
+          const ground = groundRay.intersectObjects(terrainMeshes.filter((mesh) => mesh.parent?.visible), false)[0]?.point.z ?? target.z;
+          instance.view.camera.position.set(target.x - forward.x * 45, target.y - forward.y * 45, ground + 8);
+          yaw = Math.atan2(forward.x, forward.y); pitch = -0.05; orientFps(); scheduleRefresh();
+        } else if (document.pointerLockElement) document.exitPointerLock();
       }
       if (controls) controls.enabled = mode === 'orbit';
       if (instance && mode === 'fps') {
@@ -426,10 +449,16 @@ export function TiledSpatialScene3D({
         if (!response.ok) throw new Error(`Catalogue Unity inaccessible (${response.status}).`);
         catalog = parseUnitySpatialCatalog(await response.json());
         instance = new Instance({ target: host, crs: coordinateSystem(), backgroundColor: '#102429' });
+        instance.renderer.toneMapping = ACESFilmicToneMapping;
+        instance.renderer.toneMappingExposure = 0.72;
         instance.view.camera.up.copy(WORLD_UP);
         controls = new MapControls(instance.view.camera, instance.domElement); controls.enableDamping = true; controls.dampingFactor = 0.12; controls.screenSpacePanning = false; controls.minDistance = 5; controls.zoomSpeed = 1.35;
         instance.view.setControls(controls); controls.addEventListener('change', scheduleRefresh);
         instance.domElement.addEventListener('pointerdown', pointerDownHandler); instance.domElement.addEventListener('pointerup', pointerUpHandler);
+        const lighting = new Group(); lighting.name = 'Unity directional lighting';
+        lighting.add(new AmbientLight('#dce5e1', 1.15));
+        const sun = new DirectionalLight('#fff0d5', 1.8); sun.position.set(3_500, -2_500, 8_000); lighting.add(sun);
+        await instance.add(lighting);
         const far = await buildTile(source, catalog.lod_policy.far.terrain, catalog.lod_policy.far.imagery, catalog.origin_l93_m, abortController.signal, true);
         if (disposed) { disposeObject(far.root); return; }
         farRoot = far.root; terrainMeshes.push(far.terrain); await instance.add(farRoot);
