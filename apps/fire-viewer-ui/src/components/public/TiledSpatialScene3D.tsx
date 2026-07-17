@@ -34,6 +34,7 @@ import {
   parseUnitySpatialCatalog,
   type UnityAssetReference,
   type UnityBounds,
+  type UnityCatalogTile,
   type UnityMeshData,
   type UnityOrigin,
   type UnitySpatialCatalog,
@@ -189,7 +190,13 @@ async function buildTile(
   ]);
   const decoded = await decodeUnityTile(buffer, origin, far ? 5 : 1);
   const root = new Group(); root.name = far ? 'Unity FAR terrain' : `Unity detail ${decoded.tileId}`;
-  const terrain = new Mesh(geometry(decoded.terrain), new MeshBasicMaterial({ map: image, side: DoubleSide }));
+  const terrain = new Mesh(geometry(decoded.terrain), new MeshBasicMaterial({
+    map: image,
+    side: DoubleSide,
+    polygonOffset: !far,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+  }));
   terrain.name = far ? 'far-terrain' : `terrain-${decoded.tileId}`;
   root.add(terrain);
   if (!far) {
@@ -278,32 +285,20 @@ export function TiledSpatialScene3D({
     const abortController = new AbortController(); let disposed = false; let animationFrame = 0; let refreshTimer: number | null = null;
     let instance: Instance | null = null; let controls: MapControls | null = null; let farRoot: Group | null = null; let catalog: UnitySpatialCatalog | null = null;
     const details = new Map<string, Group>(); const pending = new Map<string, Promise<void>>(); const failed = new Set<string>();
-    const terrainMeshes: Mesh[] = []; let desiredIds = new Set<string>(); const pressed = new Set<string>();
+    const terrainMeshes: Mesh[] = []; let desiredIds = new Set<string>(); let desiredTiles: readonly UnityCatalogTile[] = []; const pressed = new Set<string>();
     let mode: 'orbit' | 'fps' = 'orbit'; let yaw = 0; let pitch = -0.15; let previousFrame = performance.now(); let pointerDown: readonly [number, number] | null = null;
 
     const updateState = () => setDetailState({ active: [...desiredIds].filter((id) => details.get(id)?.visible).length, expected: desiredIds.size, failures: failed.size });
     const publish = () => {
       if (!farRoot) return;
-      const complete = desiredIds.size > 0 && [...desiredIds].every((id) => details.has(id));
-      farRoot.visible = !complete;
-      for (const [id, root] of details) root.visible = complete && desiredIds.has(id);
+      farRoot.visible = true;
+      for (const [id, root] of details) root.visible = desiredIds.has(id);
       updateState(); instance?.notifyChange(instance.view.camera);
     };
-    const selectDetails = (east: number, north: number) => {
+    const fillDetailCapacity = () => {
       if (!catalog || !instance || !controls || disposed) return;
-      const distance = instance.view.camera.position.distanceTo(controls.target);
-      const absoluteEast = east + catalog.origin_l93_m[0];
-      const absoluteNorth = north + catalog.origin_l93_m[1];
-      const wanted = distance > 3_000 ? [] : catalog.tiles
-        .map((tile) => ({ tile, distance: distanceToBounds(tile.bounds_l93_m, absoluteEast, absoluteNorth) }))
-        .filter((entry) => entry.distance <= catalog!.lod_policy.detail.preload_radius_m)
-        .sort((left, right) => left.distance - right.distance || left.tile.id.localeCompare(right.tile.id))
-        .slice(0, catalog.lod_policy.detail.maximum_resident_tile_count)
-        .map((entry) => entry.tile);
-      desiredIds = new Set(wanted.map((tile) => tile.id)); publish();
-      for (const [id, root] of details) if (!desiredIds.has(id)) { instance.remove(root); disposeObject(root); details.delete(id); }
       let capacity = 2 - pending.size;
-      for (const tile of wanted) {
+      for (const tile of desiredTiles) {
         if (capacity <= 0) break;
         if (details.has(tile.id) || pending.has(tile.id) || failed.has(tile.id)) continue;
         capacity -= 1;
@@ -311,11 +306,32 @@ export function TiledSpatialScene3D({
           if (disposed || !desiredIds.has(tile.id) || !instance) { disposeObject(root); return; }
           root.visible = false; await instance.add(root); details.set(tile.id, root); terrainMeshes.push(terrain); publish();
         }).catch((error: unknown) => { if (!disposed && !abortController.signal.aborted) { console.error(error); failed.add(tile.id); } }).finally(() => {
-          pending.delete(tile.id); if (!disposed) { updateState(); window.setTimeout(scheduleRefresh, 0); }
+          pending.delete(tile.id); if (!disposed) { updateState(); window.setTimeout(fillDetailCapacity, 0); }
         });
         pending.set(tile.id, loading);
       }
       updateState();
+    };
+    const selectDetails = (east: number, north: number) => {
+      if (!catalog || !instance || !controls || disposed) return;
+      const distance = instance.view.camera.position.distanceTo(controls.target);
+      const absoluteEast = east + catalog.origin_l93_m[0];
+      const absoluteNorth = north + catalog.origin_l93_m[1];
+      desiredTiles = distance > 3_000 ? [] : catalog.tiles
+        .map((tile) => ({ tile, distance: distanceToBounds(tile.bounds_l93_m, absoluteEast, absoluteNorth) }))
+        .filter((entry) => entry.distance <= catalog!.lod_policy.detail.preload_radius_m)
+        .sort((left, right) => left.distance - right.distance || left.tile.id.localeCompare(right.tile.id))
+        .slice(0, catalog.lod_policy.detail.maximum_resident_tile_count)
+        .map((entry) => entry.tile);
+      desiredIds = new Set(desiredTiles.map((tile) => tile.id)); publish();
+      for (const [id, root] of details) if (!desiredIds.has(id)) {
+        root.traverse((candidate) => {
+          const index = terrainMeshes.indexOf(candidate as Mesh);
+          if (index >= 0) terrainMeshes.splice(index, 1);
+        });
+        instance.remove(root); disposeObject(root); details.delete(id);
+      }
+      fillDetailCapacity();
     };
     const scheduleRefresh = () => {
       if (refreshTimer !== null) window.clearTimeout(refreshTimer);
