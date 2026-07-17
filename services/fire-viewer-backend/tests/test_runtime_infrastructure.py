@@ -135,6 +135,43 @@ def test_vercel_blob_store_uses_private_immutable_objects(tmp_path: Path) -> Non
     assert calls[0][2]["add_random_suffix"] is False
 
 
+def test_vercel_blob_store_lists_a_bounded_prefix_inventory() -> None:
+    calls: list[dict[str, object]] = []
+
+    class FakeBlobClient:
+        def iter_objects(self, **kwargs: object):
+            calls.append(kwargs)
+            return iter(
+                [
+                    SimpleNamespace(
+                        pathname="firewarning/packages/upload/catalog.json",
+                        size=123,
+                    ),
+                    SimpleNamespace(
+                        pathname="firewarning/packages/upload/assets/tile.fwtile",
+                        size=456,
+                    ),
+                ]
+            )
+
+    store = VercelBlobObjectStore(prefix="firewarning", token="secret")
+    store.client = FakeBlobClient()  # type: ignore[assignment]
+
+    result = store.list_prefix("packages/upload", limit=2_001)
+
+    assert calls == [
+        {
+            "prefix": "firewarning/packages/upload/",
+            "batch_size": 1_000,
+            "limit": 2_001,
+        }
+    ]
+    assert [(item.pathname, item.size_bytes, item.content_type) for item in result] == [
+        ("firewarning/packages/upload/catalog.json", 123, None),
+        ("firewarning/packages/upload/assets/tile.fwtile", 456, None),
+    ]
+
+
 def test_object_store_factory_uses_configured_backend(tmp_path: Path) -> None:
     settings = Settings(
         _env_file=None,

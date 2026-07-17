@@ -13,6 +13,9 @@ from sqlalchemy import select
 
 from fire_viewer.db.models import AuditEvent, SpatialPackage, SpatialPackageFile
 from fire_viewer.domain.enums import SpatialPackageFileKind
+from fire_viewer.domain.schemas import AdminSpatialPackageFromBlobRequest
+from fire_viewer.services.spatial_package_blob_import import validate_blob_package
+from fire_viewer.storage import ObjectMetadata
 
 _PNG = (
     b"\x89PNG\r\n\x1a\n"
@@ -138,6 +141,114 @@ def _finalize(client, *, package_id: str, objects: list[dict[str, Any]], key: st
     )
 
 
+def test_large_blob_inventory_uses_one_listing_and_two_metadata_heads(settings) -> None:
+    package_id = "pkg-large-unity-r1"
+    asset_count = 952
+    asset_digest = hashlib.sha256(b"x").hexdigest()
+    catalog = {
+        "assets": [
+            {
+                "path": f"assets/detail/tile-{index:04d}.fwtile",
+                "sha256": asset_digest,
+                "byte_count": 1,
+            }
+            for index in range(asset_count)
+        ]
+    }
+    catalog_raw = json.dumps(catalog, separators=(",", ":")).encode()
+    manifest_raw = json.dumps(
+        {
+            "package_id": package_id,
+            "catalog": {
+                "path": "catalog.json",
+                "sha256": hashlib.sha256(catalog_raw).hexdigest(),
+                "byte_count": len(catalog_raw),
+            },
+            "zones": [{"zone_id": "IMPORT-TEST-01", "revision_id": "R1"}],
+        },
+        separators=(",", ":"),
+    ).encode()
+    documents = {
+        "package-manifest.json": manifest_raw,
+        "catalog.json": catalog_raw,
+        **{f"assets/detail/tile-{index:04d}.fwtile": b"x" for index in range(asset_count)},
+    }
+    storage_key = f"packages/{_UPLOAD_ID}"
+    content_types = {path: _content_type(path) for path in documents}
+    objects = [
+        {
+            "path": path,
+            "pathname": f"{storage_key}/{path}",
+            "size_bytes": len(content),
+            "content_type": content_types[path],
+        }
+        for path, content in documents.items()
+    ]
+
+    class RecordingStore:
+        def __init__(self) -> None:
+            self.list_calls = 0
+            self.head_calls: list[str] = []
+            self.read_calls: list[str] = []
+
+        def pathname_for(self, key: str) -> str:
+            return key
+
+        def uri_for(self, key: str) -> str:
+            return f"local://{key}"
+
+        def list_prefix(self, key: str, *, limit: int) -> list[ObjectMetadata]:
+            self.list_calls += 1
+            assert key == storage_key
+            assert limit == 2_001
+            return [
+                ObjectMetadata(
+                    pathname=f"{storage_key}/{path}",
+                    size_bytes=len(content),
+                    content_type=None,
+                )
+                for path, content in documents.items()
+            ][:limit]
+
+        def head(self, uri: str) -> ObjectMetadata:
+            self.head_calls.append(uri)
+            path = uri.removeprefix(f"local://{storage_key}/")
+            return ObjectMetadata(
+                pathname=f"{storage_key}/{path}",
+                size_bytes=len(documents[path]),
+                content_type=content_types[path],
+            )
+
+        def read_bytes(self, uri: str) -> bytes:
+            self.read_calls.append(uri)
+            return documents[uri.removeprefix(f"local://{storage_key}/")]
+
+    store = RecordingStore()
+    validated = validate_blob_package(
+        zone_id="IMPORT-TEST-01",
+        revision=1,
+        payload=AdminSpatialPackageFromBlobRequest.model_validate(
+            {
+                "upload_id": _UPLOAD_ID,
+                "package_id": package_id,
+                "reason": "Finalisation contrôlée du grand package spatial Unity.",
+                "objects": objects,
+            }
+        ),
+        settings=settings.model_copy(update={"zone_upload_max_files": 2_000}),
+        store=store,  # type: ignore[arg-type]
+    )
+
+    assert validated.object_count == 954
+    assert len(validated.asset_catalog) == asset_count
+    assert store.list_calls == 1
+    assert set(store.head_calls) == {
+        f"local://{storage_key}/package-manifest.json",
+        f"local://{storage_key}/catalog.json",
+    }
+    assert set(store.read_calls) == set(store.head_calls)
+
+
 def test_admin_finalizes_exact_blob_inventory_then_previews_and_publishes(
     client, settings, session
 ) -> None:
@@ -160,7 +271,7 @@ def test_admin_finalizes_exact_blob_inventory_then_previews_and_publishes(
         "object_count": 4,
         "total_size_bytes": sum(map(len, documents.values())),
         "asset_count": 2,
-        "validation_summary": "Blob metadata and package inventory were verified.",
+        "validation_summary": "Stored Blob inventory and package metadata were verified.",
     }
 
     replay = _finalize(
@@ -179,9 +290,7 @@ def test_admin_finalizes_exact_blob_inventory_then_previews_and_publishes(
     assert package is not None
     stored_files = list(
         session.scalars(
-            select(SpatialPackageFile).where(
-                SpatialPackageFile.spatial_package_id == package.id
-            )
+            select(SpatialPackageFile).where(SpatialPackageFile.spatial_package_id == package.id)
         )
     )
     assert {item.uri for item in stored_files} == {
@@ -189,9 +298,7 @@ def test_admin_finalizes_exact_blob_inventory_then_previews_and_publishes(
         f"local://packages/{_UPLOAD_ID}/assets/preview.png",
     }
     assert session.scalar(
-        select(AuditEvent).where(
-            AuditEvent.action == "spatial_package.finalized_from_blob"
-        )
+        select(AuditEvent).where(AuditEvent.action == "spatial_package.finalized_from_blob")
     )
 
     base = "/api/v1/admin/zones/IMPORT-TEST-01/revisions/1"
@@ -364,11 +471,12 @@ def test_finalization_rejects_incomplete_or_inconsistent_blob_packages(
 
     assert response.status_code == 400
     assert response.json()["type"].endswith(expected_error)
-    assert session.scalar(
-        select(SpatialPackage).where(
-            SpatialPackage.package_id == f"pkg-invalid-{mutation}"
+    assert (
+        session.scalar(
+            select(SpatialPackage).where(SpatialPackage.package_id == f"pkg-invalid-{mutation}")
         )
-    ) is None
+        is None
+    )
 
 
 def test_finalization_rejects_unsafe_and_unknown_object_paths(client, settings) -> None:
@@ -398,9 +506,7 @@ def test_finalization_rejects_unsafe_and_unknown_object_paths(client, settings) 
     assert response.json()["type"].endswith("unsupported_package_file_type")
 
 
-def test_admin_grant_issues_a_prefix_limited_vercel_blob_client_token(
-    client, settings
-) -> None:
+def test_admin_grant_issues_a_prefix_limited_vercel_blob_client_token(client, settings) -> None:
     _create_zone_and_revision(client)
     settings.object_storage_backend = "vercel_blob"
     settings.blob_read_write_token = SecretStr("vercel_blob_rw_teststore_testsecret")
@@ -445,9 +551,7 @@ def test_admin_grant_issues_a_prefix_limited_vercel_blob_client_token(
     assert hmac.compare_digest(signature, expected_signature)
 
     token_payload = json.loads(base64.b64decode(encoded_payload))
-    assert token_payload["pathname"] == (
-        f"{grant['pathname_prefix']}/assets/model.glb"
-    )
+    assert token_payload["pathname"] == (f"{grant['pathname_prefix']}/assets/model.glb")
     assert token_payload["allowedContentTypes"] == [
         "application/json",
         "application/vnd.fireviewer.terrain",

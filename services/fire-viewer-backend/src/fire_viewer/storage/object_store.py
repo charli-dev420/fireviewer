@@ -20,7 +20,7 @@ class ObjectStorageError(RuntimeError):
 class ObjectMetadata:
     pathname: str
     size_bytes: int
-    content_type: str
+    content_type: str | None
 
 
 def _safe_key(key: str) -> str:
@@ -41,8 +41,10 @@ def _content_type(path: Path) -> str:
         ".fwtile": "application/vnd.fireviewer.tile",
         ".fwterrain": "application/vnd.fireviewer.terrain",
     }
-    return explicit.get(path.suffix.casefold()) or mimetypes.guess_type(path.name)[0] or (
-        "application/octet-stream"
+    return (
+        explicit.get(path.suffix.casefold())
+        or mimetypes.guess_type(path.name)[0]
+        or ("application/octet-stream")
     )
 
 
@@ -58,6 +60,8 @@ class ObjectStore(Protocol):
     def read_bytes(self, uri: str) -> bytes: ...
 
     def head(self, uri: str) -> ObjectMetadata: ...
+
+    def list_prefix(self, key: str, *, limit: int) -> list[ObjectMetadata]: ...
 
 
 class LocalObjectStore:
@@ -109,6 +113,24 @@ class LocalObjectStore:
             size_bytes=path.stat().st_size,
             content_type=content_type,
         )
+
+    def list_prefix(self, key: str, *, limit: int) -> list[ObjectMetadata]:
+        prefix = self._path_for(key)
+        if not prefix.exists():
+            return []
+        result: list[ObjectMetadata] = []
+        for path in sorted(candidate for candidate in prefix.rglob("*") if candidate.is_file()):
+            pathname = path.relative_to(self.root).as_posix()
+            result.append(
+                ObjectMetadata(
+                    pathname=pathname,
+                    size_bytes=path.stat().st_size,
+                    content_type=_content_type(path),
+                )
+            )
+            if len(result) >= limit:
+                break
+        return result
 
 
 class VercelBlobObjectStore:
@@ -185,6 +207,27 @@ class VercelBlobObjectStore:
             size_bytes=result.size,
             content_type=result.content_type,
         )
+
+    def list_prefix(self, key: str, *, limit: int) -> list[ObjectMetadata]:
+        prefix = f"{self._blob_key(key).rstrip('/')}/"
+        try:
+            return [
+                ObjectMetadata(
+                    pathname=item.pathname,
+                    size_bytes=item.size,
+                    # The Vercel Blob list endpoint does not expose the stored content type.
+                    # Finalization still validates the declared type against the safe path and
+                    # checks the two package metadata objects with authoritative HEAD requests.
+                    content_type=None,
+                )
+                for item in self.client.iter_objects(
+                    prefix=prefix,
+                    batch_size=min(limit, 1_000),
+                    limit=limit,
+                )
+            ]
+        except BaseException as exc:
+            raise ObjectStorageError("Vercel Blob inventory listing failed.") from exc
 
 
 def build_object_store(settings: Settings) -> ObjectStore:

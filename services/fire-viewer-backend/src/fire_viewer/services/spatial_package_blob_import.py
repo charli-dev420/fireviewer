@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any
@@ -160,21 +159,27 @@ def _content_type(path: str) -> str:
     return result
 
 
-def _head_objects(
+def _list_objects(
     store: ObjectStore,
     storage_key: str,
-    objects: list[AdminBlobObjectReference],
+    *,
+    limit: int,
 ) -> dict[str, ObjectMetadata]:
-    def load(item: AdminBlobObjectReference) -> tuple[str, ObjectMetadata]:
-        return item.path, store.head(store.uri_for(f"{storage_key}/{item.path}"))
-
     try:
-        with ThreadPoolExecutor(max_workers=min(8, len(objects))) as executor:
-            return dict(executor.map(load, objects))
+        prefix = f"{store.pathname_for(storage_key).rstrip('/')}/"
+        result: dict[str, ObjectMetadata] = {}
+        for item in store.list_prefix(storage_key, limit=limit):
+            if not item.pathname.startswith(prefix):
+                raise ObjectStorageError("Object inventory escaped the package prefix.")
+            path = item.pathname.removeprefix(prefix)
+            if not path or path in result:
+                raise ObjectStorageError("Object inventory contains an invalid pathname.")
+            result[path] = item
+        return result
     except ObjectStorageError as exc:
         raise BadRequestError(
             "missing_blob_object",
-            "At least one declared Blob object is missing or inaccessible.",
+            "The declared Blob object inventory is missing or inaccessible.",
         ) from exc
 
 
@@ -219,13 +224,36 @@ def validate_blob_package(
             "package-manifest.json and catalog.json are required.",
         )
 
-    metadata = _head_objects(object_store, storage_key, list(by_path.values()))
+    metadata = _list_objects(
+        object_store,
+        storage_key,
+        limit=settings.zone_upload_max_files + 1,
+    )
+    if len(metadata) > settings.zone_upload_max_files:
+        raise BadRequestError("too_many_package_files", "The package contains too many files.")
+    if set(metadata) != set(by_path):
+        raise BadRequestError(
+            "missing_blob_object",
+            "The declared Blob objects do not match the stored package inventory.",
+        )
+
+    # Vercel Blob exposes pathname and size in one paginated inventory request, but not the
+    # stored content type. Only the two small metadata documents need authoritative HEAD calls;
+    # every declared asset type is already constrained by its safe suffix and upload token.
+    for path in _REQUIRED_PATHS:
+        try:
+            metadata[path] = object_store.head(object_store.uri_for(f"{storage_key}/{path}"))
+        except ObjectStorageError as exc:
+            raise BadRequestError(
+                "missing_blob_object",
+                "The package metadata objects are missing or inaccessible.",
+            ) from exc
     for path, item in by_path.items():
         actual = metadata[path]
         if (
             actual.pathname != item.pathname
             or actual.size_bytes != item.size_bytes
-            or actual.content_type != item.content_type
+            or (actual.content_type is not None and actual.content_type != item.content_type)
         ):
             raise BadRequestError(
                 "blob_metadata_mismatch",
@@ -402,7 +430,10 @@ def import_blob_package(
         },
         verification_report={
             "status": "finalized_from_blob",
-            "summary": "Blob object pathnames, sizes and content types match the package catalog.",
+            "summary": (
+                "Stored Blob pathnames and sizes match the package catalog; declared content "
+                "types match supported file extensions."
+            ),
             "object_count": validated.object_count,
         },
         created_by=actor.actor_id,
@@ -433,7 +464,7 @@ def import_blob_package(
             object_count=validated.object_count,
             total_size_bytes=validated.total_size_bytes,
             asset_count=len(files),
-            validation_summary="Blob metadata and package inventory were verified.",
+            validation_summary="Stored Blob inventory and package metadata were verified.",
         ),
         trace_id=trace_id,
     )
