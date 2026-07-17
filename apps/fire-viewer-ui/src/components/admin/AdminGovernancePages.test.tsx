@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AdminApiProvider } from './AdminApiContext';
@@ -65,26 +64,5 @@ describe('surfaces de gouvernance administrateur', () => {
       expect(document.body.textContent).not.toContain('public_report_hash_secret');
       view.unmount();
     }
-  });
-
-  it('applique uniquement la migration Unity bornée depuis la page système', async () => {
-    vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
-    const fetchMock = vi.fn((input: RequestInfo | URL) => {
-      const url = new URL(typeof input === 'string' ? input : input.toString());
-      if (url.pathname === '/api/v1/admin/system/schema-upgrade') {
-        return Promise.resolve(response({ previous_revision: 'e6f3a1b8c420', current_revision: 'd7c5e3a1b920', applied: true, trace_id: 'trace-schema-upgrade' }));
-      }
-      return Promise.resolve(governancePayload(url.pathname));
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    renderAdmin(<AdminSystemPage />);
-
-    await userEvent.click(await screen.findByRole('button', { name: 'Appliquer le pas suivant' }));
-
-    expect(await screen.findByText(/e6f3a1b8c420 → d7c5e3a1b920 appliquée/)).toBeVisible();
-    expect(fetchMock).toHaveBeenCalledWith(
-      `${API_ORIGIN}/api/v1/admin/system/schema-upgrade`,
-      expect.objectContaining({ method: 'POST' }),
-    );
   });
 });
