@@ -371,13 +371,48 @@ export function TiledSpatialScene3D({
     const host = hostRef.current;
     if (!host || typeof WebGLRenderingContext === 'undefined') { setStatus('error'); return undefined; }
     const abortController = new AbortController(); let disposed = false; let animationFrame = 0; let refreshTimer: number | null = null;
-    let instance: Instance | null = null; let controls: MapControls | null = null; let farRoot: Group | null = null; let catalog: UnitySpatialCatalog | null = null;
+    let instance: Instance | null = null; let controls: MapControls | null = null; let farRoot: Group | null = null; let farTerrain: Mesh | null = null; let catalog: UnitySpatialCatalog | null = null;
     const details = new Map<string, Group>(); const pending = new Map<string, Promise<void>>(); const failed = new Set<string>();
     const terrainMeshes: Mesh[] = []; const roadMeshes: Mesh[] = []; let terrainElevationRange: readonly [number, number] = [-1_000, 5_000];
+    const tileSightPoints = new Map<string, readonly Vector3[]>();
     let desiredIds = new Set<string>(); let desiredTiles: readonly UnityCatalogTile[] = []; const pressed = new Set<string>();
     let mode: 'orbit' | 'fps' = 'orbit'; let fpsAnchoredToRoad = false; let yaw = 0; let pitch = -0.15; let previousFrame = performance.now(); let pointerDown: readonly [number, number] | null = null;
 
     const updateState = () => setDetailState({ active: [...desiredIds].filter((id) => details.get(id)?.visible).length, expected: desiredIds.size, failures: failed.size });
+    const sightPointsFor = (tile: UnityCatalogTile): readonly Vector3[] => {
+      const cached = tileSightPoints.get(tile.id);
+      if (cached) return cached;
+      if (!farTerrain || !catalog) return [];
+      farTerrain.updateWorldMatrix(true, false);
+      const [west, south, east, north] = tile.bounds_l93_m;
+      const inset = Math.min(5, (east - west) * 0.02, (north - south) * 0.02);
+      const samples = [
+        [(west + east) / 2, (south + north) / 2],
+        [west + inset, south + inset], [west + inset, north - inset],
+        [east - inset, south + inset], [east - inset, north - inset],
+      ] as const;
+      const points = samples.flatMap(([sampleEast, sampleNorth]) => {
+        const ray = new Raycaster(
+          new Vector3(sampleEast - catalog!.origin_l93_m[0], sampleNorth - catalog!.origin_l93_m[1], terrainElevationRange[1] + 2_000),
+          new Vector3(0, 0, -1),
+        );
+        const ground = ray.intersectObject(farTerrain!, false)[0]?.point;
+        return ground ? [ground.clone().addScaledVector(WORLD_UP, 8)] : [];
+      });
+      tileSightPoints.set(tile.id, points); return points;
+    };
+    const tileHasTerrainLineOfSight = (tile: UnityCatalogTile): boolean => {
+      if (!farTerrain || !instance) return true;
+      const points = sightPointsFor(tile);
+      if (!points.length) return true;
+      return points.some((point) => {
+        const direction = point.clone().sub(instance!.view.camera.position);
+        const distance = direction.length();
+        if (distance <= 12) return true;
+        const ray = new Raycaster(instance!.view.camera.position, direction.normalize(), 0.5, distance - 10);
+        return ray.intersectObject(farTerrain!, false).length === 0;
+      });
+    };
     const publish = () => {
       if (!farRoot) return;
       farRoot.visible = true;
@@ -411,6 +446,7 @@ export function TiledSpatialScene3D({
         .filter((tile) => tileIntersectsCamera(frustum, tile, catalog!.origin_l93_m, terrainElevationRange))
         .map((tile) => ({ tile, distance: tileVolume(tile, catalog!.origin_l93_m, terrainElevationRange).distanceToPoint(instance!.view.camera.position) }))
         .filter((entry) => entry.distance <= nearDetailDistance)
+        .filter((entry) => tileHasTerrainLineOfSight(entry.tile))
         .sort((left, right) => left.distance - right.distance || left.tile.id.localeCompare(right.tile.id))
         .map((entry) => entry.tile) : [];
       desiredIds = new Set(desiredTiles.map((tile) => tile.id)); publish();
@@ -533,7 +569,7 @@ export function TiledSpatialScene3D({
         if (disposed) { disposeObject(far.root); return; }
         const farBounds = far.terrain.geometry.boundingBox;
         if (farBounds) terrainElevationRange = [farBounds.min.z, farBounds.max.z];
-        farRoot = far.root; farRoot.position.z = -3; terrainMeshes.push(far.terrain); await instance.add(farRoot);
+        farRoot = far.root; farRoot.position.z = -3; farTerrain = far.terrain; terrainMeshes.push(far.terrain); await instance.add(farRoot);
         const overlays = new Group(); overlays.name = 'admin-spatial-overlays'; await instance.add(overlays);
         const runtime: Runtime = { instance, controls, overlays, origin: catalog.origin_l93_m, catalog, refreshDetails: scheduleRefresh };
         runtimeRef.current = runtime; redrawOverlays(runtime, propsRef.current.overlayPoints, propsRef.current.overlayLines);
