@@ -69,6 +69,7 @@ from fire_viewer.domain.schemas import (
     AdminSpatialPackagePublicationEnvelope,
     AdminSpatialPackagePublicationRequest,
     AdminSpatialPackagePublishRequest,
+    AdminSpatialPackageRecoveryRequest,
     AdminSystemStatus,
     AdminWorkQueueResponse,
     AdminZoneCreateRequest,
@@ -124,6 +125,7 @@ from fire_viewer.services.incident_spatial_review import (
 from fire_viewer.services.public_incident_view import list_public_reports, review_public_report
 from fire_viewer.services.spatial_package_blob_import import (
     import_blob_package,
+    recover_blob_package_request,
     validate_blob_package,
 )
 from fire_viewer.services.spatial_package_import import create_spatial_revision
@@ -908,6 +910,53 @@ def finalize_zone_package_from_blob(
     idempotency_key: IdempotencyKeyDep,
 ) -> AdminSpatialPackageImportEnvelope:
     _require_admin(actor)
+    validated = validate_blob_package(
+        zone_id=zone_id,
+        revision=revision,
+        payload=payload,
+        settings=settings,
+    )
+    outcome = import_blob_package(
+        session,
+        zone_id=zone_id,
+        revision=revision,
+        payload=payload,
+        validated=validated,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        trace_id=trace_id,
+        settings=settings,
+    )
+    response.status_code = 201
+    _set_mutation_headers(response, replayed=outcome.replayed)
+    return outcome.response
+
+
+@router.post(
+    "/zones/{zone_id}/revisions/{revision}/packages/recover-from-blob",
+    response_model=AdminSpatialPackageImportEnvelope,
+    status_code=201,
+)
+def recover_zone_package_from_blob(
+    zone_id: ZoneIdPath,
+    revision: RevisionPath,
+    recovery: AdminSpatialPackageRecoveryRequest,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    trace_id: TraceIdDep,
+    idempotency_key: IdempotencyKeyDep,
+) -> AdminSpatialPackageImportEnvelope:
+    """Finalize an interrupted upload by rebuilding its bounded Blob inventory."""
+
+    _require_admin(actor)
+    payload = recover_blob_package_request(
+        upload_id=recovery.upload_id,
+        package_id=recovery.package_id,
+        reason=recovery.reason,
+        settings=settings,
+    )
     validated = validate_blob_package(
         zone_id=zone_id,
         revision=revision,

@@ -141,6 +141,18 @@ def _finalize(client, *, package_id: str, objects: list[dict[str, Any]], key: st
     )
 
 
+def _recover(client, *, package_id: str, key: str):
+    return client.post(
+        "/api/v1/admin/zones/IMPORT-TEST-01/revisions/1/packages/recover-from-blob",
+        json={
+            "upload_id": _UPLOAD_ID,
+            "package_id": package_id,
+            "reason": "Reprise contrôlée de la finalisation du package déjà stocké.",
+        },
+        headers=_headers(key),
+    )
+
+
 def test_large_blob_inventory_uses_one_listing_and_two_metadata_heads(settings) -> None:
     package_id = "pkg-large-unity-r1"
     asset_count = 952
@@ -336,6 +348,35 @@ def test_admin_finalizes_exact_blob_inventory_then_previews_and_publishes(
     )
     assert published.status_code == 200
     assert published.json()["publication"]["package_state"] == "PUBLISHED"
+
+
+def test_admin_recovers_a_complete_stored_upload_without_reupload(
+    client, settings, session
+) -> None:
+    _create_zone_and_revision(client)
+    documents, _objects = _stage_blob_objects(settings, package_id="pkg-recovered-r1")
+
+    response = _recover(
+        client,
+        package_id="pkg-recovered-r1",
+        key="spatial-import-recovery-0001",
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["package"] == {
+        "package_id": "pkg-recovered-r1",
+        "state": "DRAFT",
+        "upload_id": _UPLOAD_ID,
+        "object_count": 4,
+        "total_size_bytes": sum(map(len, documents.values())),
+        "asset_count": 2,
+        "validation_summary": "Stored Blob inventory and package metadata were verified.",
+    }
+    package = session.scalar(
+        select(SpatialPackage).where(SpatialPackage.package_id == "pkg-recovered-r1")
+    )
+    assert package is not None
+    assert package.provenance["upload_id"] == _UPLOAD_ID
 
 
 def test_admin_finalizes_unity_remote_tile_inventory(client, settings, session) -> None:

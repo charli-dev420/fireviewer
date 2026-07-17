@@ -348,6 +348,41 @@ def validate_blob_package(
     )
 
 
+def recover_blob_package_request(
+    *,
+    upload_id: str,
+    package_id: str,
+    reason: str,
+    settings: Settings,
+    store: ObjectStore | None = None,
+) -> AdminSpatialPackageFromBlobRequest:
+    """Rebuild the client inventory for an interrupted, fully stored upload."""
+
+    object_store = store or build_object_store(settings)
+    storage_key = f"packages/{upload_id}"
+    metadata = _list_objects(
+        object_store,
+        storage_key,
+        limit=settings.zone_upload_max_files + 1,
+    )
+    if len(metadata) > settings.zone_upload_max_files:
+        raise BadRequestError("too_many_package_files", "The package contains too many files.")
+    return AdminSpatialPackageFromBlobRequest(
+        upload_id=upload_id,
+        package_id=package_id,
+        reason=reason,
+        objects=[
+            AdminBlobObjectReference(
+                path=path,
+                pathname=item.pathname,
+                size_bytes=item.size_bytes,
+                content_type=_content_type(path),
+            )
+            for path, item in sorted(metadata.items())
+        ],
+    )
+
+
 def _kind_and_media_type(path: str) -> tuple[SpatialPackageFileKind, str]:
     suffix = PurePosixPath(path).suffix.casefold()
     if suffix in {".jpg", ".jpeg"}:

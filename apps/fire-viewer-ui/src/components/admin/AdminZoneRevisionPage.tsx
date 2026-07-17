@@ -36,6 +36,10 @@ export function AdminZoneRevisionPage({
   const [importReason, setImportReason] = useState('');
   const [progress, setProgress] = useState<SpatialPackageUploadProgress | null>(null);
   const [importing, setImporting] = useState(false);
+  const [recoveryUploadId, setRecoveryUploadId] = useState('');
+  const [recoveryPackageId, setRecoveryPackageId] = useState('');
+  const [recoveryReason, setRecoveryReason] = useState('');
+  const [recovering, setRecovering] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -117,6 +121,37 @@ export function AdminZoneRevisionPage({
       setSelectionError(error instanceof Error ? error.message : 'L’envoi du package spatial a échoué.');
     } finally {
       setImporting(false);
+    }
+  }
+
+  async function recoverPackage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage(null);
+    setSelectionError(null);
+    setRecovering(true);
+    try {
+      const result = await api.recoverSpatialPackageFromBlob(
+        zoneId,
+        revision,
+        {
+          upload_id: recoveryUploadId.trim(),
+          package_id: recoveryPackageId.trim(),
+          reason: recoveryReason.trim(),
+        },
+        { idempotencyKey: createAdminIdempotencyKey() },
+      );
+      setPackageId(result.package_id);
+      setRecoveryUploadId('');
+      setRecoveryPackageId('');
+      setRecoveryReason('');
+      setMessage(
+        `Package ${result.package_id} repris sans nouvel envoi : ${result.object_count} objets et ${result.asset_count} assets contrôlés.`,
+      );
+      reload();
+    } catch (error) {
+      setSelectionError(error instanceof Error ? error.message : 'La reprise du package spatial a échoué.');
+    } finally {
+      setRecovering(false);
     }
   }
 
@@ -209,6 +244,29 @@ export function AdminZoneRevisionPage({
             </button>
           </div>
         </form>
+        <details className="admin-form-card admin-form-card--narrow">
+          <summary>Reprendre une finalisation interrompue</summary>
+          <p>Utilisez cette reprise uniquement si tous les fichiers ont déjà été envoyés et que la finalisation a échoué.</p>
+          <form onSubmit={(event) => void recoverPackage(event)}>
+            <label>
+              Identifiant de l’upload
+              <input value={recoveryUploadId} onChange={(event) => setRecoveryUploadId(event.target.value)} required pattern="[a-f0-9]{32}" maxLength={32} />
+            </label>
+            <label>
+              Identifiant du package
+              <input value={recoveryPackageId} onChange={(event) => setRecoveryPackageId(event.target.value)} required minLength={3} maxLength={96} />
+            </label>
+            <label>
+              Motif de reprise
+              <textarea value={recoveryReason} onChange={(event) => setRecoveryReason(event.target.value)} required minLength={10} maxLength={500} />
+            </label>
+            <div className="admin-form-actions">
+              <button className="button button--secondary" type="submit" disabled={recovering}>
+                {recovering ? 'Reprise en cours…' : 'Finaliser sans renvoyer les fichiers'}
+              </button>
+            </div>
+          </form>
+        </details>
       </section>
 
       <section className="admin-section">

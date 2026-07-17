@@ -155,6 +155,40 @@ describe('client API d’administration', () => {
     expect(JSON.parse(String(init?.body))).toMatchObject({ upload_id: 'a'.repeat(32), objects });
   });
 
+  it('reprend un upload Blob stocké sans renvoyer son inventaire depuis le navigateur', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response({
+      package: {
+        package_id: 'pkg-zone-r2',
+        state: 'DRAFT',
+        upload_id: 'a'.repeat(32),
+        object_count: 954,
+        total_size_bytes: 1_412_566_951,
+        asset_count: 952,
+        validation_summary: 'Objets Blob contrôlés.',
+      },
+      trace_id: 'trace-package-recovery',
+    }, 201));
+    const client = new AdminApiClient({ session: SESSION, fetchImpl: fetchMock });
+
+    await expect(client.recoverSpatialPackageFromBlob('TEST-ZONE-01', 2, {
+      upload_id: 'a'.repeat(32),
+      package_id: 'pkg-zone-r2',
+      reason: 'Reprise de la finalisation après interruption réseau.',
+    }, { idempotencyKey: 'package-recovery-0001' })).resolves.toMatchObject({
+      package_id: 'pkg-zone-r2',
+      object_count: 954,
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe(`${API_ORIGIN}/api/v1/admin/zones/TEST-ZONE-01/revisions/2/packages/recover-from-blob`);
+    expect(JSON.parse(String(init?.body))).toEqual({
+      upload_id: 'a'.repeat(32),
+      package_id: 'pkg-zone-r2',
+      reason: 'Reprise de la finalisation après interruption réseau.',
+    });
+  });
+
   it('transmet le mot de passe uniquement dans la requête de publication', async () => {
     vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response({

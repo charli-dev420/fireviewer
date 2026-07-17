@@ -1194,6 +1194,12 @@ class AdminSpatialPackageFromBlobRequest(StrictModel):
     objects: list[AdminBlobObjectReference] = Field(min_length=3, max_length=100_000)
 
 
+class AdminSpatialPackageRecoveryRequest(StrictModel):
+    upload_id: str = Field(pattern=r"^[a-f0-9]{32}$")
+    package_id: str = Field(min_length=3, max_length=96, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+    reason: str = Field(min_length=10, max_length=500)
+
+
 class ZoneVisibilityRequest(StrictModel):
     visibility: Literal[ZoneVisibility.PUBLISHED, ZoneVisibility.HIDDEN]
     reason: str = Field(min_length=10, max_length=500)

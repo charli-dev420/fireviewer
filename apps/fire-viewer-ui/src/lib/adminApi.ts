@@ -1304,6 +1304,25 @@ export class AdminApiClient {
     catch { throw new AdminApiError('parse', 'La réponse de finalisation du package spatial est invalide.'); }
   }
 
+  async recoverSpatialPackageFromBlob(
+    zoneId: string,
+    revision: number,
+    input: { readonly upload_id: string; readonly package_id: string; readonly reason: string },
+    options: AdminRequestOptions,
+  ): Promise<AdminSpatialPackageImport> {
+    const normalized = normalizeZoneId(zoneId);
+    if (!Number.isSafeInteger(revision) || revision < 1 || !/^[a-f0-9]{32}$/.test(input.upload_id) || input.package_id.trim().length < 3 || input.reason.trim().length < 10) {
+      throw new AdminApiError('configuration', 'La reprise du package spatial est invalide.');
+    }
+    const payload = await this.postJson(
+      `/zones/${encodeURIComponent(normalized)}/revisions/${revision}/packages/recover-from-blob`,
+      input,
+      options,
+    );
+    try { return parseSpatialPackageImport(payload); }
+    catch { throw new AdminApiError('parse', 'La réponse de reprise du package spatial est invalide.'); }
+  }
+
   async validateSpatialPackage(zoneId: string, revision: number, input: { readonly package_id: string; readonly reason: string }, options: AdminRequestOptions): Promise<AdminSpatialPackagePublication> {
     const normalized = normalizeZoneId(zoneId);
     if (!Number.isSafeInteger(revision) || revision < 1 || input.package_id.trim().length < 3 || input.reason.trim().length < 10) throw new AdminApiError('configuration', 'La validation du package est invalide.');
