@@ -46,6 +46,7 @@ import {
   type UnitySpatialCatalog,
   type UnityTileGeometry,
 } from '../../lib/unitySpatialTile';
+import { terrainOcclusionProbeDistance } from '../../lib/spatialVisibility';
 
 export interface TiledSceneSource {
   readonly catalogUrl: string;
@@ -408,9 +409,13 @@ export function TiledSpatialScene3D({
       if (!points.length) return true;
       return points.some((point) => {
         const direction = point.clone().sub(instance!.view.camera.position);
-        const distance = direction.length();
-        if (distance <= 12) return true;
-        const ray = new Raycaster(instance!.view.camera.position, direction.normalize(), 0.5, distance - 10);
+        const probeDistance = terrainOcclusionProbeDistance(
+          instance!.view.camera.position,
+          point,
+          tileVolume(tile, catalog!.origin_l93_m, terrainElevationRange),
+        );
+        if (probeDistance <= 0.5) return true;
+        const ray = new Raycaster(instance!.view.camera.position, direction.normalize(), 0.5, probeDistance);
         return ray.intersectObject(farTerrain!, false).length === 0;
       });
     };

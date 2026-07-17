@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { Box3, Vector3 } from 'three';
 import { parseTiledSpatialCatalog } from '../../lib/tiledSpatialCatalog';
+import { terrainOcclusionProbeDistance } from '../../lib/spatialVisibility';
 
 const files = {
   'terrain/T00/colour.png': '/api/colour',
@@ -48,5 +50,32 @@ describe('parseTiledSpatialCatalog', () => {
       ...files,
       'terrain/T00/elevation.cog.tif': '',
     })).toThrow('absent du package publié');
+  });
+});
+
+describe('terrainOcclusionProbeDistance', () => {
+  it('arrête le contrôle avant l’entrée dans la tuile pour ne pas auto-masquer son relief', () => {
+    const camera = new Vector3(0, 0, 100);
+    const target = new Vector3(100, 0, 0);
+    const volume = new Box3(new Vector3(90, -10, -20), new Vector3(110, 10, 80));
+
+    const probeDistance = terrainOcclusionProbeDistance(camera, target, volume);
+    const tileEntryDistance = camera.distanceTo(new Vector3(90, 0, 10));
+
+    expect(probeDistance).toBeCloseTo(tileEntryDistance - 2, 5);
+    expect(probeDistance).toBeLessThan(camera.distanceTo(target));
+  });
+
+  it('conserve la distance complète lorsqu’aucun volume cible n’est traversé', () => {
+    const camera = new Vector3(0, 0, 100);
+    const target = new Vector3(100, 0, 0);
+    const volume = new Box3(new Vector3(-110, -10, -20), new Vector3(-90, 10, 80));
+
+    expect(terrainOcclusionProbeDistance(camera, target, volume)).toBeCloseTo(camera.distanceTo(target) - 2, 5);
+  });
+
+  it('ne masque jamais la tuile qui contient déjà la caméra', () => {
+    const volume = new Box3(new Vector3(-10, -10, -20), new Vector3(110, 10, 120));
+    expect(terrainOcclusionProbeDistance(new Vector3(0, 0, 100), new Vector3(100, 0, 0), volume)).toBe(0);
   });
 });
