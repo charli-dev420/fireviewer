@@ -12,7 +12,7 @@ Dans `Packages/manifest.json` du projet Unity :
 ```json
 {
   "dependencies": {
-    "com.fireviewer.spatial-tiles": "file:D:/Dev/project/fireviewer/tools/spatial-hybrid-zone/unity/runtime-package/com.fireviewer.spatial-tiles"
+    "com.fireviewer.spatial-tiles": "file:D:/chemin/vers/fireviewer/tools/spatial-hybrid-zone/unity/runtime-package/com.fireviewer.spatial-tiles"
   }
 }
 ```

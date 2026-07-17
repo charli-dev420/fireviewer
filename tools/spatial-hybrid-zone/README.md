@@ -1,5 +1,10 @@
 # Package global hybride — zone Justin / Die
 
+Pour reproduire la carte Unity V1 validee sur une autre zone de France, utiliser
+le [kit de production France](production-kit-france/README.md). Il enchaine les
+sources LiDAR/orthophoto, les LOD FAR/MID/NEAR, le controle Blender facultatif,
+le catalogue Unity distant et le dossier final attendu par l'upload du site.
+
 Ce pipeline prépare **hors du site et sans téléchargement** le socle géospatial
 global destiné à la validation dans Blender puis à l'intégration Giro3D :
 

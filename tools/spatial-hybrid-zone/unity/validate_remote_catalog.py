@@ -100,13 +100,14 @@ def validate(artifact_root: Path, output_root: Path) -> dict[str, Any]:
         )
     if int(catalog.get("exported_detail_tile_count", -1)) != len(ready_ids):
         raise FWTileError("catalog exported tile count is inconsistent")
-    maximum_resident = int(
-        catalog.get("lod_policy", {})
-        .get("detail", {})
-        .get("maximum_resident_tile_count", -1)
-    )
+    detail_policy = catalog.get("lod_policy", {}).get("detail", {})
+    maximum_resident = int(detail_policy.get("maximum_resident_tile_count", -1))
     if maximum_resident != 16:
         raise FWTileError("catalog does not enforce the global 16-tile budget")
+    if float(detail_policy.get("publish_distance_m", -1)) != 600.0:
+        raise FWTileError("catalog does not preserve the 600 m publish distance")
+    if float(detail_policy.get("preload_radius_m", -1)) != 750.0:
+        raise FWTileError("catalog does not preserve the 750 m preload radius")
 
     receipt_paths = sorted((output_root / "receipts").glob("x*_s*.json"))
     receipt_ids: set[str] = set()
@@ -155,6 +156,10 @@ def validate(artifact_root: Path, output_root: Path) -> dict[str, Any]:
         combined_bytes.append(payload_size + imagery_size)
 
     far = catalog.get("lod_policy", {}).get("far", {})
+    if far.get("terrain", {}).get("resolution_m") != [5.0, 5.0]:
+        raise FWTileError("catalog FAR terrain resolution is not 5 m")
+    if far.get("imagery", {}).get("resolution_m") != 2.0:
+        raise FWTileError("catalog FAR imagery resolution is not 2 m")
     far_terrain = _asset_path(output_root, far.get("terrain", {}))
     far_imagery = _asset_path(output_root, far.get("imagery", {}))
     referenced_paths.update((far_terrain, far_imagery))

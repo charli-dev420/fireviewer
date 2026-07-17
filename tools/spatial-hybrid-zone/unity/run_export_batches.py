@@ -42,6 +42,12 @@ def _arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifact-root", type=Path, default=DEFAULT_ARTIFACT_ROOT)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--production-manifest", type=Path)
+    parser.add_argument("--global-vector-package", type=Path)
+    parser.add_argument("--far-terrain", type=Path)
+    parser.add_argument("--far-imagery", type=Path)
+    parser.add_argument("--detail-zones", type=Path, default=DETAIL_ZONE_CONTRACT_PATH)
+    parser.add_argument("--far-imagery-resolution-m", type=float, default=2.0)
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=4)
     return parser.parse_args(argv)
@@ -50,8 +56,12 @@ def _arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def _ready_tile_ids(
     artifact_root: Path,
     detail_zone_contract: Path = DETAIL_ZONE_CONTRACT_PATH,
+    production_manifest: Path | None = None,
 ) -> list[str]:
-    manifest_path = artifact_root / "global-05m/production-manifest.json"
+    manifest_path = (
+        production_manifest
+        or artifact_root / "global-05m/production-manifest.json"
+    )
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("status") != "ready":
         raise RuntimeError("production manifest is not ready")
@@ -71,8 +81,8 @@ def _ready_tile_ids(
 def _validate_limits(workers: int, batch_size: int) -> None:
     if workers != 1:
         raise ValueError(
-            "workers must be exactly one: each exporter retains the 3.5 GiB "
-            "global vector model"
+            "workers must be exactly one: every exporter retains the complete "
+            "global vector model and its native geospatial allocations"
         )
     if batch_size < 1:
         raise ValueError("batch size must be at least one")
@@ -86,15 +96,14 @@ def _chunks(values: Sequence[str], size: int) -> list[tuple[str, ...]]:
 
 def _run_batch(
     exporter: Path,
-    artifact_root: Path,
+    exporter_arguments: Sequence[str],
     output_root: Path,
     tile_ids: Sequence[str],
 ) -> BatchResult:
     command = [
         sys.executable,
         str(exporter),
-        "--artifact-root",
-        str(artifact_root),
+        *exporter_arguments,
         "--output-root",
         str(output_root),
     ]
@@ -155,7 +164,32 @@ def main(argv: Sequence[str] | None = None) -> int:
     artifact_root = arguments.artifact_root.resolve()
     output_root = arguments.output_root.resolve()
     exporter = Path(__file__).with_name("export_remote_catalog.py").resolve()
-    ready = _ready_tile_ids(artifact_root)
+    production_manifest = (
+        arguments.production_manifest.resolve()
+        if arguments.production_manifest
+        else artifact_root / "global-05m/production-manifest.json"
+    )
+    detail_zones = arguments.detail_zones.resolve()
+    ready = _ready_tile_ids(artifact_root, detail_zones, production_manifest)
+    if not ready:
+        raise RuntimeError("production manifest contains no ready tile")
+    exporter_arguments = [
+        "--artifact-root",
+        str(artifact_root),
+        "--production-manifest",
+        str(production_manifest),
+        "--detail-zones",
+        str(detail_zones),
+        "--far-imagery-resolution-m",
+        str(arguments.far_imagery_resolution_m),
+    ]
+    for option, value in (
+        ("--global-vector-package", arguments.global_vector_package),
+        ("--far-terrain", arguments.far_terrain),
+        ("--far-imagery", arguments.far_imagery),
+    ):
+        if value is not None:
+            exporter_arguments.extend((option, str(value.resolve())))
     pending = [
         tile_id
         for tile_id in ready
@@ -181,7 +215,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         max_workers=arguments.workers
     ) as executor:
         futures = [
-            executor.submit(_run_batch, exporter, artifact_root, output_root, batch)
+            executor.submit(_run_batch, exporter, exporter_arguments, output_root, batch)
             for batch in batches
         ]
         for future in concurrent.futures.as_completed(futures):
@@ -208,7 +242,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ) as executor:
             futures = [
                 executor.submit(
-                    _run_batch, exporter, artifact_root, output_root, (tile_id,)
+                    _run_batch, exporter, exporter_arguments, output_root, (tile_id,)
                 )
                 for tile_id in retry_ids
             ]
@@ -239,10 +273,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     # Reopen one existing tile in a final isolated process. The exporter
-    # validates that receipt and atomically rebuilds catalog.json from all 475
-    # receipts, without keeping the native geospatial stack alive for the full
+    # validates that receipt and atomically rebuilds catalog.json from every
+    # receipt, without keeping the native geospatial stack alive for the full
     # production run.
-    final = _run_batch(exporter, artifact_root, output_root, (ready[0],))
+    final = _run_batch(exporter, exporter_arguments, output_root, (ready[0],))
     _print_result(final, _receipt_count(output_root), len(ready))
     if final.return_code:
         return final.return_code

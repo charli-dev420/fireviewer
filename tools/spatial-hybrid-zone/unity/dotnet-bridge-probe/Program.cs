@@ -31,12 +31,34 @@ FwTileGeometry farGeometry = FwTileGeometryDecoder.Decode(FwTileContainerDecoder
 FwTileSelectionPlan nearPlan = FwSpatialLodPlanner.Select(catalog, 1d, 1d, 750d, 16);
 FwTileSelectionPlan midPlan = FwSpatialLodPlanner.Select(catalog, 1d, 1d, 3000d, 16);
 FwTileSelectionPlan farPlan = FwSpatialLodPlanner.Select(catalog, 1d, 1d, 3000.001d, 16);
+var unorderedFootprint = new FwPlanarFootprint(new[]
+{
+    new FwPlanarPoint(2d, 2d), new FwPlanarPoint(-1d, -1d),
+    new FwPlanarPoint(2d, -1d), new FwPlanarPoint(-1d, 2d),
+    new FwPlanarPoint(2d, 2d),
+}, 0d);
+bool unorderedFootprintIntersects = unorderedFootprint.Intersects(tile);
+var exactMarginPolygon = new[]
+{
+    new FwPlanarPoint(52d, 0.5d), new FwPlanarPoint(53d, 0.5d),
+    new FwPlanarPoint(53d, 1.5d), new FwPlanarPoint(52d, 1.5d),
+};
+bool margin50Includes = new FwPlanarFootprint(exactMarginPolygon, 50d).Intersects(tile);
+bool margin49Point9Excludes = !new FwPlanarFootprint(exactMarginPolygon, 49.9d).Intersects(tile);
 var overloadedTiles = new FwCatalogTile[17];
 for (int index = 0; index < overloadedTiles.Length; index++)
     overloadedTiles[index] = new FwCatalogTile { id = $"tile-{index:00}", bounds_l93_m = new[] { 0d, 0d, 2d, 2d } };
 FwCatalogTile[] originalTiles = catalog.tiles;
 catalog.tiles = overloadedTiles;
-FwTileSelectionPlan blockedPlan = FwSpatialLodPlanner.Select(catalog, 1d, 1d, 1000d, 16);
+FwTileSelectionPlan clampedPlan = FwSpatialLodPlanner.Select(catalog, 1d, 1d, 1000d, 16);
+catalog.tiles = new[] { new FwCatalogTile { id = "visible-beyond-focus-radius", bounds_l93_m = new[] { 800d, 0d, 900d, 100d } } };
+var remoteFootprint = new FwPlanarFootprint(new[]
+{
+    new FwPlanarPoint(790d, -10d), new FwPlanarPoint(910d, -10d),
+    new FwPlanarPoint(910d, 110d), new FwPlanarPoint(790d, 110d),
+}, 0d);
+FwTileSelectionPlan visibleBeyondRadiusPlan = FwSpatialLodPlanner.Select(catalog, 0d, 0d, 120d, 16, remoteFootprint);
+FwTileSelectionPlan midVisibleFootprintPlan = FwSpatialLodPlanner.Select(catalog, 0d, 0d, 1400d, 16, remoteFootprint);
 catalog.tiles = originalTiles;
 var atomic = new FwAtomicPublicationState();
 atomic.Begin(new[] { "a", "b" });
@@ -69,11 +91,17 @@ Console.WriteLine(JsonSerializer.Serialize(new
     near_750_tiles = nearPlan.Tiles.Length,
     mid_3000_tiles = midPlan.Tiles.Length,
     far_over_3000_tiles = farPlan.Tiles.Length,
+    unordered_footprint_intersects = unorderedFootprintIntersects,
+    margin_50_includes = margin50Includes,
+    margin_49_9_excludes = margin49Point9Excludes,
+    visible_beyond_radius_tiles = visibleBeyondRadiusPlan.Tiles.Length,
+    mid_visible_footprint_tiles = midVisibleFootprintPlan.Tiles.Length,
     band_750 = FwSpatialLodPlanner.ClassifyBand(750d),
     band_over_750 = FwSpatialLodPlanner.ClassifyBand(750.001d),
     band_3000 = FwSpatialLodPlanner.ClassifyBand(3000d),
     band_over_3000 = FwSpatialLodPlanner.ClassifyBand(3000.001d),
-    budget_blocked = blockedPlan.IsBlocked,
+    budget_clamped_tiles = clampedPlan.Tiles.Length,
+    budget_clamped_without_blocking = !clampedPlan.IsBlocked,
     partial_published = partialPublished,
     complete_published = completePublished,
     far_during_partial = farDuringPartial,

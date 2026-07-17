@@ -15,6 +15,7 @@ namespace FireViewer.SpatialTiles
         public double view_distance_m;
         public double focus_easting_l93_m;
         public double focus_northing_l93_m;
+        public double focus_elevation_l93_m;
         public int desired_tile_count;
         public int resident_tile_count;
         public int visible_detail_tile_count;
@@ -38,13 +39,18 @@ namespace FireViewer.SpatialTiles
         [SerializeField, Min(0.0001f)] private float unityUnitsPerMetre = 1f;
         [SerializeField, Range(1, FwSpatialLodPlanner.AbsoluteMaximumResidentTiles)] private int runtimeResidentBudget = 16;
         [SerializeField, Min(0.05f)] private float evaluationIntervalSeconds = 0.25f;
+        [SerializeField, Min(0f)] private float nearVisibleTileMarginMetres = 50f;
+        [SerializeField, Min(0f)] private float nearTerrainVerticalMarginMetres = 60f;
+        [SerializeField] private bool detailStreamingAuthorized;
         [SerializeField] private bool startAutomatically = true;
         [SerializeField] private FwSpatialStreamingTelemetry telemetry = new();
 
         private readonly Dictionary<string, FwLoadedTile> residents = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, FwRegularTerrainSampler> residentTerrainSamplers = new(StringComparer.Ordinal);
         private readonly FwAtomicPublicationState publication = new();
         private FwRemoteCatalog catalog;
         private FwLoadedTile far;
+        private FwRegularTerrainSampler farTerrainSampler;
         private Coroutine bootstrapCoroutine;
         private Coroutine reconcileCoroutine;
         private FwTileSelectionPlan targetPlan;
@@ -59,6 +65,8 @@ namespace FireViewer.SpatialTiles
         public FwSpatialStreamingTelemetry Telemetry => telemetry;
         public bool IsReady => ready;
         public int ResidentTileCount => residents.Count;
+        public bool DetailStreamingAuthorized => detailStreamingAuthorized;
+        public Camera ViewerCamera => viewerCamera != null ? viewerCamera : Camera.main;
 
         public void Configure(
             string remoteCatalogUrl,
@@ -66,7 +74,8 @@ namespace FireViewer.SpatialTiles
             Transform frameOrigin,
             Transform streamedContentRoot = null,
             float unitsPerMetre = 1f,
-            int residentBudget = 16)
+            int residentBudget = 16,
+            bool authorizeDetailStreaming = false)
         {
             catalogUrl = remoteCatalogUrl ?? string.Empty;
             focus = focusTransform;
@@ -74,10 +83,23 @@ namespace FireViewer.SpatialTiles
             contentRoot = streamedContentRoot;
             unityUnitsPerMetre = unitsPerMetre;
             runtimeResidentBudget = Mathf.Clamp(residentBudget, 1, FwSpatialLodPlanner.AbsoluteMaximumResidentTiles);
+            detailStreamingAuthorized = authorizeDetailStreaming;
             if (Application.isPlaying && isActiveAndEnabled) StartStreaming();
         }
 
         public void SetViewerCamera(Camera camera) => viewerCamera = camera;
+
+        /// <summary>
+        /// The authenticated host owns this decision.  When access is
+        /// revoked, the streamer itself returns to FAR so moving the camera
+        /// from another script cannot download MID/NEAR assets.
+        /// </summary>
+        public void SetDetailStreamingAuthorized(bool authorized)
+        {
+            detailStreamingAuthorized = authorized;
+            targetSignature = string.Empty;
+            if (ready && !stopping) Evaluate(true);
+        }
 
         public void StartStreaming()
         {
@@ -99,6 +121,8 @@ namespace FireViewer.SpatialTiles
             ReleaseAllDetails();
             far?.Dispose();
             far = null;
+            farTerrainSampler = null;
+            residentTerrainSamplers.Clear();
             ClearFarDetailMask();
             targetPlan = null;
             targetSignature = string.Empty;
@@ -138,10 +162,13 @@ namespace FireViewer.SpatialTiles
             float localY = elevation.HasValue
                 ? checked((float)((elevation.Value - catalog.origin_l93_m[2]) * unityUnitsPerMetre))
                 : currentLocal.y;
+            if (TrySampleTerrainHeightMetres(easting, northing, out float groundUpMetres))
+                localY = groundUpMetres * unityUnitsPerMetre;
             Vector3 local = new(localX, localY, localZ);
             focus.position = localFrameOrigin != null ? localFrameOrigin.TransformPoint(local) : local;
             telemetry.focus_easting_l93_m = easting;
             telemetry.focus_northing_l93_m = northing;
+            telemetry.focus_elevation_l93_m = catalog.origin_l93_m[2] + localY / unityUnitsPerMetre;
             Evaluate(true);
         }
 
@@ -152,6 +179,33 @@ namespace FireViewer.SpatialTiles
             Vector3 local = localFrameOrigin != null ? localFrameOrigin.InverseTransformPoint(focus.position) : focus.position;
             easting = catalog.origin_l93_m[0] + local.x / unityUnitsPerMetre;
             northing = catalog.origin_l93_m[1] + local.z / unityUnitsPerMetre;
+            return true;
+        }
+
+        public bool SnapFocusToTerrain()
+        {
+            if (catalog == null || focus == null || unityUnitsPerMetre <= 0f ||
+                !TryGetFocusLambert(out double easting, out double northing) ||
+                !TrySampleTerrainHeightMetres(easting, northing, out float groundUpMetres))
+                return false;
+
+            Vector3 local = localFrameOrigin != null ? localFrameOrigin.InverseTransformPoint(focus.position) : focus.position;
+            local.y = groundUpMetres * unityUnitsPerMetre;
+            focus.position = localFrameOrigin != null ? localFrameOrigin.TransformPoint(local) : local;
+            telemetry.focus_elevation_l93_m = catalog.origin_l93_m[2] + groundUpMetres;
+            return true;
+        }
+
+        public bool TrySampleTerrainWorldPoint(Vector3 worldPosition, out Vector3 surfaceWorldPoint)
+        {
+            surfaceWorldPoint = default;
+            if (catalog == null || unityUnitsPerMetre <= 0f) return false;
+            Vector3 local = localFrameOrigin != null ? localFrameOrigin.InverseTransformPoint(worldPosition) : worldPosition;
+            double easting = catalog.origin_l93_m[0] + local.x / unityUnitsPerMetre;
+            double northing = catalog.origin_l93_m[1] + local.z / unityUnitsPerMetre;
+            if (!TrySampleTerrainHeightMetres(easting, northing, out float groundUpMetres)) return false;
+            local.y = groundUpMetres * unityUnitsPerMetre;
+            surfaceWorldPoint = localFrameOrigin != null ? localFrameOrigin.TransformPoint(local) : local;
             return true;
         }
 
@@ -184,6 +238,7 @@ namespace FireViewer.SpatialTiles
             if (stopping) { loadedFar?.Dispose(); yield break; }
             if (error != null) { Fail("far_load_failed", error); yield break; }
             far = loadedFar;
+            farTerrainSampler = new FwRegularTerrainSampler(far.Geometry.Terrain);
             far.Root.SetActive(true);
             ClearFarDetailMask();
             ready = true;
@@ -208,10 +263,44 @@ namespace FireViewer.SpatialTiles
 
         private void Evaluate(bool force)
         {
+            SnapFocusToTerrain();
             if (!ready || !TryGetFocusLambert(out double east, out double north)) return;
-            double viewDistance = ViewDistanceMetres();
+            double viewDistance = detailStreamingAuthorized ? ViewDistanceMetres() : double.PositiveInfinity;
             string lodBand = FwSpatialLodPlanner.ClassifyBand(viewDistance);
-            FwTileSelectionPlan plan = FwSpatialLodPlanner.Select(catalog, east, north, viewDistance, runtimeResidentBudget);
+            FwPlanarFootprint visibleFootprint = null;
+            bool usesDetailTiles = !string.Equals(lodBand, "far", StringComparison.Ordinal);
+            if (usesDetailTiles && !TryBuildCameraTerrainFootprint(viewDistance, out visibleFootprint))
+            {
+                // A raised camera can stop intersecting the terrain envelope.
+                // Never retain the previous detail mask in that state: it
+                // would keep punching obsolete rectangles out of the global
+                // MNT and make distant terrain appear to disappear.  Publish
+                // an explicit FAR-only fallback until the camera sees a valid
+                // terrain footprint again.
+                var fallback = new FwTileSelectionPlan(
+                    Array.Empty<FwCatalogTile>(),
+                    "Detail camera footprint is unavailable; FAR fallback is active.");
+                QueuePlan(fallback, east, north, viewDistance, lodBand, force);
+                return;
+            }
+            FwTileSelectionPlan plan = FwSpatialLodPlanner.Select(
+                catalog,
+                east,
+                north,
+                viewDistance,
+                runtimeResidentBudget,
+                visibleFootprint);
+            QueuePlan(plan, east, north, viewDistance, lodBand, force);
+        }
+
+        private void QueuePlan(
+            FwTileSelectionPlan plan,
+            double east,
+            double north,
+            double viewDistance,
+            string lodBand,
+            bool force)
+        {
             string signature = PlanSignature(plan);
             telemetry.focus_easting_l93_m = east;
             telemetry.focus_northing_l93_m = north;
@@ -223,6 +312,13 @@ namespace FireViewer.SpatialTiles
             revision++;
             telemetry.revision = revision;
             telemetry.desired_tile_count = plan.Tiles.Length;
+            if (plan.IsBlocked)
+            {
+                Debug.LogWarning(
+                    $"FIREVIEWER_SPATIAL_PLAN_BLOCKED zone={telemetry.focus_zone} band={lodBand} " +
+                    $"distanceM={viewDistance:0} reason={plan.BlockingError}",
+                    this);
+            }
             ScheduleReconcile();
         }
 
@@ -244,10 +340,24 @@ namespace FireViewer.SpatialTiles
             foreach (FwCatalogTile tile in plan.Tiles)
                 if (residents.ContainsKey(tile.id)) publication.Stage(tile.id);
 
+            // Keep a global, non-drawn fallback resident in memory.  It is
+            // activated only while a different detail footprint is staged,
+            // and masked beneath any previously visible detail tiles.
+            if (!desiredIds.SetEquals(previouslyVisible) && far?.Root != null)
+            {
+                far.Root.SetActive(true);
+                PublishFarDetailMaskForVisibleResidents();
+            }
+
             if (plan.IsBlocked)
             {
                 publication.Fail(plan.BlockingError);
-                telemetry.state = previouslyVisible.Count > 0 ? "detail_previous_budget_blocked" : "far_budget_blocked";
+                // A blocked or geometrically unavailable NEAR plan must not
+                // leave an obsolete FAR cut-out on screen.  Keep cached detail
+                // objects resident, but hide them and clear their mask so the
+                // complete global MNT is immediately visible.
+                ShowFarAndHideDetails();
+                telemetry.state = "far_detail_fallback";
                 telemetry.last_error = plan.BlockingError;
                 reconcileCoroutine = null;
                 RefreshTelemetry();
@@ -296,6 +406,7 @@ namespace FireViewer.SpatialTiles
                 }
                 loaded.Root.SetActive(false);
                 residents.Add(tile.id, loaded);
+                residentTerrainSamplers[tile.id] = new FwRegularTerrainSampler(loaded.Geometry.Terrain);
                 newlyLoaded.Add(tile.id);
                 publication.Stage(tile.id);
                 RefreshTelemetry();
@@ -327,11 +438,11 @@ namespace FireViewer.SpatialTiles
 
             foreach (FwCatalogTile tile in plan.Tiles) residents[tile.id].Root.SetActive(true);
             ReleaseOutside(plan.Tiles);
-            // Keep the global context outside the detailed footprint only.
-            // The FAR shader clips these exact tile rectangles so its 5 m
-            // surface cannot cut through the 1 m detailed terrain or vectors.
+            // Preserve the global MNT behind MID/NEAR so the horizon never
+            // disappears.  The terrain shader clips FAR only beneath the
+            // exact detailed tile rectangles, preventing overlap/z-fighting.
             PublishFarDetailMask(plan.Tiles);
-            far.Root.SetActive(true);
+            if (far?.Root != null) far.Root.SetActive(true);
             telemetry.state = "detail_atomic";
             telemetry.last_error = string.Empty;
             reconcileCoroutine = null;
@@ -375,6 +486,7 @@ namespace FireViewer.SpatialTiles
         {
             if (!residents.TryGetValue(tileId, out FwLoadedTile tile)) return;
             residents.Remove(tileId);
+            residentTerrainSamplers.Remove(tileId);
             tile.Dispose();
         }
 
@@ -467,6 +579,152 @@ namespace FireViewer.SpatialTiles
                 return Vector3.Distance(camera.transform.position, focus.position) / unityUnitsPerMetre;
             Vector3 local = localFrameOrigin != null ? localFrameOrigin.InverseTransformPoint(focus.position) : focus.position;
             return Math.Abs(local.y) / unityUnitsPerMetre;
+        }
+
+        private bool TryBuildCameraTerrainFootprint(double viewDistanceMetres, out FwPlanarFootprint footprint)
+        {
+            footprint = null;
+            Camera camera = viewerCamera != null ? viewerCamera : Camera.main;
+            if (camera == null || focus == null || catalog?.lod_policy?.detail == null || unityUnitsPerMetre <= 0f) return false;
+
+            float visibleDepthMetres = checked((float)(
+                viewDistanceMetres + catalog.lod_policy.detail.preload_radius_m));
+            float farDistance = Mathf.Min(
+                camera.farClipPlane,
+                visibleDepthMetres * unityUnitsPerMetre);
+            if (farDistance <= camera.nearClipPlane) return false;
+            var nearCorners = new Vector3[4];
+            var farCorners = new Vector3[4];
+            camera.CalculateFrustumCorners(new Rect(0f, 0f, 1f, 1f), camera.nearClipPlane, Camera.MonoOrStereoscopicEye.Mono, nearCorners);
+            camera.CalculateFrustumCorners(new Rect(0f, 0f, 1f, 1f), farDistance, Camera.MonoOrStereoscopicEye.Mono, farCorners);
+
+            var worldCorners = new Vector3[8];
+            for (int index = 0; index < 4; index++)
+            {
+                worldCorners[index] = camera.transform.TransformPoint(nearCorners[index]);
+                worldCorners[index + 4] = camera.transform.TransformPoint(farCorners[index]);
+            }
+            int[,] edges =
+            {
+                { 0, 1 }, { 1, 2 }, { 2, 3 }, { 3, 0 },
+                { 4, 5 }, { 5, 6 }, { 6, 7 }, { 7, 4 },
+                { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 },
+            };
+            Vector3 planeNormal = localFrameOrigin != null ? localFrameOrigin.up : Vector3.up;
+            Vector3 focusLocal = localFrameOrigin != null ? localFrameOrigin.InverseTransformPoint(focus.position) : focus.position;
+            float minimumTerrainUpMetres = focusLocal.y / unityUnitsPerMetre;
+            float maximumTerrainUpMetres = minimumTerrainUpMetres;
+            float minimumEastMetres = float.PositiveInfinity;
+            float minimumNorthMetres = float.PositiveInfinity;
+            float maximumEastMetres = float.NegativeInfinity;
+            float maximumNorthMetres = float.NegativeInfinity;
+            foreach (Vector3 worldCorner in worldCorners)
+            {
+                Vector3 localCorner = localFrameOrigin != null
+                    ? localFrameOrigin.InverseTransformPoint(worldCorner)
+                    : worldCorner;
+                float eastMetres = localCorner.x / unityUnitsPerMetre;
+                float northMetres = localCorner.z / unityUnitsPerMetre;
+                minimumEastMetres = Mathf.Min(minimumEastMetres, eastMetres);
+                minimumNorthMetres = Mathf.Min(minimumNorthMetres, northMetres);
+                maximumEastMetres = Mathf.Max(maximumEastMetres, eastMetres);
+                maximumNorthMetres = Mathf.Max(maximumNorthMetres, northMetres);
+            }
+            float rangeMarginMetres = nearVisibleTileMarginMetres;
+            bool sampledTerrainRange = farTerrainSampler != null && farTerrainSampler.TryGetHeightRange(
+                minimumEastMetres - rangeMarginMetres,
+                minimumNorthMetres - rangeMarginMetres,
+                maximumEastMetres + rangeMarginMetres,
+                maximumNorthMetres + rangeMarginMetres,
+                out minimumTerrainUpMetres,
+                out maximumTerrainUpMetres);
+            if (!sampledTerrainRange)
+            {
+                // TryGetHeightRange resets its outputs when the projected
+                // frustum lies outside the AOI.  Restore the real focus height
+                // explicitly instead of constructing a slab around project Y=0.
+                minimumTerrainUpMetres = focusLocal.y / unityUnitsPerMetre;
+                maximumTerrainUpMetres = minimumTerrainUpMetres;
+            }
+            minimumTerrainUpMetres -= nearTerrainVerticalMarginMetres;
+            maximumTerrainUpMetres += nearTerrainVerticalMarginMetres;
+            Vector3 lowerLocal = new(focusLocal.x, minimumTerrainUpMetres * unityUnitsPerMetre, focusLocal.z);
+            Vector3 upperLocal = new(focusLocal.x, maximumTerrainUpMetres * unityUnitsPerMetre, focusLocal.z);
+            Vector3 lowerPlanePoint = localFrameOrigin != null ? localFrameOrigin.TransformPoint(lowerLocal) : lowerLocal;
+            Vector3 upperPlanePoint = localFrameOrigin != null ? localFrameOrigin.TransformPoint(upperLocal) : upperLocal;
+            var intersections = new List<FwPlanarPoint>(12);
+            const float planeEpsilon = 0.001f;
+            foreach (Vector3 corner in worldCorners)
+            {
+                float lowerDistance = Vector3.Dot(planeNormal, corner - lowerPlanePoint);
+                float upperDistance = Vector3.Dot(planeNormal, corner - upperPlanePoint);
+                if (lowerDistance >= -planeEpsilon && upperDistance <= planeEpsilon)
+                    AddLambertFootprintPoint(intersections, corner);
+            }
+            for (int edge = 0; edge < edges.GetLength(0); edge++)
+            {
+                Vector3 start = worldCorners[edges[edge, 0]];
+                Vector3 end = worldCorners[edges[edge, 1]];
+                AddPlaneIntersection(intersections, start, end, planeNormal, lowerPlanePoint, planeEpsilon);
+                AddPlaneIntersection(intersections, start, end, planeNormal, upperPlanePoint, planeEpsilon);
+            }
+
+            if (intersections.Count < 3) return false;
+            try
+            {
+                footprint = new FwPlanarFootprint(intersections.ToArray(), nearVisibleTileMarginMetres);
+                return true;
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+        }
+
+        private void AddPlaneIntersection(
+            List<FwPlanarPoint> intersections,
+            Vector3 start,
+            Vector3 end,
+            Vector3 planeNormal,
+            Vector3 planePoint,
+            float epsilon)
+        {
+            float startDistance = Vector3.Dot(planeNormal, start - planePoint);
+            float endDistance = Vector3.Dot(planeNormal, end - planePoint);
+            if (Mathf.Abs(startDistance) <= epsilon) AddLambertFootprintPoint(intersections, start);
+            if (Mathf.Abs(endDistance) <= epsilon) AddLambertFootprintPoint(intersections, end);
+            if ((startDistance < -epsilon && endDistance > epsilon) ||
+                (startDistance > epsilon && endDistance < -epsilon))
+            {
+                float factor = startDistance / (startDistance - endDistance);
+                AddLambertFootprintPoint(intersections, Vector3.LerpUnclamped(start, end, factor));
+            }
+        }
+
+        private bool TrySampleTerrainHeightMetres(double easting, double northing, out float groundUpMetres)
+        {
+            groundUpMetres = 0f;
+            if (catalog == null) return false;
+            float localEast = checked((float)(easting - catalog.origin_l93_m[0]));
+            float localNorth = checked((float)(northing - catalog.origin_l93_m[1]));
+            foreach (FwRegularTerrainSampler sampler in residentTerrainSamplers.Values)
+                if (sampler.TrySample(localEast, localNorth, out groundUpMetres)) return true;
+            return farTerrainSampler != null && farTerrainSampler.TrySample(localEast, localNorth, out groundUpMetres);
+        }
+
+        private void AddLambertFootprintPoint(List<FwPlanarPoint> points, Vector3 worldPoint)
+        {
+            Vector3 local = localFrameOrigin != null ? localFrameOrigin.InverseTransformPoint(worldPoint) : worldPoint;
+            var point = new FwPlanarPoint(
+                catalog.origin_l93_m[0] + local.x / unityUnitsPerMetre,
+                catalog.origin_l93_m[1] + local.z / unityUnitsPerMetre);
+            foreach (FwPlanarPoint existing in points)
+            {
+                double deltaEast = existing.East - point.East;
+                double deltaNorth = existing.North - point.North;
+                if (deltaEast * deltaEast + deltaNorth * deltaNorth <= 0.01d) return;
+            }
+            points.Add(point);
         }
 
         private static IEnumerable<string> TileIds(FwCatalogTile[] tiles)
