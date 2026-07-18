@@ -16,6 +16,9 @@ from fire_viewer.db.models import (
     ManifestRevision,
     SpatialPackage,
     SpatialPackageFile,
+    SpatialZone,
+    SpatialZoneRevision,
+    ZoneProfile,
     ZonePublication,
 )
 from fire_viewer.domain.enums import (
@@ -25,6 +28,7 @@ from fire_viewer.domain.enums import (
     ZonePublicationState,
 )
 from fire_viewer.domain.schemas import AdminSpatialPackageFromBlobRequest
+from fire_viewer.domain.spatial import wgs84_to_lambert93
 from fire_viewer.services.spatial_package_blob_import import validate_blob_package
 from fire_viewer.storage import ObjectMetadata
 
@@ -101,6 +105,117 @@ def _package_documents(*, package_id: str, revision: int = 1) -> dict[str, bytes
         "catalog.json": catalog_raw,
         **assets,
     }
+
+
+def _remote_tile_package_documents(
+    *,
+    package_id: str,
+    zone_id: str,
+    origin_lon: float,
+    origin_lat: float,
+    origin_height_m: float = 410.0,
+) -> dict[str, bytes]:
+    origin_easting, origin_northing = wgs84_to_lambert93(origin_lon, origin_lat)
+    origin = [origin_easting, origin_northing, origin_height_m]
+    bounds = [
+        origin_easting - 500.0,
+        origin_northing - 600.0,
+        origin_easting + 700.0,
+        origin_northing + 800.0,
+    ]
+    terrain_header = json.dumps(
+        {
+            "schema": "fireviewer.fwtile.v1",
+            "kind": "global_far_terrain",
+            "crs": "EPSG:2154",
+            "origin_l93_m": origin,
+            "bounds_l93_m": bounds,
+            "sections": [
+                {
+                    "name": "terrain",
+                    "metadata": {
+                        "elevation_quantization": {
+                            "minimum_m": -35.0,
+                            "maximum_m": 65.0,
+                        }
+                    },
+                }
+            ],
+        },
+        separators=(",", ":"),
+    ).encode()
+    far_terrain = (
+        b"FWTILE1\0"
+        + (1).to_bytes(2, "little")
+        + b"\0\0"
+        + len(terrain_header).to_bytes(4, "little")
+        + terrain_header
+    )
+    assets = {
+        "assets/far/global.jpg": b"far-imagery",
+        "assets/far/global.fwterrain": far_terrain,
+        "assets/imagery/tile.jpg": b"detail-imagery",
+        "assets/detail/tile/tile.fwtile": b"detail-terrain",
+    }
+    def reference(path: str) -> dict[str, Any]:
+        return {
+            "path": path,
+            "sha256": hashlib.sha256(assets[path]).hexdigest(),
+            "byte_count": len(assets[path]),
+        }
+    catalog = {
+        "schema": "fireviewer.remote-tile-catalog.v1",
+        "crs": "EPSG:2154",
+        "linear_unit": "metre",
+        "origin_l93_m": origin,
+        "lod_policy": {
+            "far": {
+                "bounds_l93_m": bounds,
+                "terrain": reference("assets/far/global.fwterrain"),
+                "imagery": reference("assets/far/global.jpg"),
+            }
+        },
+        "tiles": [
+            {
+                "id": "tile",
+                "payload": reference("assets/detail/tile/tile.fwtile"),
+                "imagery": reference("assets/imagery/tile.jpg"),
+            }
+        ],
+    }
+    catalog_raw = json.dumps(catalog, separators=(",", ":")).encode()
+    manifest = {
+        "package_id": package_id,
+        "catalog": {
+            "path": "catalog.json",
+            "sha256": hashlib.sha256(catalog_raw).hexdigest(),
+            "byte_count": len(catalog_raw),
+        },
+        "zones": [{"zone_id": zone_id, "revision_id": "R1"}],
+    }
+    return {
+        "package-manifest.json": json.dumps(manifest, separators=(",", ":")).encode(),
+        "catalog.json": catalog_raw,
+        **assets,
+    }
+
+
+def _stage_documents(settings, documents: dict[str, bytes], *, upload_id: str):
+    root = settings.zone_upload_storage_dir / "packages" / upload_id
+    objects: list[dict[str, Any]] = []
+    for path, content in documents.items():
+        target = root / Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+        objects.append(
+            {
+                "path": path,
+                "pathname": f"packages/{upload_id}/{path}",
+                "size_bytes": len(content),
+                "content_type": _content_type(path),
+            }
+        )
+    return objects
 
 
 def _content_type(path: str) -> str:
@@ -474,6 +589,82 @@ def test_admin_imports_map_inside_incident_project_atomically(
     assert replay.status_code == 201
     assert replay.headers["Idempotent-Replay"] == "true"
     assert replay.json() == response.json()
+
+
+def test_incident_project_map_import_creates_missing_zone_and_revision(
+    client, settings, session, seed_incident
+) -> None:
+    incident, _episode = seed_incident(
+        fire_id="FR-77-00914",
+        sequence=914,
+        lon=2.588886,
+        lat=48.3894574,
+        canonical_name="Forêt de Fontainebleau",
+        status=IncidentStatus.MONITORING,
+    )
+    package_id = "pkg-fontainebleau-auto-r1"
+    zone_id = "FONTAINEBLEAU-AUTO-01"
+    upload_id = "2" * 32
+    documents = _remote_tile_package_documents(
+        package_id=package_id,
+        zone_id=zone_id,
+        origin_lon=incident.reference_lon,
+        origin_lat=incident.reference_lat,
+    )
+    objects = _stage_documents(settings, documents, upload_id=upload_id)
+
+    response = client.post(
+        f"/api/v2/admin/incidents/{incident.fire_id}/spatial-package/from-blob",
+        json={
+            "upload_id": upload_id,
+            "package_id": package_id,
+            "zone_id": zone_id,
+            "revision": 1,
+            "expected_incident_version": incident.version,
+            "primary_profile": "local",
+            "reason": "Import automatique du fond 3D depuis le projet Fontainebleau.",
+            "objects": objects,
+        },
+        headers=_headers("incident-project-map-auto-0001"),
+    )
+
+    assert response.status_code == 201, response.text
+    session.expire_all()
+    zone = session.scalar(select(SpatialZone).where(SpatialZone.zone_id == zone_id))
+    assert zone is not None
+    assert zone.label == "Forêt de Fontainebleau"
+    profile = session.scalar(
+        select(ZoneProfile).where(ZoneProfile.spatial_zone_id == zone.id)
+    )
+    assert profile is not None
+    origin_easting, origin_northing = wgs84_to_lambert93(
+        incident.reference_lon, incident.reference_lat
+    )
+    assert profile.min_easting_l93 == pytest.approx(origin_easting - 500.0)
+    assert profile.max_northing_l93 == pytest.approx(origin_northing + 800.0)
+    revision = session.scalar(
+        select(SpatialZoneRevision).where(
+            SpatialZoneRevision.spatial_zone_id == zone.id,
+            SpatialZoneRevision.revision == 1,
+        )
+    )
+    assert revision is not None
+    assert revision.origin_easting_l93 == pytest.approx(origin_easting)
+    assert revision.origin_northing_l93 == pytest.approx(origin_northing)
+    assert revision.source_orthometric_height_m == 410.0
+    assert revision.min_up_m == -35.0
+    assert revision.max_up_m == 65.0
+    assert session.scalar(
+        select(AuditEvent).where(
+            AuditEvent.action == "spatial_zone.created_from_incident_package"
+        )
+    )
+    assert session.scalar(
+        select(AuditEvent).where(
+            AuditEvent.action
+            == "spatial_zone_revision.created_from_incident_package"
+        )
+    )
 
 
 def test_incident_project_map_import_rolls_back_when_incident_version_is_stale(

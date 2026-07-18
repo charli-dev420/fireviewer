@@ -38,6 +38,9 @@ RAF20_DERIVATION_TOLERANCE_M = 0.001
 _WGS84_TO_LAMBERT93 = Transformer.from_crs(
     "EPSG:4326", PRODUCTION_HORIZONTAL_CRS, always_xy=True
 )
+_LAMBERT93_TO_WGS84 = Transformer.from_crs(
+    PRODUCTION_HORIZONTAL_CRS, "EPSG:4326", always_xy=True
+)
 
 
 class SpatialProfileError(ValueError):
@@ -104,6 +107,18 @@ def wgs84_to_lambert93(longitude: float, latitude: float) -> tuple[float, float]
     if not (_is_finite(easting) and _is_finite(northing)):
         raise SpatialProfileError("Lambert-93 production origin must be finite")
     return float(easting), float(northing)
+
+
+def lambert93_to_wgs84(easting: float, northing: float) -> tuple[float, float]:
+    """Return the continental-France WGS84 position for a Lambert-93 origin."""
+
+    if not (_is_finite(easting) and _is_finite(northing)):
+        raise SpatialProfileError("Lambert-93 production origin must be finite")
+    longitude, latitude = _LAMBERT93_TO_WGS84.transform(easting, northing)
+    result = validate_france_continentale_origin(
+        (float(longitude), float(latitude), 0.0)
+    )
+    return result[0], result[1]
 
 
 def raf20_grid_path() -> Path:

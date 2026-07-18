@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass
 from pathlib import PurePosixPath
@@ -53,6 +54,23 @@ _CONTENT_TYPES = {
 
 
 @dataclass(frozen=True, slots=True)
+class ValidatedSpatialProfile:
+    origin_easting_l93: float
+    origin_northing_l93: float
+    source_orthometric_height_m: float
+    min_easting_l93: float
+    min_northing_l93: float
+    max_easting_l93: float
+    max_northing_l93: float
+    min_east_m: float
+    max_east_m: float
+    min_north_m: float
+    max_north_m: float
+    min_up_m: float
+    max_up_m: float
+
+
+@dataclass(frozen=True, slots=True)
 class ValidatedBlobPackage:
     upload_id: str
     package_id: str
@@ -64,6 +82,7 @@ class ValidatedBlobPackage:
     asset_catalog: list[dict[str, Any]]
     object_count: int
     total_size_bytes: int
+    spatial_profile: ValidatedSpatialProfile | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,6 +132,169 @@ def _json_document(raw: bytes, *, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise BadRequestError("invalid_package_json", f"{label} must be a JSON object.")
     return value
+
+
+def _finite_number(value: object, *, label: str) -> float:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        raise BadRequestError("invalid_package_catalog", f"{label} must be numeric.")
+    result = float(value)
+    if not math.isfinite(result):
+        raise BadRequestError("invalid_package_catalog", f"{label} must be finite.")
+    return result
+
+
+def _finite_tuple(value: object, *, size: int, label: str) -> tuple[float, ...]:
+    if not isinstance(value, list) or len(value) != size:
+        raise BadRequestError(
+            "invalid_package_catalog", f"{label} must contain {size} numbers."
+        )
+    return tuple(
+        _finite_number(component, label=f"{label}[{index}]")
+        for index, component in enumerate(value)
+    )
+
+
+def _far_terrain_frame(
+    terrain_raw: bytes,
+    *,
+    expected_origin: tuple[float, ...],
+    expected_bounds: tuple[float, ...],
+) -> tuple[float, float]:
+    if len(terrain_raw) < 16 or terrain_raw[:8] != b"FWTILE1\0":
+        raise BadRequestError(
+            "invalid_package_spatial_profile", "The FAR terrain container is invalid."
+        )
+    version = int.from_bytes(terrain_raw[8:10], "little")
+    header_size = int.from_bytes(terrain_raw[12:16], "little")
+    if version != 1 or header_size <= 0 or 16 + header_size > len(terrain_raw):
+        raise BadRequestError(
+            "invalid_package_spatial_profile", "The FAR terrain header is invalid."
+        )
+    header = _json_document(
+        terrain_raw[16 : 16 + header_size], label="FAR terrain header"
+    )
+    origin = _finite_tuple(
+        header.get("origin_l93_m"), size=3, label="FAR terrain origin_l93_m"
+    )
+    bounds = _finite_tuple(
+        header.get("bounds_l93_m"), size=4, label="FAR terrain bounds_l93_m"
+    )
+    if (
+        header.get("schema") != "fireviewer.fwtile.v1"
+        or header.get("kind") != "global_far_terrain"
+        or header.get("crs") != "EPSG:2154"
+        or origin != expected_origin
+        or bounds != expected_bounds
+    ):
+        raise BadRequestError(
+            "invalid_package_spatial_profile",
+            "The FAR terrain frame does not match catalog.json.",
+        )
+    sections = header.get("sections")
+    section = (
+        next(
+            (
+                item
+                for item in sections
+                if isinstance(item, dict) and item.get("name") == "terrain"
+            ),
+            None,
+        )
+        if isinstance(sections, list)
+        else None
+    )
+    metadata = section.get("metadata") if isinstance(section, dict) else None
+    quantization = metadata.get("elevation_quantization") if isinstance(metadata, dict) else None
+    if not isinstance(quantization, dict):
+        raise BadRequestError(
+            "invalid_package_spatial_profile", "The FAR elevation range is missing."
+        )
+    minimum = _finite_number(quantization.get("minimum_m"), label="FAR minimum elevation")
+    maximum = _finite_number(quantization.get("maximum_m"), label="FAR maximum elevation")
+    if minimum >= maximum or not minimum <= 0 <= maximum:
+        raise BadRequestError(
+            "invalid_package_spatial_profile",
+            "The FAR elevation range must contain the package origin.",
+        )
+    return minimum, maximum
+
+
+def _remote_tile_spatial_profile(
+    catalog: dict[str, Any],
+    *,
+    by_path: dict[str, AdminBlobObjectReference],
+    object_store: ObjectStore,
+    storage_key: str,
+) -> ValidatedSpatialProfile | None:
+    """Derive the immutable zone frame from a real FireViewer remote-tile package."""
+
+    if catalog.get("schema") != "fireviewer.remote-tile-catalog.v1":
+        return None
+    # Legacy packages can still target a pre-created revision. Automatic incident setup
+    # is enabled only when the complete production spatial contract is present.
+    if "origin_l93_m" not in catalog and "lod_policy" not in catalog:
+        return None
+    if catalog.get("crs") != "EPSG:2154" or catalog.get("linear_unit") != "metre":
+        raise BadRequestError(
+            "invalid_package_spatial_profile",
+            "The remote-tile package must use Lambert-93 metres.",
+        )
+    origin = _finite_tuple(catalog.get("origin_l93_m"), size=3, label="origin_l93_m")
+    lod_policy = catalog.get("lod_policy")
+    far = lod_policy.get("far") if isinstance(lod_policy, dict) else None
+    if not isinstance(far, dict):
+        raise BadRequestError(
+            "invalid_package_spatial_profile", "The remote-tile FAR profile is missing."
+        )
+    bounds = _finite_tuple(far.get("bounds_l93_m"), size=4, label="far.bounds_l93_m")
+    if not (bounds[0] < bounds[2] and bounds[1] < bounds[3]):
+        raise BadRequestError(
+            "invalid_package_spatial_profile", "The remote-tile FAR bounds are invalid."
+        )
+    if not (bounds[0] <= origin[0] <= bounds[2] and bounds[1] <= origin[1] <= bounds[3]):
+        raise BadRequestError(
+            "invalid_package_spatial_profile",
+            "The remote-tile origin is outside the FAR bounds.",
+        )
+    terrain = far.get("terrain")
+    path_value = terrain.get("path") if isinstance(terrain, dict) else None
+    terrain_path = _safe_path(path_value, asset=True) if isinstance(path_value, str) else ""
+    if not terrain_path or terrain_path not in by_path or not isinstance(terrain, dict):
+        raise BadRequestError(
+            "invalid_package_spatial_profile", "The remote-tile FAR terrain is not uploaded."
+        )
+    terrain_sha256 = _sha256(terrain.get("sha256"), label="FAR terrain")
+    terrain_size = _positive_int(terrain.get("byte_count"), label="FAR terrain size")
+    if by_path[terrain_path].size_bytes != terrain_size:
+        raise BadRequestError(
+            "blob_metadata_mismatch", "The remote-tile FAR terrain size changed."
+        )
+    terrain_raw = object_store.read_bytes(object_store.uri_for(f"{storage_key}/{terrain_path}"))
+    if (
+        len(terrain_raw) != terrain_size
+        or hashlib.sha256(terrain_raw).hexdigest() != terrain_sha256
+    ):
+        raise BadRequestError(
+            "blob_metadata_mismatch", "The remote-tile FAR terrain digest changed."
+        )
+    minimum_up, maximum_up = _far_terrain_frame(
+        terrain_raw, expected_origin=origin, expected_bounds=bounds
+    )
+    return ValidatedSpatialProfile(
+        origin_easting_l93=origin[0],
+        origin_northing_l93=origin[1],
+        source_orthometric_height_m=origin[2],
+        min_easting_l93=bounds[0],
+        min_northing_l93=bounds[1],
+        max_easting_l93=bounds[2],
+        max_northing_l93=bounds[3],
+        min_east_m=bounds[0] - origin[0],
+        max_east_m=bounds[2] - origin[0],
+        min_north_m=bounds[1] - origin[1],
+        max_north_m=bounds[3] - origin[1],
+        min_up_m=minimum_up,
+        max_up_m=maximum_up,
+    )
 
 
 def _catalog_entries(catalog: dict[str, Any]) -> list[dict[str, Any]]:
@@ -334,6 +516,13 @@ def validate_blob_package(
                 "package_asset_size_mismatch", "A catalog asset has an unexpected size."
             )
 
+    spatial_profile = _remote_tile_spatial_profile(
+        catalog,
+        by_path=by_path,
+        object_store=object_store,
+        storage_key=storage_key,
+    )
+
     return ValidatedBlobPackage(
         upload_id=payload.upload_id,
         package_id=package_id,
@@ -345,6 +534,7 @@ def validate_blob_package(
         asset_catalog=[catalog_by_path[path] for path in sorted(catalog_by_path)],
         object_count=len(by_path),
         total_size_bytes=total_size_bytes,
+        spatial_profile=spatial_profile,
     )
 
 
