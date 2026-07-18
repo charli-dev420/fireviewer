@@ -5,6 +5,8 @@ from datetime import UTC, datetime
 from fire_viewer.db.models import (
     ManifestRevision,
     ModelAsset,
+    Observation,
+    Source,
     SpatialPackage,
     SpatialPackageFile,
     SpatialZone,
@@ -16,8 +18,12 @@ from fire_viewer.domain.enums import (
     AssetLod,
     AssetState,
     IncidentStatus,
+    MatchDecision,
+    SourceTrust,
+    SourceType,
     SpatialPackageFileKind,
     SpatialPackageState,
+    VerificationState,
     ZonePublicationState,
 )
 from fire_viewer.domain.spatial import derive_raf20_origin
@@ -223,10 +229,14 @@ def test_operational_map_projects_incidents_and_controlled_models(
         "total_incidents": 2,
         "active_incidents": 1,
         "monitoring_incidents": 1,
+        "archived_incidents": 0,
         "incidents_requiring_review": 0,
+        "pending_signals": 0,
+        "attached_signals": 0,
         "incidents_with_models": 1,
         "model_updates_available": 0,
     }
+    assert body["signals"] == []
     mapped = next(item for item in body["incidents"] if item["fire_id"] == incident.fire_id)
     assert mapped["spatial_zone_id"] == zone.zone_id
     assert mapped["active_package_id"] == package.package_id
@@ -235,6 +245,99 @@ def test_operational_map_projects_incidents_and_controlled_models(
     assert mapped["models"][0]["access_path"].startswith("/api/v2/admin/packages/")
     assert "vercel-blob://" not in response.text
     assert "uploads/pkg" not in response.text
+
+
+def test_operational_map_projects_pending_attached_and_archived_layers(
+    client, session, seed_incident
+) -> None:
+    active_incident, active_episode = seed_incident(
+        fire_id="FR-83-00150",
+        sequence=150,
+        lon=6.05,
+        lat=43.31,
+        status=IncidentStatus.ACTIVE_CONFIRMED,
+    )
+    seed_incident(
+        fire_id="FR-83-00151",
+        sequence=151,
+        lon=6.15,
+        lat=43.35,
+        status=IncidentStatus.CLOSED,
+        ended_at=datetime(2026, 7, 15, 7, 30, tzinfo=UTC),
+    )
+    source = Source(
+        source_key="operational-map-feed",
+        source_type=SourceType.SENSOR,
+        trust=SourceTrust.INSTITUTIONAL,
+        display_name="Flux de test",
+        enabled=True,
+    )
+    session.add(source)
+    session.flush()
+    observed_at = datetime(2026, 7, 15, 9, 30, tzinfo=UTC)
+
+    def observation(
+        observation_id: str,
+        *,
+        state: VerificationState,
+        attached: bool,
+    ) -> Observation:
+        return Observation(
+            observation_id=observation_id,
+            source_id=source.id,
+            observed_at=observed_at,
+            received_at=observed_at,
+            longitude=6.07,
+            latitude=43.32,
+            horizontal_uncertainty_m=300.0,
+            territory_code="83",
+            toponyms=["Massif des Maures"],
+            canonical_name_hint="Massif des Maures",
+            evidence_hash=f"sha256:{observation_id[-1] * 64}",
+            evidence_license="test-fixture",
+            request_hash=observation_id[-1] * 64,
+            verification_state=state,
+            attached_incident_id=active_incident.id if attached else None,
+            attached_episode_id=active_episode.id if attached else None,
+            proposed_incident_id=active_incident.id if not attached else None,
+            proposed_episode_id=active_episode.id if not attached else None,
+            match_decision=MatchDecision.ATTACH if attached else MatchDecision.REVIEW,
+            match_score=0.72,
+            match_factors={"distance": 0.8},
+            review_reasons=[] if attached else ["score_below_auto_attach_threshold"],
+            policy_id="test-policy-v1",
+            trace_id=f"trace-{observation_id}",
+            version=1,
+        )
+
+    session.add_all(
+        [
+            observation(
+                "obs-map-pending-a", state=VerificationState.PENDING_REVIEW, attached=False
+            ),
+            observation("obs-map-attached-b", state=VerificationState.VERIFIED, attached=True),
+            observation("obs-map-rejected-c", state=VerificationState.REJECTED, attached=False),
+        ]
+    )
+    session.commit()
+
+    response = client.get("/api/v2/admin/operational-map")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["summary"]["archived_incidents"] == 1
+    assert body["summary"]["pending_signals"] == 1
+    assert body["summary"]["attached_signals"] == 1
+    assert [item["observation_id"] for item in body["signals"]] == [
+        "obs-map-pending-a",
+        "obs-map-attached-b",
+    ]
+    pending = next(item for item in body["signals"] if item["state"] == "pending")
+    assert pending["proposed_fire_id"] == active_incident.fire_id
+    assert pending["attached_fire_id"] is None
+    attached = next(item for item in body["signals"] if item["state"] == "attached")
+    assert attached["attached_fire_id"] == active_incident.fire_id
+    assert "obs-map-rejected-c" not in response.text
 
 
 def test_operational_map_requires_admin_authentication(client, app) -> None:

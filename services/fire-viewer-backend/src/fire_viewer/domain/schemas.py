@@ -771,11 +771,34 @@ class AdminOperationalMapIncident(StrictModel):
     model_update_available: bool
 
 
+class AdminOperationalMapSignal(StrictModel):
+    """One persisted observation projected on the private anticipation map."""
+
+    observation_id: str
+    source_key: str
+    source_type: SourceType
+    longitude: float = Field(ge=-180, le=180)
+    latitude: float = Field(ge=-90, le=90)
+    horizontal_uncertainty_m: float = Field(gt=0)
+    territory_code: str
+    canonical_name_hint: str | None = Field(default=None, max_length=255)
+    observed_at: datetime
+    received_at: datetime
+    verification_state: VerificationState
+    match_decision: MatchDecision
+    state: Literal["pending", "attached"]
+    proposed_fire_id: str | None = None
+    attached_fire_id: str | None = None
+
+
 class AdminOperationalMapSummary(StrictModel):
     total_incidents: int = Field(ge=0)
     active_incidents: int = Field(ge=0)
     monitoring_incidents: int = Field(ge=0)
+    archived_incidents: int = Field(ge=0)
     incidents_requiring_review: int = Field(ge=0)
+    pending_signals: int = Field(ge=0)
+    attached_signals: int = Field(ge=0)
     incidents_with_models: int = Field(ge=0)
     model_updates_available: int = Field(ge=0)
 
@@ -785,6 +808,7 @@ class AdminOperationalMapResponse(StrictModel):
     coordinate_system: Literal["EPSG:4326"] = "EPSG:4326"
     summary: AdminOperationalMapSummary
     incidents: list[AdminOperationalMapIncident] = Field(default_factory=list, max_length=5_000)
+    signals: list[AdminOperationalMapSignal] = Field(default_factory=list, max_length=5_000)
 
 
 class AdminDashboardQueueSummary(StrictModel):

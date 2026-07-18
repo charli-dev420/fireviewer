@@ -7442,6 +7442,14 @@
             "type": "array",
             "maxItems": 5000,
             "title": "Incidents"
+          },
+          "signals": {
+            "items": {
+              "$ref": "#/components/schemas/AdminOperationalMapSignal"
+            },
+            "type": "array",
+            "maxItems": 5000,
+            "title": "Signals"
           }
         },
         "additionalProperties": false,
@@ -7451,6 +7459,118 @@
           "summary"
         ],
         "title": "AdminOperationalMapResponse"
+      },
+      "AdminOperationalMapSignal": {
+        "properties": {
+          "observation_id": {
+            "type": "string",
+            "title": "Observation Id"
+          },
+          "source_key": {
+            "type": "string",
+            "title": "Source Key"
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/SourceType"
+          },
+          "longitude": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Longitude"
+          },
+          "latitude": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Latitude"
+          },
+          "horizontal_uncertainty_m": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Horizontal Uncertainty M"
+          },
+          "territory_code": {
+            "type": "string",
+            "title": "Territory Code"
+          },
+          "canonical_name_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Name Hint"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Observed At"
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Received At"
+          },
+          "verification_state": {
+            "$ref": "#/components/schemas/VerificationState"
+          },
+          "match_decision": {
+            "$ref": "#/components/schemas/MatchDecision"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "attached"
+            ],
+            "title": "State"
+          },
+          "proposed_fire_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Fire Id"
+          },
+          "attached_fire_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attached Fire Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "observation_id",
+          "source_key",
+          "source_type",
+          "longitude",
+          "latitude",
+          "horizontal_uncertainty_m",
+          "territory_code",
+          "observed_at",
+          "received_at",
+          "verification_state",
+          "match_decision",
+          "state"
+        ],
+        "title": "AdminOperationalMapSignal",
+        "description": "One persisted observation projected on the private anticipation map."
       },
       "AdminOperationalMapSummary": {
         "properties": {
@@ -7469,10 +7589,25 @@
             "minimum": 0.0,
             "title": "Monitoring Incidents"
           },
+          "archived_incidents": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Archived Incidents"
+          },
           "incidents_requiring_review": {
             "type": "integer",
             "minimum": 0.0,
             "title": "Incidents Requiring Review"
+          },
+          "pending_signals": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Pending Signals"
+          },
+          "attached_signals": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Attached Signals"
           },
           "incidents_with_models": {
             "type": "integer",
@@ -7491,7 +7626,10 @@
           "total_incidents",
           "active_incidents",
           "monitoring_incidents",
+          "archived_incidents",
           "incidents_requiring_review",
+          "pending_signals",
+          "attached_signals",
           "incidents_with_models",
           "model_updates_available"
         ],

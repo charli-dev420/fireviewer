@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 
-from sqlalchemy import select
+from sqlalchemy import case, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from fire_viewer.core.time import as_utc, utcnow
@@ -14,6 +14,7 @@ from fire_viewer.db.models import (
     IncidentSeries,
     ManifestRevision,
     ModelAsset,
+    Observation,
     SpatialPackage,
     SpatialPackageFile,
     SpatialZoneRevision,
@@ -28,6 +29,7 @@ from fire_viewer.domain.schemas import (
     AdminOperationalMapIncident,
     AdminOperationalMapModel,
     AdminOperationalMapResponse,
+    AdminOperationalMapSignal,
     AdminOperationalMapSummary,
 )
 
@@ -99,8 +101,9 @@ def get_operational_map(session: Session) -> AdminOperationalMapResponse:
             .options(
                 selectinload(IncidentSeries.episodes),
                 selectinload(IncidentSeries.observations),
-                selectinload(IncidentSeries.manifest_revisions)
-                .selectinload(ManifestRevision.asset),
+                selectinload(IncidentSeries.manifest_revisions).selectinload(
+                    ManifestRevision.asset
+                ),
                 selectinload(IncidentSeries.manifest_revisions)
                 .selectinload(ManifestRevision.package)
                 .selectinload(SpatialPackage.files),
@@ -109,6 +112,34 @@ def get_operational_map(session: Session) -> AdminOperationalMapResponse:
                 .selectinload(SpatialZoneRevision.zone),
             )
             .order_by(IncidentSeries.updated_at.desc(), IncidentSeries.fire_id.asc())
+            .limit(5_000)
+        )
+        .scalars()
+        .unique()
+    )
+    observations = list(
+        session.execute(
+            select(Observation)
+            .where(Observation.verification_state != VerificationState.REJECTED)
+            .options(
+                selectinload(Observation.source),
+                selectinload(Observation.proposed_incident),
+                selectinload(Observation.attached_incident),
+            )
+            .order_by(
+                case(
+                    (
+                        or_(
+                            Observation.attached_incident_id.is_(None),
+                            Observation.verification_state == VerificationState.PENDING_REVIEW,
+                        ),
+                        0,
+                    ),
+                    else_=1,
+                ),
+                Observation.observed_at.desc(),
+                Observation.observation_id.asc(),
+            )
             .limit(5_000)
         )
         .scalars()
@@ -135,9 +166,7 @@ def get_operational_map(session: Session) -> AdminOperationalMapResponse:
                     ZonePublication.spatial_zone_revision_id.in_(revision_ids),
                     ZonePublication.is_active.is_(True),
                 )
-                .options(
-                    selectinload(ZonePublication.package).selectinload(SpatialPackage.files)
-                )
+                .options(selectinload(ZonePublication.package).selectinload(SpatialPackage.files))
             )
             .scalars()
             .unique()
@@ -220,17 +249,55 @@ def get_operational_map(session: Session) -> AdminOperationalMapResponse:
             )
         )
 
+    signal_rows = [
+        AdminOperationalMapSignal(
+            observation_id=observation.observation_id,
+            source_key=observation.source.source_key,
+            source_type=observation.source.source_type,
+            longitude=observation.longitude,
+            latitude=observation.latitude,
+            horizontal_uncertainty_m=observation.horizontal_uncertainty_m,
+            territory_code=observation.territory_code,
+            canonical_name_hint=observation.canonical_name_hint,
+            observed_at=as_utc(observation.observed_at),
+            received_at=as_utc(observation.received_at),
+            verification_state=observation.verification_state,
+            match_decision=observation.match_decision,
+            state=(
+                "pending"
+                if observation.attached_incident is None
+                or observation.verification_state == VerificationState.PENDING_REVIEW
+                else "attached"
+            ),
+            proposed_fire_id=(
+                observation.proposed_incident.fire_id
+                if observation.proposed_incident is not None
+                else None
+            ),
+            attached_fire_id=(
+                observation.attached_incident.fire_id
+                if observation.attached_incident is not None
+                else None
+            ),
+        )
+        for observation in observations
+    ]
+
     return AdminOperationalMapResponse(
         generated_at=utcnow(),
         summary=AdminOperationalMapSummary(
             total_incidents=len(rows),
-            active_incidents=sum(
-                row.status == IncidentStatus.ACTIVE_CONFIRMED for row in rows
-            ),
+            active_incidents=sum(row.status == IncidentStatus.ACTIVE_CONFIRMED for row in rows),
             monitoring_incidents=sum(row.status == IncidentStatus.MONITORING for row in rows),
+            archived_incidents=sum(
+                row.status in {IncidentStatus.EXTINGUISHED, IncidentStatus.CLOSED} for row in rows
+            ),
             incidents_requiring_review=sum(row.review_required for row in rows),
+            pending_signals=sum(row.state == "pending" for row in signal_rows),
+            attached_signals=sum(row.state == "attached" for row in signal_rows),
             incidents_with_models=sum(bool(row.models) for row in rows),
             model_updates_available=sum(row.model_update_available for row in rows),
         ),
         incidents=rows,
+        signals=signal_rows,
     )

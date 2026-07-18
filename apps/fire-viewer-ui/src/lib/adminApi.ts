@@ -189,11 +189,32 @@ export interface AdminOperationalMapIncident {
   readonly model_update_available: boolean;
 }
 
+export interface AdminOperationalMapSignal {
+  readonly observation_id: string;
+  readonly source_key: string;
+  readonly source_type: string;
+  readonly longitude: number;
+  readonly latitude: number;
+  readonly horizontal_uncertainty_m: number;
+  readonly territory_code: string;
+  readonly canonical_name_hint: string | null;
+  readonly observed_at: string;
+  readonly received_at: string;
+  readonly verification_state: string;
+  readonly match_decision: 'create' | 'attach' | 'review';
+  readonly state: 'pending' | 'attached';
+  readonly proposed_fire_id: string | null;
+  readonly attached_fire_id: string | null;
+}
+
 export interface AdminOperationalMapSummary {
   readonly total_incidents: number;
   readonly active_incidents: number;
   readonly monitoring_incidents: number;
+  readonly archived_incidents: number;
   readonly incidents_requiring_review: number;
+  readonly pending_signals: number;
+  readonly attached_signals: number;
   readonly incidents_with_models: number;
   readonly model_updates_available: number;
 }
@@ -203,6 +224,7 @@ export interface AdminOperationalMapResponse {
   readonly coordinate_system: 'EPSG:4326';
   readonly summary: AdminOperationalMapSummary;
   readonly incidents: readonly AdminOperationalMapIncident[];
+  readonly signals: readonly AdminOperationalMapSignal[];
 }
 
 export interface AdminDashboardResponse {
@@ -869,7 +891,10 @@ function parseOperationalMapSummary(value: unknown): AdminOperationalMapSummary 
     total_incidents: readNonNegativeInteger(value.total_incidents, 'total_incidents'),
     active_incidents: readNonNegativeInteger(value.active_incidents, 'active_incidents'),
     monitoring_incidents: readNonNegativeInteger(value.monitoring_incidents, 'monitoring_incidents'),
+    archived_incidents: value.archived_incidents === undefined ? 0 : readNonNegativeInteger(value.archived_incidents, 'archived_incidents'),
     incidents_requiring_review: readNonNegativeInteger(value.incidents_requiring_review, 'incidents_requiring_review'),
+    pending_signals: value.pending_signals === undefined ? 0 : readNonNegativeInteger(value.pending_signals, 'pending_signals'),
+    attached_signals: value.attached_signals === undefined ? 0 : readNonNegativeInteger(value.attached_signals, 'attached_signals'),
     incidents_with_models: readNonNegativeInteger(value.incidents_with_models, 'incidents_with_models'),
     model_updates_available: readNonNegativeInteger(value.model_updates_available, 'model_updates_available'),
   };
@@ -922,13 +947,38 @@ function parseOperationalMapIncident(value: unknown): AdminOperationalMapInciden
   };
 }
 
+function parseOperationalMapSignal(value: unknown): AdminOperationalMapSignal {
+  if (!isRecord(value)) throw new Error('Signal cartographique invalide.');
+  const longitude = readFiniteNumber(value.longitude, 'longitude');
+  const latitude = readFiniteNumber(value.latitude, 'latitude');
+  if (longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90) throw new Error('Coordonnées du signal invalides.');
+  return {
+    observation_id: readString(value.observation_id, 'observation_id', { max: 64 })!,
+    source_key: readString(value.source_key, 'source_key', { max: 128 })!,
+    source_type: readString(value.source_type, 'source_type', { max: 32 })!,
+    longitude,
+    latitude,
+    horizontal_uncertainty_m: readFiniteNumber(value.horizontal_uncertainty_m, 'horizontal_uncertainty_m'),
+    territory_code: readString(value.territory_code, 'territory_code', { max: 3 })!,
+    canonical_name_hint: readString(value.canonical_name_hint, 'canonical_name_hint', { nullable: true, max: 255 }),
+    observed_at: readIsoDate(value.observed_at, 'observed_at'),
+    received_at: readIsoDate(value.received_at, 'received_at'),
+    verification_state: readString(value.verification_state, 'verification_state', { max: 32 })!,
+    match_decision: readEnum(value.match_decision, 'match_decision', ['create', 'attach', 'review'] as const),
+    state: readEnum(value.state, 'state', ['pending', 'attached'] as const),
+    proposed_fire_id: readString(value.proposed_fire_id, 'proposed_fire_id', { nullable: true, max: 32 }),
+    attached_fire_id: readString(value.attached_fire_id, 'attached_fire_id', { nullable: true, max: 32 }),
+  };
+}
+
 function parseOperationalMap(value: unknown): AdminOperationalMapResponse {
-  if (!isRecord(value) || !Array.isArray(value.incidents)) throw new Error('Carte opérationnelle invalide.');
+  if (!isRecord(value) || !Array.isArray(value.incidents) || (value.signals !== undefined && !Array.isArray(value.signals))) throw new Error('Carte opérationnelle invalide.');
   return {
     generated_at: readIsoDate(value.generated_at, 'generated_at'),
     coordinate_system: readEnum(value.coordinate_system, 'coordinate_system', ['EPSG:4326'] as const),
     summary: parseOperationalMapSummary(value.summary),
     incidents: value.incidents.map(parseOperationalMapIncident),
+    signals: (value.signals ?? []).map(parseOperationalMapSignal),
   };
 }
 
