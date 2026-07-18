@@ -54,4 +54,6 @@ RUN useradd --create-home --uid 10001 worker
 ENV FW_RUNTIME_USER=worker
 USER root
 
+EXPOSE 8000
+
 ENTRYPOINT ["python", "-m", "firewarning_worker.bootstrap"]

@@ -7,7 +7,7 @@ import time
 
 from fire_viewer.core.config import get_settings
 from fire_viewer.db.engine import create_db_engine, create_session_factory
-from fire_viewer.services.agent_dispatcher import RunPodClient, run_dispatcher_once
+from fire_viewer.services.agent_dispatcher import build_runpod_client, run_dispatcher_once
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -25,7 +25,7 @@ def main() -> None:
     engine = create_db_engine(settings)
     factory = create_session_factory(engine)
     try:
-        with RunPodClient(settings) as client:
+        with build_runpod_client(settings) as client:
             while True:
                 processed = run_dispatcher_once(
                     factory,

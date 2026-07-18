@@ -224,6 +224,28 @@ class AgentReviewState(StrEnum):
     REJECTED = "REJECTED"
 
 
+class AgentAnalysisState(StrEnum):
+    COLLECTING = "COLLECTING"
+    PROCESSING = "PROCESSING"
+    REVIEW_PENDING = "REVIEW_PENDING"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+
+
+class AgentProposalReviewState(StrEnum):
+    PENDING = "PENDING"
+    VALIDATED = "VALIDATED"
+    REJECTED = "REJECTED"
+    INVALIDATED = "INVALIDATED"
+
+
+class AgentReportReviewState(StrEnum):
+    DRAFT = "DRAFT"
+    VALIDATED = "VALIDATED"
+    REJECTED = "REJECTED"
+    INVALIDATED = "INVALIDATED"
+
+
 class IncidentMarkerReviewState(StrEnum):
     PENDING = "PENDING"
     VALIDATED = "VALIDATED"

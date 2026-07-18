@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from urllib.parse import urlparse
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -13,27 +13,39 @@ from fire_viewer.core.ids import new_prefixed_id
 from fire_viewer.core.security import Actor
 from fire_viewer.core.time import as_utc, ensure_utc, utcnow
 from fire_viewer.db.models import (
+    AgentAnalysisWindow,
     AgentDispatch,
+    AgentFactProposal,
     AgentMediaBatch,
     AgentMediaConsent,
     AgentMediaItem,
+    AgentSituationReportFact,
+    AgentSituationReportRevision,
+    AgentSpatialProposal,
     Episode,
     IncidentSeries,
 )
 from fire_viewer.domain.agent_schemas import (
     AgentBatchCreateOutcome,
-    AgentBatchCreateRequest,
+    AgentBatchCreatePayload,
+    AgentBatchCreateRequestV2,
     AgentBatchItemResponse,
     AgentBatchResponse,
     AgentConsentWithdrawResponse,
     AgentDispatchResponse,
+    AgentMediaItemInputV2,
     WorkerBatchItem,
+    WorkerBatchItemV2,
     WorkerInput,
+    WorkerInputV2,
 )
 from fire_viewer.domain.enums import (
+    AgentAnalysisState,
     AgentBatchState,
     AgentConsentState,
     AgentDispatchState,
+    AgentProposalReviewState,
+    AgentReportReviewState,
 )
 from fire_viewer.domain.errors import BadRequestError, ConflictError, NotFoundError
 from fire_viewer.domain.hashing import json_safe, sha256_hex
@@ -81,6 +93,7 @@ def _load_batch(session: Session, batch_id: str) -> AgentMediaBatch:
         .options(
             selectinload(AgentMediaBatch.items).selectinload(AgentMediaItem.consent),
             selectinload(AgentMediaBatch.dispatch),
+            selectinload(AgentMediaBatch.analysis_window),
         )
     ).scalar_one_or_none()
     if batch is None:
@@ -94,6 +107,7 @@ def _batch_response(batch: AgentMediaBatch) -> AgentBatchResponse:
         batch_id=batch.batch_id,
         fire_id=batch.incident.fire_id if batch.incident else None,
         episode_id=batch.episode.episode_id if batch.episode else None,
+        analysis_id=batch.analysis_window.analysis_id if batch.analysis_window else None,
         schema_version=batch.schema_version,
         batch_type=batch.batch_type,
         priority=batch.priority,
@@ -137,10 +151,71 @@ def _batch_response(batch: AgentMediaBatch) -> AgentBatchResponse:
     )
 
 
+def _ensure_analysis_window(
+    session: Session,
+    *,
+    payload: AgentBatchCreateRequestV2,
+    incident: IncidentSeries,
+    episode: Episode,
+) -> AgentAnalysisWindow:
+    requested = payload.analysis_window
+    candidates = list(
+        session.scalars(
+            select(AgentAnalysisWindow).where(
+                or_(
+                    AgentAnalysisWindow.analysis_id == requested.analysis_id,
+                    and_(
+                        AgentAnalysisWindow.incident_id == incident.id,
+                        AgentAnalysisWindow.episode_id == episode.id,
+                        AgentAnalysisWindow.local_date == requested.local_date,
+                    ),
+                )
+            )
+        )
+    )
+    if len(candidates) > 1:
+        raise ConflictError(
+            "agent_analysis_window_conflict",
+            "analysis_id and incident local day identify different analysis windows.",
+        )
+    if candidates:
+        existing = candidates[0]
+        same_window = (
+            existing.analysis_id == requested.analysis_id
+            and existing.incident_id == incident.id
+            and existing.episode_id == episode.id
+            and existing.local_date == requested.local_date
+            and existing.timezone == requested.timezone
+            and as_utc(existing.window_start_at) == ensure_utc(requested.window_start_at)
+            and as_utc(existing.window_end_at) == ensure_utc(requested.window_end_at)
+        )
+        if not same_window:
+            raise ConflictError(
+                "agent_analysis_window_conflict",
+                "The analysis window identifier or local day already exists with other bounds.",
+            )
+        return existing
+
+    analysis_window = AgentAnalysisWindow(
+        analysis_id=requested.analysis_id,
+        incident_id=incident.id,
+        episode_id=episode.id,
+        window_start_at=ensure_utc(requested.window_start_at),
+        window_end_at=ensure_utc(requested.window_end_at),
+        local_date=requested.local_date,
+        timezone=requested.timezone,
+        state=AgentAnalysisState.COLLECTING,
+        version=1,
+    )
+    session.add(analysis_window)
+    session.flush()
+    return analysis_window
+
+
 def create_agent_batch(
     session: Session,
     *,
-    payload: AgentBatchCreateRequest,
+    payload: AgentBatchCreatePayload,
     idempotency_key: str,
     actor: Actor,
     trace_id: str,
@@ -169,22 +244,30 @@ def create_agent_batch(
             "agent_deadline_required", "user_deadline batches require deadline_at"
         )
 
+    if isinstance(payload, AgentBatchCreateRequestV2):
+        v2_payload: AgentBatchCreateRequestV2 | None = payload
+        fire_id: str | None = payload.analysis_window.fire_id
+        episode_id: str | None = payload.analysis_window.episode_id
+    else:
+        v2_payload = None
+        fire_id = payload.fire_id
+        episode_id = payload.episode_id
     incident = None
     episode = None
-    if payload.fire_id is not None and payload.episode_id is not None:
+    if fire_id is not None and episode_id is not None:
         incident = session.execute(
-            select(IncidentSeries).where(IncidentSeries.fire_id == payload.fire_id)
+            select(IncidentSeries).where(IncidentSeries.fire_id == fire_id)
         ).scalar_one_or_none()
         if incident is None:
-            raise NotFoundError("incident", payload.fire_id)
+            raise NotFoundError("incident", fire_id)
         episode = session.execute(
             select(Episode).where(
                 Episode.incident_id == incident.id,
-                Episode.episode_id == payload.episode_id,
+                Episode.episode_id == episode_id,
             )
         ).scalar_one_or_none()
         if episode is None:
-            raise NotFoundError("episode", payload.episode_id)
+            raise NotFoundError("episode", episode_id)
 
     for request_item in payload.items:
         for url in [
@@ -196,6 +279,14 @@ def create_agent_batch(
                 _validate_https_host(url, settings.agent_media_allowed_hosts)
         if request_item.consent.source_reference_url is not None:
             _validate_https_reference(request_item.consent.source_reference_url)
+        if (
+            isinstance(request_item, AgentMediaItemInputV2)
+            and request_item.provenance.source_reference_url is not None
+        ):
+            _validate_https_reference(request_item.provenance.source_reference_url)
+    if v2_payload is not None and v2_payload.reference_bundle is not None:
+        for asset in v2_payload.reference_bundle.assets:
+            _validate_https_host(asset.working_file_url, settings.agent_media_allowed_hosts)
 
     request_hash = sha256_hex(payload)
     existing = (
@@ -210,6 +301,7 @@ def create_agent_batch(
             .options(
                 selectinload(AgentMediaBatch.items).selectinload(AgentMediaItem.consent),
                 selectinload(AgentMediaBatch.dispatch),
+                selectinload(AgentMediaBatch.analysis_window),
             )
         )
         .scalars()
@@ -227,6 +319,17 @@ def create_agent_batch(
             )
         return AgentBatchCreateOutcome(replayed=True, batch=_batch_response(existing))
 
+    analysis_window = None
+    if v2_payload is not None:
+        if incident is None or episode is None:
+            raise AssertionError("v2 agent batches require an incident episode")
+        analysis_window = _ensure_analysis_window(
+            session,
+            payload=v2_payload,
+            incident=incident,
+            episode=episode,
+        )
+
     batch = AgentMediaBatch(
         batch_id=payload.batch_id,
         schema_version=payload.schema_version,
@@ -235,6 +338,12 @@ def create_agent_batch(
         state=AgentBatchState.DRAFT,
         incident_id=incident.id if incident else None,
         episode_id=episode.id if episode else None,
+        analysis_window_id=analysis_window.id if analysis_window else None,
+        reference_bundle_payload=(
+            json_safe(v2_payload.reference_bundle)
+            if v2_payload is not None and v2_payload.reference_bundle
+            else None
+        ),
         idempotency_key=idempotency_key,
         request_hash=request_hash,
         trace_id=trace_id,
@@ -259,6 +368,15 @@ def create_agent_batch(
                 "agent_consent_expired",
                 f"Consent is already expired for {source_item.input_id}.",
             )
+        if isinstance(source_item, AgentMediaItemInputV2):
+            metadata_payload = {
+                "provenance": json_safe(source_item.provenance),
+                "captured_at": json_safe(source_item.captured_at),
+                "camera": json_safe(source_item.camera) if source_item.camera else None,
+                "satellite": json_safe(source_item.satellite) if source_item.satellite else None,
+            }
+        else:
+            metadata_payload = json_safe(source_item.metadata)
         media_item = AgentMediaItem(
             input_id=source_item.input_id,
             media_type=source_item.media_type,
@@ -267,7 +385,7 @@ def create_agent_batch(
             ),
             media_sha256=source_item.media_sha256,
             size_bytes=source_item.size_bytes,
-            metadata_payload=json_safe(source_item.metadata),
+            metadata_payload=metadata_payload,
             processable_payload={
                 "frames": [json_safe(frame) for frame in source_item.frames],
                 "audio_url": str(source_item.audio_url) if source_item.audio_url else None,
@@ -319,6 +437,7 @@ def create_agent_batch(
                 .options(
                     selectinload(AgentMediaBatch.items).selectinload(AgentMediaItem.consent),
                     selectinload(AgentMediaBatch.dispatch),
+                    selectinload(AgentMediaBatch.analysis_window),
                 )
             )
             .scalars()
@@ -343,6 +462,56 @@ def create_agent_batch(
 
 
 def _worker_payload(batch: AgentMediaBatch) -> dict[str, object]:
+    if batch.schema_version == "2.0":
+        analysis_window = batch.analysis_window
+        incident = batch.incident
+        episode = batch.episode
+        if analysis_window is None or incident is None or episode is None:
+            raise ConflictError(
+                "agent_analysis_window_missing",
+                "A v2 batch cannot be dispatched without its persisted analysis window.",
+            )
+        v2_items: list[WorkerBatchItemV2] = []
+        for item in batch.items:
+            processable = item.processable_payload
+            metadata = item.metadata_payload
+            v2_items.append(
+                WorkerBatchItemV2.model_validate(
+                    {
+                        "input_id": item.input_id,
+                        "media_type": item.media_type.value,
+                        "working_file_url": item.working_file_url,
+                        "provenance": metadata.get("provenance"),
+                        "captured_at": metadata.get("captured_at"),
+                        "camera": metadata.get("camera"),
+                        "satellite": metadata.get("satellite"),
+                        "frames": processable.get("frames", []),
+                        "audio_url": processable.get("audio_url"),
+                        "article_text": processable.get("article_text"),
+                    }
+                )
+            )
+        worker_input_v2 = WorkerInputV2.model_validate(
+            {
+                "batch_id": batch.batch_id,
+                "batch_type": batch.batch_type.value,
+                "priority": batch.priority.value,
+                "analysis_window": {
+                    "analysis_id": analysis_window.analysis_id,
+                    "fire_id": incident.fire_id,
+                    "episode_id": episode.episode_id,
+                    "window_start_at": as_utc(analysis_window.window_start_at),
+                    "window_end_at": as_utc(analysis_window.window_end_at),
+                    "local_date": analysis_window.local_date,
+                    "timezone": analysis_window.timezone,
+                },
+                "deadline_at": as_utc(batch.deadline_at) if batch.deadline_at else None,
+                "reference_bundle": batch.reference_bundle_payload,
+                "items": v2_items,
+            }
+        )
+        return worker_input_v2.model_dump(mode="json", exclude_none=True)
+
     items: list[WorkerBatchItem] = []
     for item in batch.items:
         processable = item.processable_payload
@@ -479,6 +648,56 @@ def withdraw_agent_consent(
         consent.withdrawal_reason = reason
     item.purge_after = now
     batch.purge_after = now
+    invalidated_facts = list(
+        session.scalars(
+            select(AgentFactProposal).where(
+                AgentFactProposal.source_media_item_id == item.id,
+                AgentFactProposal.review_state != AgentProposalReviewState.INVALIDATED,
+            )
+        )
+    )
+    invalidated_proposals = list(
+        session.scalars(
+            select(AgentSpatialProposal).where(
+                AgentSpatialProposal.source_media_item_id == item.id,
+                AgentSpatialProposal.review_state != AgentProposalReviewState.INVALIDATED,
+            )
+        )
+    )
+    for fact in invalidated_facts:
+        fact.review_state = AgentProposalReviewState.INVALIDATED
+        fact.reviewed_by = actor.actor_id
+        fact.reviewed_at = now
+        fact.review_reason = reason
+    for spatial_proposal in invalidated_proposals:
+        spatial_proposal.review_state = AgentProposalReviewState.INVALIDATED
+        spatial_proposal.reviewed_by = actor.actor_id
+        spatial_proposal.reviewed_at = now
+        spatial_proposal.review_reason = reason
+
+    fact_row_ids = [fact.id for fact in invalidated_facts]
+    invalidated_reports: list[AgentSituationReportRevision] = []
+    if fact_row_ids:
+        invalidated_reports = list(
+            session.scalars(
+                select(AgentSituationReportRevision)
+                .join(
+                    AgentSituationReportFact,
+                    AgentSituationReportFact.report_id == AgentSituationReportRevision.id,
+                )
+                .where(
+                    AgentSituationReportFact.fact_id.in_(fact_row_ids),
+                    AgentSituationReportRevision.review_state
+                    != AgentReportReviewState.INVALIDATED,
+                )
+                .distinct()
+            )
+        )
+        for report in invalidated_reports:
+            report.review_state = AgentReportReviewState.INVALIDATED
+            report.reviewed_by = actor.actor_id
+            report.reviewed_at = now
+            report.review_reason = reason
     dispatch = batch.dispatch
     terminal_dispatch = {
         AgentDispatchState.SUCCEEDED,
@@ -506,6 +725,9 @@ def withdraw_agent_consent(
             "consent_state": consent.state.value,
             "batch_state": batch.state.value,
             "purge_after": now,
+            "invalidated_spatial_proposals": len(invalidated_proposals),
+            "invalidated_fact_proposals": len(invalidated_facts),
+            "invalidated_reports": len(invalidated_reports),
         },
     )
     session.commit()

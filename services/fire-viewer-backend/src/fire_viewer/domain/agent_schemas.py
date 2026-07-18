@@ -166,6 +166,7 @@ class AgentBatchResponse(StrictAgentModel):
     batch_id: str
     fire_id: str | None = None
     episode_id: str | None = None
+    analysis_id: str | None = None
     schema_version: str
     batch_type: AgentBatchType
     priority: AgentBatchPriority
@@ -537,6 +538,12 @@ class AgentBatchCreateRequestV2(StrictAgentModel):
         if self.batch_type != AgentBatchType.SATELLITE_MEDIA and has_satellite:
             raise ValueError("satellite images require a satellite batch")
         return self
+
+
+AgentBatchCreatePayload = Annotated[
+    AgentBatchCreateRequest | AgentBatchCreateRequestV2,
+    Field(discriminator="schema_version"),
+]
 
 
 class WorkerInputV2(StrictAgentModel):

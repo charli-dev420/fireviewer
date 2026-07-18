@@ -4143,7 +4143,22 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AgentBatchCreateRequest"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/AgentBatchCreateRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AgentBatchCreateRequestV2"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "schema_version",
+                  "mapping": {
+                    "1.0": "#/components/schemas/AgentBatchCreateRequest",
+                    "2.0": "#/components/schemas/AgentBatchCreateRequestV2"
+                  }
+                },
+                "title": "Payload"
               }
             }
           }
@@ -9497,6 +9512,77 @@
         ],
         "title": "AgentBatchCreateRequest"
       },
+      "AgentBatchCreateRequestV2": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "2.0",
+            "title": "Schema Version",
+            "default": "2.0"
+          },
+          "batch_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Batch Id"
+          },
+          "batch_type": {
+            "$ref": "#/components/schemas/AgentBatchType"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/AgentBatchPriority"
+          },
+          "analysis_window": {
+            "$ref": "#/components/schemas/AnalysisWindowV2"
+          },
+          "deadline_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline At"
+          },
+          "purge_after": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Purge After"
+          },
+          "reference_bundle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpatialReferenceBundleV2"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentMediaItemInputV2"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "minItems": 1,
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "batch_id",
+          "batch_type",
+          "priority",
+          "analysis_window",
+          "purge_after",
+          "items"
+        ],
+        "title": "AgentBatchCreateRequestV2"
+      },
       "AgentBatchItemResponse": {
         "properties": {
           "input_id": {
@@ -9598,6 +9684,17 @@
               }
             ],
             "title": "Episode Id"
+          },
+          "analysis_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Id"
           },
           "schema_version": {
             "type": "string",
@@ -10221,6 +10318,136 @@
         ],
         "title": "AgentMediaItemInput"
       },
+      "AgentMediaItemInputV2": {
+        "properties": {
+          "input_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Input Id"
+          },
+          "media_type": {
+            "$ref": "#/components/schemas/AgentMediaType"
+          },
+          "working_file_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Working File Url"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/SourceProvenanceV2"
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At"
+          },
+          "camera": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CameraMetadataV2"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "satellite": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SatelliteMetadataV2"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/WorkerFrameInput"
+            },
+            "type": "array",
+            "maxItems": 64,
+            "title": "Frames"
+          },
+          "audio_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Url"
+          },
+          "article_text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Article Text"
+          },
+          "media_sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Sha256"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2147483648.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "consent": {
+            "$ref": "#/components/schemas/AgentConsentInput"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "input_id",
+          "media_type",
+          "provenance",
+          "consent"
+        ],
+        "title": "AgentMediaItemInputV2"
+      },
       "AgentMediaType": {
         "type": "string",
         "enum": [
@@ -10266,6 +10493,58 @@
         ],
         "title": "AgentReviewResolutionRequest"
       },
+      "AnalysisWindowV2": {
+        "properties": {
+          "analysis_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Analysis Id"
+          },
+          "fire_id": {
+            "type": "string",
+            "pattern": "^FR-[0-9A-Z]{2,3}-[0-9]{5}$",
+            "title": "Fire Id"
+          },
+          "episode_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Episode Id"
+          },
+          "window_start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Window Start At"
+          },
+          "window_end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Window End At"
+          },
+          "local_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Local Date"
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 3,
+            "title": "Timezone"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "analysis_id",
+          "fire_id",
+          "episode_id",
+          "window_start_at",
+          "window_end_at",
+          "local_date",
+          "timezone"
+        ],
+        "title": "AnalysisWindowV2"
+      },
       "AssetLod": {
         "type": "string",
         "enum": [
@@ -10276,6 +10555,158 @@
           "extended"
         ],
         "title": "AssetLod"
+      },
+      "CameraMetadataV2": {
+        "properties": {
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": -90.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 180.0,
+                "minimum": -180.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longitude"
+          },
+          "orthometric_height_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orthometric Height M"
+          },
+          "horizontal_accuracy_m": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100000.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizontal Accuracy M"
+          },
+          "yaw_deg": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMaximum": 360.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yaw Deg"
+          },
+          "pitch_deg": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": -90.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pitch Deg"
+          },
+          "roll_deg": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 180.0,
+                "minimum": -180.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roll Deg"
+          },
+          "horizontal_fov_deg": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMaximum": 180.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizontal Fov Deg"
+          },
+          "image_width_px": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 200000.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Width Px"
+          },
+          "image_height_px": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 200000.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Height Px"
+          },
+          "pose_origin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "METADATA",
+                  "USER_DECLARED",
+                  "CROSS_VIEW_ESTIMATE",
+                  "HUMAN_CONFIRMED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pose Origin"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CameraMetadataV2"
       },
       "DetectionContext": {
         "properties": {
@@ -12133,6 +12564,133 @@
         ],
         "title": "ReviewResolutionResponse"
       },
+      "SatelliteMetadataV2": {
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Product Id"
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Provider"
+          },
+          "acquired_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Acquired At"
+          },
+          "crs": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 3,
+            "title": "Crs"
+          },
+          "raster_width_px": {
+            "type": "integer",
+            "maximum": 500000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Raster Width Px"
+          },
+          "raster_height_px": {
+            "type": "integer",
+            "maximum": 500000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Raster Height Px"
+          },
+          "geotransform": {
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array",
+            "maxItems": 6,
+            "minItems": 6,
+            "title": "Geotransform"
+          },
+          "bbox_wgs84": {
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array",
+            "maxItems": 4,
+            "minItems": 4,
+            "title": "Bbox Wgs84"
+          },
+          "resolution_m": {
+            "type": "number",
+            "maximum": 100000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Resolution M"
+          },
+          "bands": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "minItems": 1,
+            "title": "Bands"
+          },
+          "cloud_cover_percent": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cloud Cover Percent"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "product_id",
+          "provider",
+          "acquired_at",
+          "crs",
+          "raster_width_px",
+          "raster_height_px",
+          "geotransform",
+          "bbox_wgs84",
+          "resolution_m",
+          "bands"
+        ],
+        "title": "SatelliteMetadataV2"
+      },
       "SourceInput": {
         "properties": {
           "id": {
@@ -12156,6 +12714,64 @@
           "type"
         ],
         "title": "SourceInput"
+      },
+      "SourceProvenanceV2": {
+        "properties": {
+          "source_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Source Key"
+          },
+          "source_reference_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Reference Url"
+          },
+          "license_identifier": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "License Identifier"
+          },
+          "attribution": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attribution"
+          },
+          "trust": {
+            "type": "string",
+            "enum": [
+              "unverified",
+              "partner",
+              "institutional",
+              "operator"
+            ],
+            "title": "Trust"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_key",
+          "license_identifier",
+          "trust"
+        ],
+        "title": "SourceProvenanceV2"
       },
       "SourceResponse": {
         "properties": {
@@ -12397,6 +13013,90 @@
         ],
         "title": "SpatialPackageState"
       },
+      "SpatialReferenceAssetV2": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "terrain_mnt",
+              "surface_dsm",
+              "orthophoto",
+              "scene_catalog"
+            ],
+            "title": "Kind"
+          },
+          "working_file_url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "title": "Working File Url"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256"
+          },
+          "crs": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 3,
+            "title": "Crs"
+          },
+          "resolution_m": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100000.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution M"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "working_file_url",
+          "sha256",
+          "crs"
+        ],
+        "title": "SpatialReferenceAssetV2"
+      },
+      "SpatialReferenceBundleV2": {
+        "properties": {
+          "reference_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Reference Id"
+          },
+          "manifest_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Manifest Sha256"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/SpatialReferenceAssetV2"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Assets"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reference_id",
+          "manifest_sha256",
+          "assets"
+        ],
+        "title": "SpatialReferenceBundleV2"
+      },
       "TransitionRequest": {
         "properties": {
           "target_status": {
@@ -12628,6 +13328,34 @@
           "public_notice"
         ],
         "title": "ViewerManifest"
+      },
+      "WorkerFrameInput": {
+        "properties": {
+          "frame_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Frame Id"
+          },
+          "timestamp_s": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Timestamp S"
+          },
+          "working_file_url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "title": "Working File Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "frame_id",
+          "timestamp_s",
+          "working_file_url"
+        ],
+        "title": "WorkerFrameInput"
       },
       "ZoneInformationState": {
         "type": "string",

@@ -15,6 +15,7 @@ from typing import Any, Protocol
 import httpx
 from pydantic import ValidationError
 from sqlalchemy import or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload, sessionmaker
 
 from fire_viewer.core.config import Settings
@@ -30,7 +31,12 @@ from fire_viewer.db.models import (
     AgentReviewTask,
     IncidentSpatialMarker,
 )
-from fire_viewer.domain.agent_schemas import WorkerItemResult, WorkerModelRun, WorkerOutput
+from fire_viewer.domain.agent_schemas import (
+    WorkerItemResult,
+    WorkerModelRun,
+    WorkerOutput,
+    WorkerOutputV2,
+)
 from fire_viewer.domain.enums import (
     ActorType,
     AgentBatchState,
@@ -39,6 +45,10 @@ from fire_viewer.domain.enums import (
     AgentModelRunState,
     AgentReviewState,
     IncidentMarkerReviewState,
+)
+from fire_viewer.services.agent_intelligence import (
+    persist_worker_output_v2,
+    validate_worker_output_v2,
 )
 from fire_viewer.services.common import record_operator_audit
 
@@ -62,6 +72,8 @@ class RunPodTransport(Protocol):
 
 
 class RunPodClient:
+    """RunPod Serverless transport, reserved for the post-staging deployment."""
+
     def __init__(self, settings: Settings) -> None:
         if not settings.agent_runpod_endpoint_id or not settings.agent_runpod_api_key:
             raise ValueError("RunPod endpoint credentials are not configured")
@@ -117,6 +129,72 @@ class RunPodClient:
 
     def __exit__(self, *_exc: object) -> None:
         self.close()
+
+
+class RunPodPodClient:
+    """Direct HTTPS transport to a persistent RunPod pod used during validation."""
+
+    def __init__(self, settings: Settings) -> None:
+        if not settings.agent_runpod_pod_base_url or not settings.agent_runpod_pod_auth_token:
+            raise ValueError("RunPod pod URL and authentication token are not configured")
+        self._jobs_url = f"{str(settings.agent_runpod_pod_base_url).rstrip('/')}/v1/jobs"
+        self._headers = {
+            "Authorization": (
+                f"Bearer {settings.agent_runpod_pod_auth_token.get_secret_value()}"
+            ),
+            "Content-Type": "application/json",
+        }
+        self._policy = {
+            "executionTimeout": settings.agent_execution_timeout_ms,
+            "ttl": settings.agent_job_ttl_ms,
+        }
+        self._client = httpx.Client(
+            timeout=httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=10.0),
+            follow_redirects=False,
+            headers=self._headers,
+        )
+
+    @staticmethod
+    def _object_response(response: httpx.Response) -> dict[str, Any]:
+        response.raise_for_status()
+        value = response.json()
+        if not isinstance(value, dict):
+            raise ValueError("RunPod pod returned a non-object response")
+        return value
+
+    def submit(self, payload: Mapping[str, object]) -> dict[str, Any]:
+        value = self._object_response(
+            self._client.post(
+                self._jobs_url,
+                json={"input": dict(payload), "policy": self._policy},
+            )
+        )
+        if not isinstance(value.get("id"), str) or not value["id"]:
+            raise ValueError("RunPod pod submission response has no job id")
+        return value
+
+    def status(self, remote_job_id: str) -> dict[str, Any]:
+        return self._object_response(self._client.get(f"{self._jobs_url}/{remote_job_id}"))
+
+    def cancel(self, remote_job_id: str) -> dict[str, Any]:
+        return self._object_response(
+            self._client.post(f"{self._jobs_url}/{remote_job_id}/cancel")
+        )
+
+    def close(self) -> None:
+        self._client.close()
+
+    def __enter__(self) -> RunPodPodClient:
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self.close()
+
+
+def build_runpod_client(settings: Settings) -> RunPodClient | RunPodPodClient:
+    if settings.agent_runpod_transport == "pod":
+        return RunPodPodClient(settings)
+    return RunPodClient(settings)
 
 
 def _system_actor(worker_id: str) -> Actor:
@@ -415,7 +493,9 @@ def _validate_item_evidence(item: AgentMediaItem, result: WorkerItemResult) -> N
 def _validate_worker_output(
     dispatch: AgentDispatch,
     raw_output: object,
-) -> WorkerOutput:
+) -> WorkerOutput | WorkerOutputV2:
+    if dispatch.batch.schema_version == "2.0":
+        return validate_worker_output_v2(dispatch, raw_output)
     output = WorkerOutput.model_validate(raw_output)
     if output.batch_id != dispatch.batch.batch_id:
         raise ValueError("worker batch_id does not match the persisted batch")
@@ -441,7 +521,10 @@ def _validate_worker_output(
     return output
 
 
-def _persist_model_runs(dispatch: AgentDispatch, output: WorkerOutput) -> None:
+def _persist_model_runs(
+    dispatch: AgentDispatch,
+    output: WorkerOutput | WorkerOutputV2,
+) -> None:
     if dispatch.model_runs:
         raise ValueError("model runs were already persisted for this dispatch")
     for run in output.model_runs:
@@ -514,7 +597,6 @@ def _complete(
         output = _validate_worker_output(dispatch, raw_output)
         execution_ms = _optional_nonnegative_int(response.get("executionTime"))
         delay_ms = _optional_nonnegative_int(response.get("delayTime"))
-        _persist_model_runs(dispatch, output)
     except (ValidationError, ValueError) as exc:
         dispatch.raw_output = raw_output if isinstance(raw_output, dict) else None
         _dead_letter(
@@ -556,7 +638,30 @@ def _complete(
         )
         return
 
-    _persist_capture_markers(session, dispatch, output)
+    try:
+        with session.begin_nested():
+            _persist_model_runs(dispatch, output)
+            if isinstance(output, WorkerOutputV2):
+                persist_worker_output_v2(
+                    session,
+                    dispatch,
+                    output,
+                    worker_id=worker_id,
+                )
+            else:
+                _persist_capture_markers(session, dispatch, output)
+            session.flush()
+    except (IntegrityError, ValueError) as exc:
+        dispatch.raw_output = output.model_dump(mode="json")
+        _dead_letter(
+            session,
+            dispatch,
+            worker_id=worker_id,
+            failure_class="invalid_output",
+            error_code="agent_worker_output_persistence_invalid",
+            detail=f"Worker output could not be persisted safely: {exc}",
+        )
+        return
 
     dispatch.state = (
         AgentDispatchState.SUCCEEDED

@@ -59,6 +59,26 @@ def test_blob_token_accepts_vercel_marketplace_variable(monkeypatch: pytest.Monk
     assert settings.blob_read_write_token.get_secret_value() == "vercel-marketplace-token"
 
 
+def test_direct_pod_dispatch_requires_a_long_token_and_https() -> None:
+    with pytest.raises(ValidationError, match="at least 32 items"):
+        Settings(
+            _env_file=None,
+            agent_dispatch_enabled=True,
+            agent_runpod_transport="pod",
+            agent_runpod_pod_base_url="https://pod-test.example",
+            agent_runpod_pod_auth_token="too-short",
+        )
+
+    with pytest.raises(ValidationError, match="must use HTTPS"):
+        Settings(
+            _env_file=None,
+            agent_dispatch_enabled=True,
+            agent_runpod_transport="pod",
+            agent_runpod_pod_base_url="http://pod-test.example",
+            agent_runpod_pod_auth_token="x" * 40,
+        )
+
+
 def test_local_object_store_round_trip_is_immutable(tmp_path: Path) -> None:
     store = LocalObjectStore(tmp_path / "objects")
     staged = tmp_path / "staged"
@@ -187,7 +207,7 @@ def test_readiness_requires_current_schema_and_spatial_runtime(client, session) 
     assert ready.json() == {
         "status": "ready",
         "database": "ok",
-        "schema_revision": "d7c5e3a1b920",
+        "schema_revision": "e1c7a9b4d620",
         "spatial_index": "ok",
     }
 

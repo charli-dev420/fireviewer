@@ -12,7 +12,9 @@ contribution ou collecte
   -> antivirus, EXIF, FFprobe, OCR, frames, audio, déduplication
   -> fichiers de travail privés + URLs HTTPS signées
   -> batch et dispatch dédiés persistés
-  -> RunPod /run
+  -> transport RunPod sélectionné par configuration
+     -> recette : pod persistant /v1/jobs
+     -> production future : Serverless /run
   -> polling et persistance immédiate du résultat
   -> validation déterministe backend
   -> tâche de revue humaine
@@ -31,13 +33,28 @@ l'annulation distante si nécessaire et le dispatcher efface les références pr
 dérivés arrivés à rétention. Le stockage qui émet les URL HTTPS privées reste responsable de la
 suppression physique par sa propre politique de cycle de vie.
 
-Le binaire `fire-viewer-agent-dispatcher` prend un lease atomique et appelle uniquement `/run`,
-`/status/{id}` et `/cancel/{id}`. Il valide strictement les identifiants, révisions de modèles et liens
-de preuve avant de créer une tâche de revue. Il ne modifie aucun incident public.
+Le binaire `fire-viewer-agent-dispatcher` prend un lease atomique. En recette il appelle uniquement
+`POST /v1/jobs`, `GET /v1/jobs/{id}` et `POST /v1/jobs/{id}/cancel` sur le proxy HTTPS du pod,
+avec un Bearer dédié. Après bascule explicite, le transport Serverless utilise `/run`, `/status/{id}`
+et `/cancel/{id}`. Les deux transports renvoient les mêmes états. Le dispatcher valide strictement
+les identifiants, fenêtres d'analyse, révisions de modèles et liens de preuve avant de créer une tâche
+de revue. Il ne modifie aucun incident public.
 
-## Appel RunPod
+## Pod persistant de recette
 
-Utiliser l'API asynchrone `/run`, jamais un appel synchrone long. Le secret RunPod reste dans le
+Le pod démarre avec `FW_RUN_MODE=pod`, expose `8000/http` et monte son volume sur
+`/runpod-volume`. `FW_POD_AUTH_TOKEN` contient au moins 32 caractères et n'est partagé qu'entre le
+backend et le pod. La file HTTP n'exécute qu'un lot à la fois afin de respecter le déchargement
+séquentiel des modèles et le plafond VRAM. `/healthz` ne révèle que l'état du processus.
+
+Le backend utilise `FV_AGENT_RUNPOD_TRANSPORT=pod`, l'URL HTTPS du proxy RunPod et le même token.
+Il ne faut pas activer le dispatcher avant que le pod soit sain et son cache de poids verrouillé
+complet. Le pod est arrêté après les essais ; son volume est conservé pour éviter de repayer le
+provisionnement des poids lors du test suivant.
+
+## Appel RunPod Serverless futur
+
+Après validation du pod, utiliser l'API asynchrone `/run`, jamais un appel synchrone long. Le secret RunPod reste dans le
 gestionnaire de secrets backend. Le `batch_id` est stable et l'empreinte canonique du payload est
 persistée avant soumission. Un même `batch_id` avec un payload différent est rejeté. L'état
 `SUBMITTING` est committé avant le POST : si sa réponse est ambiguë ou si le processus s'arrête après

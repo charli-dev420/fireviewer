@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import (
     JSON,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     Enum,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -25,6 +27,7 @@ from fire_viewer.db.base import Base
 from fire_viewer.domain.enums import (
     ActiveFireZoneReviewState,
     ActorType,
+    AgentAnalysisState,
     AgentBatchPriority,
     AgentBatchState,
     AgentBatchType,
@@ -34,6 +37,8 @@ from fire_viewer.domain.enums import (
     AgentDispatchState,
     AgentMediaType,
     AgentModelRunState,
+    AgentProposalReviewState,
+    AgentReportReviewState,
     AgentReviewState,
     AssetLod,
     AssetState,
@@ -1079,6 +1084,75 @@ class ManifestRevision(Base):
     )
 
 
+class AgentAnalysisWindow(Base, TimestampMixin):
+    """One private, local-day analysis workspace for an incident episode."""
+
+    __tablename__ = "agent_analysis_window"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    analysis_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    incident_id: Mapped[int] = mapped_column(
+        ForeignKey("incident_series.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    episode_id: Mapped[int] = mapped_column(
+        ForeignKey("episode.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    window_start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    window_end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    local_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    timezone: Mapped[str] = mapped_column(String(64), nullable=False)
+    state: Mapped[AgentAnalysisState] = mapped_column(
+        enum_column(AgentAnalysisState, name="agent_analysis_state"),
+        nullable=False,
+        default=AgentAnalysisState.COLLECTING,
+        index=True,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+    incident: Mapped[IncidentSeries] = relationship(foreign_keys=[incident_id])
+    episode: Mapped[Episode] = relationship(foreign_keys=[episode_id])
+    batches: Mapped[list[AgentMediaBatch]] = relationship(
+        back_populates="analysis_window",
+        foreign_keys=(
+            "[AgentMediaBatch.analysis_window_id, AgentMediaBatch.incident_id, "
+            "AgentMediaBatch.episode_id]"
+        ),
+        overlaps="incident,episode",
+    )
+    source_annotations: Mapped[list[AgentSourceAnnotation]] = relationship(
+        back_populates="analysis_window"
+    )
+    spatial_proposals: Mapped[list[AgentSpatialProposal]] = relationship(
+        back_populates="analysis_window"
+    )
+    fact_proposals: Mapped[list[AgentFactProposal]] = relationship(
+        back_populates="analysis_window"
+    )
+    report_revisions: Mapped[list[AgentSituationReportRevision]] = relationship(
+        back_populates="analysis_window",
+        foreign_keys=(
+            "[AgentSituationReportRevision.analysis_window_id, "
+            "AgentSituationReportRevision.incident_id, AgentSituationReportRevision.episode_id]"
+        ),
+        order_by="AgentSituationReportRevision.revision",
+        overlaps="incident,episode",
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "incident_id", "episode_id", "local_date", name="uq_agent_analysis_local_day"
+        ),
+        UniqueConstraint(
+            "id", "incident_id", "episode_id", name="uq_agent_analysis_window_identity"
+        ),
+        CheckConstraint(
+            "window_end_at > window_start_at", name="ck_agent_analysis_window_order"
+        ),
+        CheckConstraint("length(timezone) >= 3", name="ck_agent_analysis_timezone"),
+        CheckConstraint("version >= 1", name="ck_agent_analysis_version"),
+    )
+
+
 class AgentMediaBatch(Base, TimestampMixin):
     """Private media-analysis batch; deliberately independent from terrain/publication jobs."""
 
@@ -1101,6 +1175,10 @@ class AgentMediaBatch(Base, TimestampMixin):
     )
     episode_id: Mapped[int | None] = mapped_column(
         ForeignKey("episode.id", ondelete="RESTRICT"), index=True
+    )
+    analysis_window_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    reference_bundle_payload: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON(none_as_null=True)
     )
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -1125,9 +1203,23 @@ class AgentMediaBatch(Base, TimestampMixin):
     )
     incident: Mapped[IncidentSeries | None] = relationship(foreign_keys=[incident_id])
     episode: Mapped[Episode | None] = relationship(foreign_keys=[episode_id])
+    analysis_window: Mapped[AgentAnalysisWindow | None] = relationship(
+        back_populates="batches",
+        foreign_keys=[analysis_window_id, incident_id, episode_id],
+        overlaps="incident,episode",
+    )
 
     __table_args__ = (
-        CheckConstraint("schema_version = '1.0'", name="ck_agent_batch_schema_version"),
+        CheckConstraint(
+            "schema_version IN ('1.0', '2.0')", name="ck_agent_batch_schema_version"
+        ),
+        CheckConstraint(
+            "(schema_version = '1.0' AND analysis_window_id IS NULL "
+            "AND reference_bundle_payload IS NULL) OR "
+            "(schema_version = '2.0' AND analysis_window_id IS NOT NULL "
+            "AND incident_id IS NOT NULL AND episode_id IS NOT NULL)",
+            name="ck_agent_batch_analysis_window_version",
+        ),
         CheckConstraint(
             "(incident_id IS NULL AND episode_id IS NULL) OR "
             "(incident_id IS NOT NULL AND episode_id IS NOT NULL)",
@@ -1137,6 +1229,16 @@ class AgentMediaBatch(Base, TimestampMixin):
         CheckConstraint(
             "payload_hash IS NULL OR (" + sha256_hex_check("payload_hash") + ")",
             name="ck_agent_batch_payload_hash",
+        ),
+        ForeignKeyConstraint(
+            ["analysis_window_id", "incident_id", "episode_id"],
+            [
+                "agent_analysis_window.id",
+                "agent_analysis_window.incident_id",
+                "agent_analysis_window.episode_id",
+            ],
+            name="fk_agent_batch_analysis_window_identity",
+            ondelete="RESTRICT",
         ),
     )
 
@@ -1168,6 +1270,15 @@ class AgentMediaItem(Base, TimestampMixin):
     batch: Mapped[AgentMediaBatch] = relationship(back_populates="items")
     consent: Mapped[AgentMediaConsent] = relationship(
         back_populates="item", cascade="all, delete-orphan", uselist=False
+    )
+    source_annotations: Mapped[list[AgentSourceAnnotation]] = relationship(
+        back_populates="source_media_item"
+    )
+    spatial_proposals: Mapped[list[AgentSpatialProposal]] = relationship(
+        back_populates="source_media_item"
+    )
+    fact_proposals: Mapped[list[AgentFactProposal]] = relationship(
+        back_populates="source_media_item"
     )
 
     __table_args__ = (
@@ -1228,6 +1339,319 @@ class AgentMediaConsent(Base, TimestampMixin):
             name="ck_agent_consent_reference_https",
         ),
     )
+
+
+class AgentSourceAnnotation(Base, TimestampMixin):
+    """A model-proposed anchor in source pixels, never a geographic point by itself."""
+
+    __tablename__ = "agent_source_annotation"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    annotation_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    analysis_window_id: Mapped[int] = mapped_column(
+        ForeignKey("agent_analysis_window.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    source_media_item_id: Mapped[int] = mapped_column(
+        ForeignKey("agent_media_item.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    evidence_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    evidence_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    semantic_anchor: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_x_normalized: Mapped[float] = mapped_column(Float, nullable=False)
+    source_y_normalized: Mapped[float] = mapped_column(Float, nullable=False)
+    model_score: Mapped[float | None] = mapped_column(Float)
+
+    analysis_window: Mapped[AgentAnalysisWindow] = relationship(
+        back_populates="source_annotations"
+    )
+    source_media_item: Mapped[AgentMediaItem] = relationship(
+        back_populates="source_annotations"
+    )
+    spatial_proposals: Mapped[list[AgentSpatialProposal]] = relationship(
+        back_populates="source_annotation"
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "evidence_kind IN ('image', 'frame', 'satellite_image')",
+            name="ck_agent_annotation_evidence_kind",
+        ),
+        CheckConstraint(
+            "semantic_anchor IN ('active_fire_point', 'visible_fire_front_point', "
+            "'smoke_column_base')",
+            name="ck_agent_annotation_semantic_anchor",
+        ),
+        CheckConstraint(
+            "source_x_normalized >= 0 AND source_x_normalized <= 1",
+            name="ck_agent_annotation_x",
+        ),
+        CheckConstraint(
+            "source_y_normalized >= 0 AND source_y_normalized <= 1",
+            name="ck_agent_annotation_y",
+        ),
+        CheckConstraint(
+            "model_score IS NULL OR (model_score >= 0 AND model_score <= 1)",
+            name="ck_agent_annotation_score",
+        ),
+    )
+
+
+class AgentSpatialProposal(Base, TimestampMixin):
+    """Private geographic proposal or explicit abstention awaiting human review."""
+
+    __tablename__ = "agent_spatial_proposal"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    proposal_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    analysis_window_id: Mapped[int] = mapped_column(
+        ForeignKey("agent_analysis_window.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    source_media_item_id: Mapped[int] = mapped_column(
+        ForeignKey("agent_media_item.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    source_annotation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("agent_source_annotation.id", ondelete="RESTRICT"), index=True
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    observed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    geometry_origin: Mapped[str | None] = mapped_column(String(64))
+    longitude: Mapped[float | None] = mapped_column(Float)
+    latitude: Mapped[float | None] = mapped_column(Float)
+    altitude_m: Mapped[float | None] = mapped_column(Float)
+    horizontal_accuracy_m: Mapped[float | None] = mapped_column(Float)
+    reference_bundle_sha256: Mapped[str | None] = mapped_column(String(64))
+    uncertainty_codes: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    review_state: Mapped[AgentProposalReviewState] = mapped_column(
+        enum_column(AgentProposalReviewState, name="agent_proposal_review_state"),
+        nullable=False,
+        default=AgentProposalReviewState.PENDING,
+        index=True,
+    )
+    reviewed_by: Mapped[str | None] = mapped_column(String(255))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    review_reason: Mapped[str | None] = mapped_column(String(500))
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+    analysis_window: Mapped[AgentAnalysisWindow] = relationship(
+        back_populates="spatial_proposals"
+    )
+    source_media_item: Mapped[AgentMediaItem] = relationship(
+        back_populates="spatial_proposals"
+    )
+    source_annotation: Mapped[AgentSourceAnnotation | None] = relationship(
+        back_populates="spatial_proposals"
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('ground_point', 'insufficient_geometry')",
+            name="ck_agent_spatial_proposal_status",
+        ),
+        CheckConstraint(
+            "geometry_origin IS NULL OR geometry_origin IN "
+            "('SATELLITE_GEOTRANSFORM', 'CAMERA_RAYCAST', 'CROSS_VIEW_RAYCAST', "
+            "'EXPLICIT_SOURCE_GEOMETRY')",
+            name="ck_agent_spatial_proposal_origin",
+        ),
+        CheckConstraint(
+            "longitude IS NULL OR (longitude >= -180 AND longitude <= 180)",
+            name="ck_agent_spatial_proposal_longitude",
+        ),
+        CheckConstraint(
+            "latitude IS NULL OR (latitude >= -90 AND latitude <= 90)",
+            name="ck_agent_spatial_proposal_latitude",
+        ),
+        CheckConstraint(
+            "horizontal_accuracy_m IS NULL OR horizontal_accuracy_m > 0",
+            name="ck_agent_spatial_proposal_accuracy",
+        ),
+        CheckConstraint(
+            "reference_bundle_sha256 IS NULL OR ("
+            + sha256_hex_check("reference_bundle_sha256")
+            + ")",
+            name="ck_agent_spatial_proposal_reference_hash",
+        ),
+        CheckConstraint(
+            "(status = 'ground_point' AND source_annotation_id IS NOT NULL "
+            "AND geometry_origin IS NOT NULL AND longitude IS NOT NULL AND latitude IS NOT NULL "
+            "AND horizontal_accuracy_m IS NOT NULL AND reference_bundle_sha256 IS NOT NULL) OR "
+            "(status = 'insufficient_geometry' AND geometry_origin IS NULL "
+            "AND longitude IS NULL AND latitude IS NULL AND altitude_m IS NULL "
+            "AND horizontal_accuracy_m IS NULL)",
+            name="ck_agent_spatial_proposal_geometry_shape",
+        ),
+        CheckConstraint(
+            "(review_state = 'PENDING' AND reviewed_by IS NULL AND reviewed_at IS NULL "
+            "AND review_reason IS NULL) OR "
+            "(review_state != 'PENDING' AND reviewed_by IS NOT NULL "
+            "AND reviewed_at IS NOT NULL AND review_reason IS NOT NULL)",
+            name="ck_agent_spatial_proposal_review",
+        ),
+        CheckConstraint("version >= 1", name="ck_agent_spatial_proposal_version"),
+    )
+
+
+class AgentFactProposal(Base, TimestampMixin):
+    """One typed, sourced operational fact kept private until human validation."""
+
+    __tablename__ = "agent_fact_proposal"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    fact_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    analysis_window_id: Mapped[int] = mapped_column(
+        ForeignKey("agent_analysis_window.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    source_media_item_id: Mapped[int] = mapped_column(
+        ForeignKey("agent_media_item.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    category: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    fact_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    as_of: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    evidence_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    evidence_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    certainty: Mapped[str] = mapped_column(String(32), nullable=False)
+    value_number: Mapped[float | None] = mapped_column(Float)
+    value_text: Mapped[str | None] = mapped_column(Text)
+    value_boolean: Mapped[bool | None] = mapped_column(Boolean)
+    unit: Mapped[str | None] = mapped_column(String(64))
+    summary: Mapped[str] = mapped_column(String(1_000), nullable=False)
+    conflict_group_id: Mapped[str | None] = mapped_column(String(128), index=True)
+    review_state: Mapped[AgentProposalReviewState] = mapped_column(
+        enum_column(AgentProposalReviewState, name="agent_proposal_review_state"),
+        nullable=False,
+        default=AgentProposalReviewState.PENDING,
+        index=True,
+    )
+    reviewed_by: Mapped[str | None] = mapped_column(String(255))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    review_reason: Mapped[str | None] = mapped_column(String(500))
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+    analysis_window: Mapped[AgentAnalysisWindow] = relationship(back_populates="fact_proposals")
+    source_media_item: Mapped[AgentMediaItem] = relationship(back_populates="fact_proposals")
+    report_links: Mapped[list[AgentSituationReportFact]] = relationship(back_populates="fact")
+
+    __table_args__ = (
+        CheckConstraint(
+            "category IN ('fire_activity', 'burned_area', 'resources', 'evacuation', "
+            "'access', 'infrastructure', 'weather', 'other')",
+            name="ck_agent_fact_category",
+        ),
+        CheckConstraint(
+            "evidence_kind IN ('frame', 'image', 'satellite_image', 'transcript_segment', "
+            "'article_text', 'metadata')",
+            name="ck_agent_fact_evidence_kind",
+        ),
+        CheckConstraint(
+            "certainty IN ('directly_visible', 'explicitly_written', 'explicitly_spoken')",
+            name="ck_agent_fact_certainty",
+        ),
+        CheckConstraint(
+            "((CASE WHEN value_number IS NULL THEN 0 ELSE 1 END) + "
+            "(CASE WHEN value_text IS NULL THEN 0 ELSE 1 END) + "
+            "(CASE WHEN value_boolean IS NULL THEN 0 ELSE 1 END)) = 1",
+            name="ck_agent_fact_one_typed_value",
+        ),
+        CheckConstraint(
+            "unit IS NULL OR value_number IS NOT NULL", name="ck_agent_fact_numeric_unit"
+        ),
+        CheckConstraint(
+            "(review_state = 'PENDING' AND reviewed_by IS NULL AND reviewed_at IS NULL "
+            "AND review_reason IS NULL) OR "
+            "(review_state != 'PENDING' AND reviewed_by IS NOT NULL "
+            "AND reviewed_at IS NOT NULL AND review_reason IS NOT NULL)",
+            name="ck_agent_fact_review",
+        ),
+        CheckConstraint("version >= 1", name="ck_agent_fact_version"),
+    )
+
+
+class AgentSituationReportRevision(Base, TimestampMixin):
+    """Versioned private situation report; validation is distinct from publication."""
+
+    __tablename__ = "agent_situation_report_revision"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    report_revision_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, unique=True, index=True
+    )
+    analysis_window_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    incident_id: Mapped[int] = mapped_column(
+        ForeignKey("incident_series.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    episode_id: Mapped[int] = mapped_column(
+        ForeignKey("episode.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    body_markdown: Mapped[str] = mapped_column(Text, nullable=False)
+    sections_payload: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False)
+    review_state: Mapped[AgentReportReviewState] = mapped_column(
+        enum_column(AgentReportReviewState, name="agent_report_review_state"),
+        nullable=False,
+        default=AgentReportReviewState.DRAFT,
+        index=True,
+    )
+    supersedes_report_id: Mapped[int | None] = mapped_column(
+        ForeignKey("agent_situation_report_revision.id", ondelete="RESTRICT"), index=True
+    )
+    created_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    reviewed_by: Mapped[str | None] = mapped_column(String(255))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    review_reason: Mapped[str | None] = mapped_column(String(500))
+
+    analysis_window: Mapped[AgentAnalysisWindow] = relationship(
+        back_populates="report_revisions",
+        foreign_keys=[analysis_window_id, incident_id, episode_id],
+        overlaps="incident,episode",
+    )
+    incident: Mapped[IncidentSeries] = relationship(foreign_keys=[incident_id])
+    episode: Mapped[Episode] = relationship(foreign_keys=[episode_id])
+    fact_links: Mapped[list[AgentSituationReportFact]] = relationship(
+        back_populates="report", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "analysis_window_id", "revision", name="uq_agent_situation_report_revision"
+        ),
+        ForeignKeyConstraint(
+            ["analysis_window_id", "incident_id", "episode_id"],
+            [
+                "agent_analysis_window.id",
+                "agent_analysis_window.incident_id",
+                "agent_analysis_window.episode_id",
+            ],
+            name="fk_agent_report_analysis_window_identity",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("revision >= 1", name="ck_agent_report_revision_positive"),
+        CheckConstraint("length(reason) >= 10", name="ck_agent_report_reason"),
+        CheckConstraint(
+            "(review_state = 'DRAFT' AND reviewed_by IS NULL AND reviewed_at IS NULL "
+            "AND review_reason IS NULL) OR "
+            "(review_state != 'DRAFT' AND reviewed_by IS NOT NULL "
+            "AND reviewed_at IS NOT NULL AND review_reason IS NOT NULL)",
+            name="ck_agent_report_review",
+        ),
+    )
+
+
+class AgentSituationReportFact(Base):
+    """Relational proof that a report revision only depends on stored fact proposals."""
+
+    __tablename__ = "agent_situation_report_fact"
+
+    report_id: Mapped[int] = mapped_column(
+        ForeignKey("agent_situation_report_revision.id", ondelete="CASCADE"), primary_key=True
+    )
+    fact_id: Mapped[int] = mapped_column(
+        ForeignKey("agent_fact_proposal.id", ondelete="RESTRICT"), primary_key=True, index=True
+    )
+
+    report: Mapped[AgentSituationReportRevision] = relationship(back_populates="fact_links")
+    fact: Mapped[AgentFactProposal] = relationship(back_populates="report_links")
 
 
 class AgentDispatch(Base, TimestampMixin):

@@ -15,6 +15,7 @@ DEFAULT_CACHE_ROOT = Path("/runpod-volume/huggingface-cache/hub")
 DEFAULT_ROMA_ROOT = Path("/runpod-volume/firewarning-roma")
 RUNTIME_MODULES = {
     "serverless": "firewarning_worker.handler",
+    "pod": "firewarning_worker.pod_server",
     "pod_validation": "firewarning_worker.pod_validation",
 }
 

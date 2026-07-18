@@ -140,32 +140,38 @@ JSON fermé. RoMa/DINOv2 ne peut proposer un recalage exploitable qu'après réu
 Le training Qwen et tout fine-tuning restent hors de cette évolution. Un incident actif sert
 uniquement à l'inférence privée et reste interdit dans train et validation.
 
-### Validation humaine et publication
+### Validation humaine et publication en situation opérationnelle
 
-Toutes les sorties v2 portent `requires_human_review=true`. Le dispatcher persiste des propositions
-et crée une tâche de revue ; il ne crée jamais une publication.
+Toutes les sorties v2 portent `requires_human_review=true`. Le dispatcher persiste des propositions ;
+il ne crée jamais seul une publication.
 
-L'Admin doit permettre, depuis le dossier incident :
+L'opérateur ne suit pas un workflow administratif en plusieurs écrans. Depuis l'unique fiche de
+l'incident, la dernière analyse disponible est déjà ouverte et préremplie : scène 3D, calque proposé,
+faits utiles et rapport. Les sources et les détails techniques sont repliés par défaut et restent
+accessibles à la demande.
 
-1. de comparer la preuve et la scène 3D ;
-2. de valider ou rejeter chaque point ;
-3. d'éditer ou fusionner la zone ;
-4. de résoudre les faits contradictoires ;
-5. d'éditer le rapport ;
-6. de publier ou retirer la mise à jour dans une action séparée et auditée.
+Le parcours nominal tient en trois gestes :
 
-Les points, la zone, les faits et le rapport ont des décisions séparées côté backend même s'ils sont
-présentés dans une page unique. Aucun brouillon, résultat partiel ou objet rejeté ne devient public.
+1. vérifier visuellement la mise à jour proposée ;
+2. corriger directement un point, une zone, un fait ou le texte si nécessaire ;
+3. utiliser l'action principale `Valider et publier la mise à jour`.
+
+Un enregistrement de brouillon reste disponible sans imposer d'étape supplémentaire. Le rejet d'un
+élément est une action locale depuis cet élément, pas une page dédiée. Les décisions détaillées sont
+conservées côté backend pour la traçabilité mais ne deviennent ni des formulaires ni des validations
+séquentielles. L'action principale est idempotente, reprend après une coupure réseau et ne perd pas les
+corrections déjà saisies. Aucun brouillon, résultat partiel ou objet rejeté ne devient public.
 
 ## Stratégie de compatibilité
 
 - Les contrats `WorkerInput` et `WorkerOutput` v1 restent inchangés.
 - Les nouveaux objets portent tous le suffixe `V2` pendant le raccordement.
-- Le dispatcher choisira ultérieurement le validateur à partir de `schema_version` sans repli
-  silencieux.
+- Le dispatcher choisit le validateur à partir de `schema_version` sans repli silencieux.
+- La recette utilise un pod RunPod persistant avec une file HTTP authentifiée et un seul consommateur.
+- Le transport Serverless reste présent mais inactif jusqu'à la réussite des gates GPU.
 - Le worker v1 ne reçoit aucune référence spatiale v2.
 - Le worker v2 n'écrit pas dans la table historique `job`.
-- Les migrations de persistance seront additives et séparées de ce premier commit de contrat.
+- Les migrations de persistance sont additives et ne détournent pas la table historique `job`.
 
 ## Gates d'implémentation
 
@@ -175,7 +181,7 @@ présentés dans une page unique. Aucun brouillon, résultat partiel ou objet re
 | `persistence_ready` | propositions, faits, rapports et fenêtres sont persistés sans détourner `job` |
 | `local_flow_ready` | un lot simulé produit une revue privée complète sans GPU |
 | `worker_flow_ready` | le worker réel traite les trois voies et respecte les abstentions |
-| `admin_review_ready` | points, zone, faits et rapport sont éditables depuis une page incident |
+| `admin_review_ready` | une page incident préremplie permet de corriger puis valider et publier en une action idempotente |
 | `public_projection_ready` | seules les révisions approuvées sont visibles dans la fiche et la scène 3D |
 | `runpod_ready` | dix cycles réels valident cold start, timeout, annulation, échec partiel et budget 16 Go |
 

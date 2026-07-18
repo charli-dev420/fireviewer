@@ -1,6 +1,8 @@
 # FireWarning agent worker
 
-Worker RunPod Serverless isolé pour l'analyse factuelle de médias. Il prépare l'intégration GPU sans
+Worker GPU RunPod isolé pour l'analyse factuelle de médias. La recette utilise d'abord un pod
+persistant ; RunPod Serverless ne sera activé qu'après validation du pipeline. Le worker prépare
+l'intégration GPU sans
 autoriser le worker à publier, géolocaliser un phénomène, produire une prévision ou transformer une
 détection en fait public.
 
@@ -40,7 +42,14 @@ L'image destinée au registre public ne contient ni poids, ni checkpoint RT-DETR
 Elle conserve un endpoint GPU unique et une session unique par lot. Le coût de lecture du volume et le
 risque de disponibilité lié au datacenter du volume restent à mesurer.
 
-Le fichier `deploy/runpod-endpoint.example.json` propose `active_workers=0`, `max_workers=1`,
+Le fichier `deploy/runpod-pod.example.json` documente le pod de recette : port HTTP 8000, file FIFO
+à un seul consommateur, volume persistant et authentification Bearer. Le secret est injecté uniquement
+dans l'environnement RunPod. La file locale est volontairement limitée à la recette : le backend
+reste la source durable des lots et dispatchs et un redémarrage ambigu est placé en dead-letter, jamais
+resoumis automatiquement.
+
+Après la recette, le fichier `deploy/runpod-endpoint.example.json` propose pour Serverless
+`active_workers=0`, `max_workers=1`,
 FlashBoot, scaling par délai de file et un timeout d'inactivité initial de **90 secondes**. Cette valeur
 est volontairement inférieure aux 600–900 secondes envisagées dans le cahier des charges : garder un
 GPU inactif n'est rentable que si le prochain lot arrive avant le temps/coût d'un nouveau cold start.
@@ -82,6 +91,9 @@ absente échoue donc immédiatement, sans repli vers `main` ni téléchargement 
 | Variable | Rôle |
 |---|---|
 | `FW_ALLOWED_MEDIA_HOSTS` | Liste séparée par virgules des hôtes privés signant les médias |
+| `FW_RUN_MODE` | `pod` pendant la recette persistante ; `serverless` seulement après la bascule validée |
+| `FW_POD_AUTH_TOKEN` | Secret Bearer d'au moins 32 caractères, requis uniquement en mode `pod` |
+| `FW_POD_PORT` | Port HTTP du pod persistant, `8000` par défaut |
 | `FW_ENABLE_TRANSFORMERS_RUNTIME` | `true` uniquement dans l'image GPU complète |
 | `FW_HF_CACHE_ROOT` | Racine `hub` du cache Hugging Face monté |
 | `FW_ROMA_ROOT` | Racine externe des deux poids RoMa vérifiés |
@@ -91,7 +103,8 @@ absente échoue donc immédiatement, sans repli vers `main` ni téléchargement 
 | `FW_RTDETR_CHECKPOINT_PATH` | Répertoire contenant `model.safetensors` et la configuration Transformers |
 | `FW_RTDETR_CHECKPOINT_SHA256` | SHA-256 exact de `model.safetensors` |
 
-Ne jamais placer une clé RunPod, un token Hugging Face ou une URL signée dans l'image ou le dépôt.
+Ne jamais placer une clé RunPod, `FW_POD_AUTH_TOKEN`, un token Hugging Face ou une URL signée dans
+l'image ou le dépôt.
 
 ## Construction et tests
 

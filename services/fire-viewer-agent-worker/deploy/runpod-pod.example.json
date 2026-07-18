@@ -1,0 +1,36 @@
+{
+  "mode": "persistent-validation-pod",
+  "compute": {
+    "gpu_count": 1,
+    "gpu_vram_minimum_gb": 16,
+    "preferred_gpu": "NVIDIA RTX A4000",
+    "container_disk_gb": 30,
+    "persistent_volume_gb": 100,
+    "persistent_volume_mount_path": "/runpod-volume"
+  },
+  "image": "REPLACE_WITH_PUBLIC_IMAGE_AND_IMMUTABLE_TAG",
+  "ports": ["8000/http"],
+  "environment": {
+    "FW_RUN_MODE": "pod",
+    "FW_POD_PORT": "8000",
+    "FW_POD_AUTH_TOKEN": "INJECT_FROM_SECRET_MANAGER_MINIMUM_32_CHARACTERS",
+    "FW_ALLOWED_MEDIA_HOSTS": "private-media.example",
+    "FW_ENABLE_TRANSFORMERS_RUNTIME": "true",
+    "FW_HF_CACHE_ROOT": "/runpod-volume/huggingface-cache/hub",
+    "FW_ROMA_ROOT": "/runpod-volume/firewarning-roma",
+    "FW_AUTO_PREFETCH_MODELS": "true",
+    "FW_ATTENTION_IMPLEMENTATION": "flash_attention_2",
+    "FW_RTDETR_CHECKPOINT_PATH": "/runpod-volume/firewarning-rtdetr",
+    "FW_RTDETR_CHECKPOINT_SHA256": "REPLACE_WITH_64_HEX_CHARACTERS"
+  },
+  "backend": {
+    "FV_AGENT_RUNPOD_TRANSPORT": "pod",
+    "FV_AGENT_RUNPOD_POD_BASE_URL": "https://REPLACE_WITH_POD_PROXY_HOST",
+    "FV_AGENT_RUNPOD_POD_AUTH_TOKEN": "SAME_SECRET_AS_FW_POD_AUTH_TOKEN"
+  },
+  "constraints": [
+    "No model weights, datasets, signed URLs, environment files, or secrets in the image.",
+    "Stop the pod after validation; retain only the model volume.",
+    "Do not create a Serverless endpoint during this phase."
+  ]
+}

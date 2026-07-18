@@ -15,7 +15,7 @@ from fire_viewer.api.dependencies import (
 )
 from fire_viewer.core.security import Actor, require_role
 from fire_viewer.domain.agent_schemas import (
-    AgentBatchCreateRequest,
+    AgentBatchCreatePayload,
     AgentBatchResponse,
     AgentConsentWithdrawRequest,
     AgentConsentWithdrawResponse,
@@ -49,7 +49,7 @@ def _private(response: Response) -> None:
     status_code=status.HTTP_201_CREATED,
 )
 def create_batch(
-    payload: AgentBatchCreateRequest,
+    payload: AgentBatchCreatePayload,
     response: Response,
     actor: ActorDep,
     session: SessionDep,
