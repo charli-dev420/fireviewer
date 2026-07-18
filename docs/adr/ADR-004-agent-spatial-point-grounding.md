@@ -5,6 +5,7 @@
 - **Décideur produit** : projet FireWarning
 - **Portée** : corpus, entraînement et proposition de calques privés issus des médias
 - **Complète** : ADR-002 et ADR-003 sans modifier leurs repères
+- **Complétée par** : ADR-005 pour le contrat worker v2, les faits et le rapport d'incident
 
 ## Contexte
 
