@@ -11,7 +11,6 @@ import { AdminIncidentSpatialReviewPage } from './AdminIncidentSpatialReviewPage
 import { AdminIncidentsPage } from './AdminIncidentsPage';
 import { AdminInformationEditorPage } from './AdminInformationEditorPage';
 import { AdminNewZonePage } from './AdminNewZonePage';
-import { AdminNewZoneRevisionPage } from './AdminNewZoneRevisionPage';
 import { AdminPublicationsPage } from './AdminPublicationsPage';
 import { AdminReportsPage } from './AdminReportsPage';
 import { AdminShell } from './AdminShell';
@@ -43,7 +42,7 @@ export default function AdminApp({ route }: AdminAppProps) {
   else if (route.kind === 'zones') page = <AdminZonesPage />;
   else if (route.kind === 'new-zone') page = <AdminNewZonePage />;
   else if (route.kind === 'zone-detail') page = <AdminZoneDetailPage zoneId={route.zoneId} />;
-  else if (route.kind === 'new-zone-revision') page = <AdminNewZoneRevisionPage zoneId={route.zoneId} />;
+  else if (route.kind === 'new-zone-revision') page = <AdminZoneDetailPage zoneId={route.zoneId} />;
   else if (route.kind === 'new-zone-information') page = <AdminInformationEditorPage zoneId={route.zoneId} />;
   else if (route.kind === 'zone-information') page = <AdminInformationEditorPage zoneId={route.zoneId} informationId={route.informationId} />;
   else if (route.kind === 'zone-revision') page = <AdminZoneRevisionPage zoneId={route.zoneId} revision={Number(route.revision)} />;

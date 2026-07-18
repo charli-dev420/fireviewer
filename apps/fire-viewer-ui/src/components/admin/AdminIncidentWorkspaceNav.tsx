@@ -5,11 +5,8 @@ interface AdminIncidentWorkspaceNavProps {
 
 const SECTIONS = [
   { key: 'dossier', active: 'dossier', label: 'Résumé', suffix: '' },
-  { key: 'map', active: 'spatial-review', label: '3D & Carte', suffix: '/revue-spatiale' },
-  { key: 'markers', active: null, label: 'Repères', suffix: '/revue-spatiale#markers' },
-  { key: 'active-zone', active: null, label: 'Zone active', suffix: '/revue-spatiale#active-zone' },
-  { key: 'media', active: 'sources-media', label: 'Médias', suffix: '/sources-medias' },
-  { key: 'stats', active: 'dossier', label: 'Infos & stats', suffix: '#infos-stats' },
+  { key: 'map', active: 'spatial-review', label: 'Carte & périmètre', suffix: '/revue-spatiale' },
+  { key: 'media', active: 'sources-media', label: 'Sources & médias', suffix: '/sources-medias' },
   { key: 'history', active: 'models-pipeline', label: 'Historique', suffix: '#history' },
   { key: 'publication', active: 'dossier', label: 'Publication', suffix: '#publication' },
 ] as const;

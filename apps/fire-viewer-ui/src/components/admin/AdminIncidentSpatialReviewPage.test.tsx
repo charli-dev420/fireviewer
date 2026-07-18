@@ -82,7 +82,7 @@ describe('outils de revue spatiale 3D', () => {
   it('retire logiquement un calque sans effacer son historique', async () => {
     const user = userEvent.setup();
     render(<AdminIncidentSpatialReviewPage fireId="FR-26-00001" />);
-    await user.click(screen.getByRole('button', { name: 'Retirer le calque' }));
+    await user.click(screen.getByRole('button', { name: 'Supprimer de la carte' }));
     expect(mocks.review).toHaveBeenCalledWith(
       'FR-26-00001',
       'AZR-01',

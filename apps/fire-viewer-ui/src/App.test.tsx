@@ -413,7 +413,7 @@ describe('Routage administrateur privé', () => {
     ['/admin/zones', 'Cartes 3D'],
     ['/admin/zones/nouvelle', 'Préparer une carte 3D'],
     ['/admin/zones/ALPES-TEST', 'Zone ALPES-TEST'],
-    ['/admin/zones/ALPES-TEST/revisions/nouvelle', 'Créer une révision spatiale'],
+    ['/admin/zones/ALPES-TEST/revisions/nouvelle', 'Zone ALPES-TEST'],
     ['/admin/zones/ALPES-TEST/revisions/2', 'Révision 2'],
     ['/admin/zones/ALPES-TEST/revisions/2/preview', 'Carte 3D — Révision 2'],
     ['/admin/zones/ALPES-TEST/information/nouvelle', 'Ajouter une information — ALPES-TEST'],
