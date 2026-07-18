@@ -81,17 +81,13 @@ describe('terrainOcclusionProbeDistance', () => {
 });
 
 describe('tileIsWithinNearDetailDistance', () => {
-  const camera = new Vector3(0, 0, 0);
-  const tile = (minimumEast: number) => new Box3(
-    new Vector3(minimumEast, -50, -20),
-    new Vector3(minimumEast + 100, 50, 80),
-  );
+  const tile = (minimumEast: number) => [minimumEast, -50, minimumEast + 100, 50] as const;
 
-  it('conserve une tuile dans la portée near étendue de 30 %', () => {
-    expect(tileIsWithinNearDetailDistance(camera, tile(1_299), 1_000)).toBe(true);
+  it('conserve autour du point visé une tuile dans la portée near étendue de 30 %', () => {
+    expect(tileIsWithinNearDetailDistance(0, 0, tile(1_299), 1_000)).toBe(true);
   });
 
-  it('écarte une tuile visible au-delà de la portée near', () => {
-    expect(tileIsWithinNearDetailDistance(camera, tile(1_301), 1_000)).toBe(false);
+  it('écarte autour du point visé une tuile visible au-delà de la portée near', () => {
+    expect(tileIsWithinNearDetailDistance(0, 0, tile(1_301), 1_000)).toBe(false);
   });
 });
