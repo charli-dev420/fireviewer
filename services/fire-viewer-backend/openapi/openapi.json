@@ -4187,6 +4187,110 @@
         }
       }
     },
+    "/api/v2/admin/agent-batches/incidents/{fire_id}/operations": {
+      "get": {
+        "tags": [
+          "admin-agent-batches"
+        ],
+        "summary": "Read Incident Operations",
+        "operationId": "read_incident_operations_api_v2_admin_agent_batches_incidents__fire_id__operations_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fire_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^FR-[0-9A-Z]{2,3}-[0-9]{5}$",
+              "title": "Fire Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentOperationsOverview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/agent-batches/incidents/{fire_id}/operations/{batch_type}/run": {
+      "post": {
+        "tags": [
+          "admin-agent-batches"
+        ],
+        "summary": "Run Incident Operation",
+        "operationId": "run_incident_operation_api_v2_admin_agent_batches_incidents__fire_id__operations__batch_type__run_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fire_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^FR-[0-9A-Z]{2,3}-[0-9]{5}$",
+              "title": "Fire Id"
+            }
+          },
+          {
+            "name": "batch_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AgentBatchType"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentOperationRunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/admin/agent-batches/{batch_id}": {
       "get": {
         "tags": [
@@ -10458,6 +10562,138 @@
           "satellite_image"
         ],
         "title": "AgentMediaType"
+      },
+      "AgentOperationRunResponse": {
+        "properties": {
+          "fire_id": {
+            "type": "string",
+            "pattern": "^FR-[0-9A-Z]{2,3}-[0-9]{5}$",
+            "title": "Fire Id"
+          },
+          "episode_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Episode Id"
+          },
+          "batch_type": {
+            "$ref": "#/components/schemas/AgentBatchType"
+          },
+          "queued_batch_ids": {
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "type": "array",
+            "title": "Queued Batch Ids"
+          },
+          "queued_files": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Queued Files"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fire_id",
+          "episode_id",
+          "batch_type",
+          "queued_batch_ids",
+          "queued_files"
+        ],
+        "title": "AgentOperationRunResponse"
+      },
+      "AgentOperationStatus": {
+        "properties": {
+          "batch_type": {
+            "$ref": "#/components/schemas/AgentBatchType"
+          },
+          "pending_files": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Pending Files"
+          },
+          "pending_analyses": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Pending Analyses"
+          },
+          "running_analyses": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Running Analyses"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "can_run": {
+            "type": "boolean",
+            "title": "Can Run"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "dispatch_disabled",
+                  "nothing_to_process"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "batch_type",
+          "pending_files",
+          "pending_analyses",
+          "running_analyses",
+          "can_run"
+        ],
+        "title": "AgentOperationStatus"
+      },
+      "AgentOperationsOverview": {
+        "properties": {
+          "fire_id": {
+            "type": "string",
+            "pattern": "^FR-[0-9A-Z]{2,3}-[0-9]{5}$",
+            "title": "Fire Id"
+          },
+          "episode_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Episode Id"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/AgentOperationStatus"
+            },
+            "type": "array",
+            "title": "Actions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fire_id",
+          "episode_id",
+          "actions"
+        ],
+        "title": "AgentOperationsOverview"
       },
       "AgentReviewResolutionRequest": {
         "properties": {

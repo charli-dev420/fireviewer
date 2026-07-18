@@ -205,7 +205,14 @@ describe('pages de workflow administrateur', () => {
       }],
       media_references: [],
     };
-    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (_input, init) => {
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
+      if (String(input).includes('/api/v2/admin/agent-batches/')) return response({
+        fire_id: 'FR-26-00001', episode_id: 'E01', actions: [
+          { batch_type: 'user_media', pending_files: 0, pending_analyses: 0, running_analyses: 0, last_run_at: null, can_run: false, blocked_reason: 'nothing_to_process' },
+          { batch_type: 'external_media', pending_files: 2, pending_analyses: 1, running_analyses: 0, last_run_at: '2026-07-18T10:00:00Z', can_run: true, blocked_reason: null },
+          { batch_type: 'satellite_media', pending_files: 0, pending_analyses: 0, running_analyses: 0, last_run_at: null, can_run: false, blocked_reason: 'nothing_to_process' },
+        ],
+      });
       if (init?.method === 'PUT') return response({ id: 'presse-locale' });
       return response(workspace);
     });
@@ -214,6 +221,7 @@ describe('pages de workflow administrateur', () => {
     renderAdmin(<AdminIncidentSourcesMediaPage fireId="FR-26-00001" />);
 
     await screen.findByRole('heading', { name: 'Sources liées' });
+    expect(await screen.findByRole('button', { name: 'Lancer presse et médias' })).toBeEnabled();
     await user.click(screen.getByText('Modifier l’affichage de cette source'));
     expect(screen.queryByLabelText(/licence|transformations|référence externe|motif audité/i)).not.toBeInTheDocument();
     await user.type(screen.getByLabelText('Nom affiché au public'), 'Journal local');

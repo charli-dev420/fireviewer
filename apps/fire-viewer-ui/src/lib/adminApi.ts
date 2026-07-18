@@ -77,6 +77,29 @@ export interface AdminIncidentSourcesMediaWorkspace {
   }[];
 }
 
+export type AdminAgentOperationType = 'user_media' | 'external_media' | 'satellite_media';
+export interface AdminAgentOperationsOverview {
+  readonly fire_id: string;
+  readonly episode_id: string;
+  readonly actions: readonly {
+    readonly batch_type: AdminAgentOperationType;
+    readonly pending_files: number;
+    readonly pending_analyses: number;
+    readonly running_analyses: number;
+    readonly last_run_at: string | null;
+    readonly can_run: boolean;
+    readonly blocked_reason: 'dispatch_disabled' | 'nothing_to_process' | null;
+  }[];
+}
+
+export interface AdminAgentOperationRunResponse {
+  readonly fire_id: string;
+  readonly episode_id: string;
+  readonly batch_type: AdminAgentOperationType;
+  readonly queued_batch_ids: readonly string[];
+  readonly queued_files: number;
+}
+
 export interface AdminIncidentModelsPipelineWorkspace {
   readonly fire_id: string;
   readonly models: readonly {
@@ -900,6 +923,26 @@ function parseOperationalMapSummary(value: unknown): AdminOperationalMapSummary 
   };
 }
 
+function parseAgentOperationsOverview(value: unknown): AdminAgentOperationsOverview {
+  if (!isRecord(value) || !Array.isArray(value.actions)) throw new Error('Commandes IA invalides.');
+  return {
+    fire_id: readString(value.fire_id, 'fire_id', { max: 32 })!,
+    episode_id: readString(value.episode_id, 'episode_id', { max: 128 })!,
+    actions: value.actions.map((item) => {
+      if (!isRecord(item)) throw new Error('Commande IA invalide.');
+      return {
+        batch_type: readEnum(item.batch_type, 'batch_type', ['user_media', 'external_media', 'satellite_media'] as const),
+        pending_files: readNonNegativeInteger(item.pending_files, 'pending_files'),
+        pending_analyses: readNonNegativeInteger(item.pending_analyses, 'pending_analyses'),
+        running_analyses: readNonNegativeInteger(item.running_analyses, 'running_analyses'),
+        last_run_at: item.last_run_at === null ? null : readIsoDate(item.last_run_at, 'last_run_at'),
+        can_run: readBoolean(item.can_run, 'can_run'),
+        blocked_reason: item.blocked_reason === null ? null : readEnum(item.blocked_reason, 'blocked_reason', ['dispatch_disabled', 'nothing_to_process'] as const),
+      };
+    }),
+  };
+}
+
 function parseOperationalMapModel(value: unknown): AdminOperationalMapModel {
   if (!isRecord(value)) throw new Error('Modèle cartographique invalide.');
   const sha256 = readString(value.sha256, 'sha256', { max: 64 })!;
@@ -1701,6 +1744,32 @@ export class AdminApiClient {
     const payload = await this.request(`/incidents/${encodeURIComponent(fireId)}/sources-media`, { method: 'GET' }, options);
     try { return parseIncidentSourcesMediaWorkspace(payload); }
     catch { throw new AdminApiError('parse', 'Les sources et médias de l’incident sont invalides.'); }
+  }
+
+  async getIncidentAgentOperations(fireId: string, options: AdminRequestOptions = {}): Promise<AdminAgentOperationsOverview> {
+    if (!/^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(fireId)) throw new AdminApiError('configuration', 'Identifiant fire_id invalide.');
+    const payload = await this.requestV2(`/agent-batches/incidents/${encodeURIComponent(fireId)}/operations`, { method: 'GET' }, options);
+    try { return parseAgentOperationsOverview(payload); }
+    catch { throw new AdminApiError('parse', 'Les commandes d’analyse IA sont invalides.'); }
+  }
+
+  async runIncidentAgentOperation(fireId: string, batchType: AdminAgentOperationType, options: AdminRequestOptions): Promise<AdminAgentOperationRunResponse> {
+    if (!/^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(fireId) || !['user_media', 'external_media', 'satellite_media'].includes(batchType)) {
+      throw new AdminApiError('configuration', 'Commande d’analyse IA invalide.');
+    }
+    const payload = await this.postJsonV2(`/agent-batches/incidents/${encodeURIComponent(fireId)}/operations/${batchType}/run`, {}, options);
+    if (!isRecord(payload) || !Array.isArray(payload.queued_batch_ids)) throw new AdminApiError('parse', 'Le lancement de l’analyse IA est invalide.');
+    try {
+      return {
+        fire_id: readString(payload.fire_id, 'fire_id', { max: 32 })!,
+        episode_id: readString(payload.episode_id, 'episode_id', { max: 128 })!,
+        batch_type: readEnum(payload.batch_type, 'batch_type', ['user_media', 'external_media', 'satellite_media'] as const),
+        queued_batch_ids: payload.queued_batch_ids.map((item) => readString(item, 'queued_batch_id', { max: 128 })!),
+        queued_files: readNonNegativeInteger(payload.queued_files, 'queued_files'),
+      };
+    } catch {
+      throw new AdminApiError('parse', 'Le lancement de l’analyse IA est invalide.');
+    }
   }
 
   async getIncidentModelsPipeline(fireId: string, options: AdminRequestOptions = {}): Promise<AdminIncidentModelsPipelineWorkspace> {

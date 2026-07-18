@@ -4693,6 +4693,17 @@ svg {
 .admin-source-editor summary { cursor: pointer; color: var(--ink-800); font-size: 0.78rem; font-weight: 800; }
 .admin-source-editor__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 14px 0; }
 .admin-source-editor__enabled { display: flex; grid-column: 1 / -1; gap: 8px; align-items: center; color: var(--ink-800); font-size: 0.78rem; font-weight: 700; }
+.admin-analysis-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding: 18px; }
+.admin-analysis-action { display: grid; min-width: 0; gap: 16px; padding: 17px; border: 1px solid var(--border); border-radius: 10px; background: linear-gradient(150deg, #fff, var(--surface-muted)); }
+.admin-analysis-action h4 { margin: 0; color: var(--ink-950); font-size: 0.94rem; }
+.admin-analysis-action p { margin: 5px 0 0; color: var(--ink-600); font-size: 0.74rem; line-height: 1.45; }
+.admin-analysis-action dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 7px; background: var(--border); }
+.admin-analysis-action dl > div { min-width: 0; padding: 10px; background: #fff; }
+.admin-analysis-action dt { color: var(--ink-600); font-size: 0.59rem; font-weight: 800; line-height: 1.25; text-transform: uppercase; }
+.admin-analysis-action dd { margin: 5px 0 0; color: var(--ink-950); font-size: 1rem; font-weight: 820; }
+.admin-analysis-action__footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; }
+.admin-analysis-action__footer > span { color: var(--ink-600); font-size: 0.69rem; font-variant-numeric: tabular-nums; }
+.admin-analysis-action__footer .button { min-height: 38px; }
 
 .admin-state {
   display: inline-flex;
@@ -4895,7 +4906,9 @@ svg {
   .admin-source-record dl,
   .admin-model-record dl,
   .admin-source-editor__grid,
-  .admin-observation-record__decision { grid-template-columns: 1fr; }
+  .admin-observation-record__decision,
+  .admin-analysis-actions { grid-template-columns: 1fr; }
+  .admin-analysis-action__footer { align-items: stretch; flex-direction: column; }
 
   /* Administrative actions must remain reachable without a hidden horizontal rail. */
   .admin-table { min-width: 0; table-layout: fixed; }

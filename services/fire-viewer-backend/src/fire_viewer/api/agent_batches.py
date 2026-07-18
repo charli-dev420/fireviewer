@@ -19,13 +19,17 @@ from fire_viewer.domain.agent_schemas import (
     AgentBatchResponse,
     AgentConsentWithdrawRequest,
     AgentConsentWithdrawResponse,
+    AgentOperationRunResponse,
+    AgentOperationsOverview,
 )
+from fire_viewer.domain.enums import AgentBatchType
 from fire_viewer.services.agent_batches import (
     create_agent_batch,
     enqueue_agent_batch,
     get_agent_batch,
     withdraw_agent_consent,
 )
+from fire_viewer.services.agent_operations import get_agent_operations, run_agent_operation
 
 router = APIRouter(prefix="/api/v2/admin/agent-batches", tags=["admin-agent-batches"])
 SafeIdPath = Annotated[
@@ -71,6 +75,48 @@ def create_batch(
         response.status_code = status.HTTP_200_OK
         response.headers["Idempotent-Replay"] = "true"
     return outcome.batch
+
+
+@router.get(
+    "/incidents/{fire_id}/operations",
+    response_model=AgentOperationsOverview,
+)
+def read_incident_operations(
+    fire_id: Annotated[str, Path(pattern=r"^FR-[0-9A-Z]{2,3}-[0-9]{5}$")],
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> AgentOperationsOverview:
+    _require_agent_operator(actor)
+    _private(response)
+    return get_agent_operations(session, fire_id=fire_id, settings=settings)
+
+
+@router.post(
+    "/incidents/{fire_id}/operations/{batch_type}/run",
+    response_model=AgentOperationRunResponse,
+)
+def run_incident_operation(
+    fire_id: Annotated[str, Path(pattern=r"^FR-[0-9A-Z]{2,3}-[0-9]{5}$")],
+    batch_type: AgentBatchType,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    trace_id: TraceIdDep,
+) -> AgentOperationRunResponse:
+    _require_agent_operator(actor)
+    result = run_agent_operation(
+        session,
+        fire_id=fire_id,
+        batch_type=batch_type,
+        actor=actor,
+        trace_id=trace_id,
+        settings=settings,
+    )
+    _private(response)
+    return result
 
 
 @router.get("/{batch_id}", response_model=AgentBatchResponse)

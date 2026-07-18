@@ -322,6 +322,30 @@ describe('client API d’administration', () => {
     ]);
   });
 
+  it('lit puis lance une analyse privée depuis le contrat admin v2', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
+    const overview = { fire_id: 'FR-26-00001', episode_id: 'E01', actions: [
+      { batch_type: 'user_media', pending_files: 3, pending_analyses: 1, running_analyses: 0, last_run_at: null, can_run: true, blocked_reason: null },
+      { batch_type: 'external_media', pending_files: 0, pending_analyses: 0, running_analyses: 1, last_run_at: '2026-07-18T10:00:00Z', can_run: false, blocked_reason: 'nothing_to_process' },
+      { batch_type: 'satellite_media', pending_files: 0, pending_analyses: 0, running_analyses: 0, last_run_at: null, can_run: false, blocked_reason: 'dispatch_disabled' },
+    ] };
+    const launched = { fire_id: 'FR-26-00001', episode_id: 'E01', batch_type: 'user_media', queued_batch_ids: ['batch-user-1'], queued_files: 3 };
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(response(overview))
+      .mockResolvedValueOnce(response(launched));
+    const client = new AdminApiClient({ session: SESSION, fetchImpl: fetchMock });
+
+    const loaded = await client.getIncidentAgentOperations('FR-26-00001');
+    expect(loaded.actions[0]).toMatchObject({ batch_type: 'user_media', pending_files: 3 });
+    await expect(client.runIncidentAgentOperation('FR-26-00001', 'user_media', { idempotencyKey: 'analysis-user-1' })).resolves.toMatchObject({ queued_files: 3, queued_batch_ids: ['batch-user-1'] });
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      `${API_ORIGIN}/api/v2/admin/agent-batches/incidents/FR-26-00001/operations`,
+      `${API_ORIGIN}/api/v2/admin/agent-batches/incidents/FR-26-00001/operations/user_media/run`,
+    ]);
+    expect(fetchMock.mock.calls[1]?.[1]).toEqual(expect.objectContaining({ method: 'POST', headers: expect.objectContaining({ 'Idempotency-Key': 'analysis-user-1' }) }));
+  });
+
   it('charge les trois projections spécialisées d’un fire_id et met à jour une source via l’API opérateur', async () => {
     vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
     const fetchMock = vi.fn<typeof fetch>()

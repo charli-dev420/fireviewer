@@ -197,6 +197,30 @@ class AgentConsentWithdrawResponse(StrictAgentModel):
     dispatch_state: AgentDispatchState | None
 
 
+class AgentOperationStatus(StrictAgentModel):
+    batch_type: AgentBatchType
+    pending_files: int = Field(ge=0)
+    pending_analyses: int = Field(ge=0)
+    running_analyses: int = Field(ge=0)
+    last_run_at: datetime | None = None
+    can_run: bool
+    blocked_reason: Literal["dispatch_disabled", "nothing_to_process"] | None = None
+
+
+class AgentOperationsOverview(StrictAgentModel):
+    fire_id: str = Field(pattern=r"^FR-[0-9A-Z]{2,3}-[0-9]{5}$")
+    episode_id: SafeIdentifier
+    actions: list[AgentOperationStatus]
+
+
+class AgentOperationRunResponse(StrictAgentModel):
+    fire_id: str = Field(pattern=r"^FR-[0-9A-Z]{2,3}-[0-9]{5}$")
+    episode_id: SafeIdentifier
+    batch_type: AgentBatchType
+    queued_batch_ids: list[SafeIdentifier]
+    queued_files: int = Field(ge=0)
+
+
 class WorkerFrameInput(StrictAgentModel):
     frame_id: SafeIdentifier
     timestamp_s: float = Field(ge=0)
