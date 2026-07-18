@@ -432,6 +432,36 @@ class AdminIncidentSummary(StrictModel):
     version: int = Field(ge=1)
 
 
+class AdminIncidentCreateRequest(StrictModel):
+    """Minimal human input for a private incident created by an administrator."""
+
+    territory_code: str = Field(min_length=2, max_length=3)
+    longitude: float = Field(ge=-180, le=180, allow_inf_nan=False)
+    latitude: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    canonical_name: str | None = Field(default=None, min_length=2, max_length=255)
+
+    @field_validator("territory_code")
+    @classmethod
+    def validate_territory_code(cls, value: str) -> str:
+        normalized = value.upper()
+        if not TERRITORY_CODE_RE.fullmatch(normalized):
+            raise ValueError("territory_code must contain 2 or 3 uppercase alphanumerics")
+        return normalized
+
+
+class AdminIncidentCreateResponse(StrictModel):
+    fire_id: str
+    episode_id: str
+    canonical_name: str | None = None
+    territory_code: str
+    longitude: float = Field(ge=-180, le=180, allow_inf_nan=False)
+    latitude: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    status: IncidentStatus
+    verification_state: VerificationState
+    visibility: PublicVisibility
+    created_at: datetime
+
+
 class AdminIncidentObservation(StrictModel):
     observation_id: str
     source_key: str
@@ -789,6 +819,7 @@ class AdminOperationalMapSignal(StrictModel):
     state: Literal["pending", "attached"]
     proposed_fire_id: str | None = None
     attached_fire_id: str | None = None
+    version: int = Field(ge=1)
 
 
 class AdminOperationalMapSummary(StrictModel):

@@ -10,6 +10,7 @@ import { AdminIncidentSourcesMediaPage } from './AdminIncidentSourcesMediaPage';
 import { AdminIncidentSpatialReviewPage } from './AdminIncidentSpatialReviewPage';
 import { AdminIncidentSpatialPackagePage } from './AdminIncidentSpatialPackagePage';
 import { AdminIncidentsPage } from './AdminIncidentsPage';
+import { AdminNewIncidentPage } from './AdminNewIncidentPage';
 import { AdminInformationEditorPage } from './AdminInformationEditorPage';
 import { AdminNewZonePage } from './AdminNewZonePage';
 import { AdminPublicationsPage } from './AdminPublicationsPage';
@@ -52,6 +53,7 @@ export default function AdminApp({ route }: AdminAppProps) {
   else if (route.kind === 'work-queue') page = <AdminWorkQueuePage />;
   else if (route.kind === 'spatial-matching') page = <AdminSpatialMatchingPage />;
   else if (route.kind === 'incidents') page = <AdminIncidentsPage />;
+  else if (route.kind === 'new-incident') page = <AdminNewIncidentPage />;
   else if (route.kind === 'incident-detail') page = <AdminIncidentDetailPage fireId={route.fireId} />;
   else if (route.kind === 'incident-observations') page = <AdminIncidentObservationsPage fireId={route.fireId} />;
   else if (route.kind === 'incident-sources-media') page = <AdminIncidentSourcesMediaPage fireId={route.fireId} />;

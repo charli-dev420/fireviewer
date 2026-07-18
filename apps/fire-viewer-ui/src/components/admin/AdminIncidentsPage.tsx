@@ -20,7 +20,7 @@ export function AdminIncidentsPage() {
     <section aria-labelledby="admin-incidents-title">
       <AdminPageHeader
         title="Incidents"
-        actions={<a className="button button--small" href="/admin/carte-operationnelle">Ouvrir la carte opérationnelle</a>}
+        actions={<><a className="button button--primary" href="/admin/incidents/nouveau">Créer un incident</a><a className="button button--small" href="/admin/carte-operationnelle">Ouvrir la carte opérationnelle</a></>}
       >
         <p>Retrouvez un incendie puis gérez toutes ses données depuis sa fiche unique.</p>
       </AdminPageHeader>
@@ -46,7 +46,7 @@ export function AdminIncidentsPage() {
       {state.kind === 'error' ? <AdminErrorState error={state.error} onRetry={reload} /> : null}
       {state.kind === 'ready' && incidents.length === 0 ? (
         <AdminEmptyState title={state.data.length ? 'Aucun résultat' : 'Aucun incident'}>
-          {state.data.length ? 'Modifiez la recherche ou le filtre.' : 'Aucun incident ne correspond aux données privées actuelles.'}
+          {state.data.length ? 'Modifiez la recherche ou le filtre.' : 'Aucun incident ne correspond aux données privées actuelles. Utilisez « Créer un incident » pour ouvrir la première fiche.'}
         </AdminEmptyState>
       ) : null}
       {state.kind === 'ready' && incidents.length ? (

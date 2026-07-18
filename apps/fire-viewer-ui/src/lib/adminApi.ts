@@ -45,6 +45,19 @@ export interface AdminIncidentSummary {
   readonly version: number;
 }
 
+export interface AdminIncidentCreateResponse {
+  readonly fire_id: string;
+  readonly episode_id: string;
+  readonly canonical_name: string | null;
+  readonly territory_code: string;
+  readonly longitude: number;
+  readonly latitude: number;
+  readonly status: string;
+  readonly verification_state: string;
+  readonly visibility: string;
+  readonly created_at: string;
+}
+
 export interface AdminIncidentDetail extends AdminIncidentSummary {
   readonly episodes: readonly { episode_id: string; ordinal: number; status: string; verification_state: string; corroborating_source_count: number; evidence_basis_at: string | null; estimated_area_ha: number | null; evacuation_established: boolean; model_generation_eligible: boolean; review_required: boolean; started_at: string; last_observed_at: string; is_current: boolean; version: number }[];
   readonly observations: readonly { observation_id: string; source_key: string; observed_at: string; verification_state: string; attached_episode_id: string | null; proposed_fire_id: string | null; proposed_episode_id: string | null; match_score: number | null; review_reasons: readonly string[]; version: number }[];
@@ -228,6 +241,7 @@ export interface AdminOperationalMapSignal {
   readonly state: 'pending' | 'attached';
   readonly proposed_fire_id: string | null;
   readonly attached_fire_id: string | null;
+  readonly version: number;
 }
 
 export interface AdminOperationalMapSummary {
@@ -1011,6 +1025,7 @@ function parseOperationalMapSignal(value: unknown): AdminOperationalMapSignal {
     state: readEnum(value.state, 'state', ['pending', 'attached'] as const),
     proposed_fire_id: readString(value.proposed_fire_id, 'proposed_fire_id', { nullable: true, max: 32 }),
     attached_fire_id: readString(value.attached_fire_id, 'attached_fire_id', { nullable: true, max: 32 }),
+    version: readPositiveInteger(value.version, 'version'),
   };
 }
 
@@ -1655,6 +1670,38 @@ export class AdminApiClient {
     if (!isRecord(payload) || !Array.isArray(payload.incidents)) throw new AdminApiError('parse', 'La liste des incidents est invalide.');
     try { return payload.incidents.map(parseIncidentSummary); }
     catch { throw new AdminApiError('parse', 'La liste des incidents est invalide.'); }
+  }
+
+  async createIncident(input: { readonly territory_code: string; readonly latitude: number; readonly longitude: number; readonly canonical_name?: string }, options: AdminRequestOptions): Promise<AdminIncidentCreateResponse> {
+    const territoryCode = input.territory_code.trim().toUpperCase();
+    if (!/^[0-9A-Z]{2,3}$/.test(territoryCode) || !Number.isFinite(input.latitude) || !Number.isFinite(input.longitude) || input.latitude < -90 || input.latitude > 90 || input.longitude < -180 || input.longitude > 180) {
+      throw new AdminApiError('configuration', 'La position ou le département de l’incident est invalide.');
+    }
+    const canonicalName = input.canonical_name?.trim();
+    if (canonicalName && (canonicalName.length < 2 || canonicalName.length > 255)) throw new AdminApiError('configuration', 'Le nom de l’incident est invalide.');
+    const payload = await this.postJsonV2('/incidents', {
+      territory_code: territoryCode,
+      latitude: input.latitude,
+      longitude: input.longitude,
+      ...(canonicalName ? { canonical_name: canonicalName } : {}),
+    }, options);
+    if (!isRecord(payload)) throw new AdminApiError('parse', 'La fiche incident créée est invalide.');
+    try {
+      return {
+        fire_id: readString(payload.fire_id, 'fire_id', { max: 32 })!,
+        episode_id: readString(payload.episode_id, 'episode_id', { max: 32 })!,
+        canonical_name: readString(payload.canonical_name, 'canonical_name', { nullable: true, max: 255 }),
+        territory_code: readString(payload.territory_code, 'territory_code', { max: 3 })!,
+        longitude: readFiniteNumber(payload.longitude, 'longitude'),
+        latitude: readFiniteNumber(payload.latitude, 'latitude'),
+        status: readString(payload.status, 'status', { max: 32 })!,
+        verification_state: readString(payload.verification_state, 'verification_state', { max: 32 })!,
+        visibility: readString(payload.visibility, 'visibility', { max: 32 })!,
+        created_at: readIsoDate(payload.created_at, 'created_at'),
+      };
+    } catch {
+      throw new AdminApiError('parse', 'La fiche incident créée est invalide.');
+    }
   }
 
   async getWorkQueue(options: AdminRequestOptions = {}): Promise<AdminWorkQueue> {

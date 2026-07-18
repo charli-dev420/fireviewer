@@ -13,6 +13,7 @@ export type AdminRoute =
   | { kind: 'work-queue' }
   | { kind: 'spatial-matching' }
   | { kind: 'incidents' }
+  | { kind: 'new-incident' }
   | { kind: 'incident-detail'; fireId: string }
   | { kind: 'incident-observations'; fireId: string }
   | { kind: 'incident-sources-media'; fireId: string }
@@ -63,6 +64,7 @@ export function resolveAdminRoute(pathname: string): AdminRoute {
   if (normalizedPath === '/admin/configuration') return { kind: 'configuration' };
   if (normalizedPath === '/admin/publications') return { kind: 'publications' };
   if (normalizedPath === '/admin/incidents') return { kind: 'incidents' };
+  if (normalizedPath === '/admin/incidents/nouveau') return { kind: 'new-incident' };
   const segments = trimSlashes(normalizedPath);
   if (segments.length === 4 && segments[0] === 'admin' && segments[1] === 'incidents' && /^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(segments[2])) {
     if (segments[3] === 'observations') return { kind: 'incident-observations', fireId: segments[2] };

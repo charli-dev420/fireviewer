@@ -3741,6 +3741,11 @@
         ],
         "summary": "Incidents",
         "operationId": "incidents_api_v2_admin_incidents_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3752,12 +3757,62 @@
               }
             }
           }
-        },
+        }
+      },
+      "post": {
+        "tags": [
+          "admin-v2"
+        ],
+        "summary": "Create Incident",
+        "operationId": "create_incident_api_v2_admin_incidents_post",
         "security": [
           {
             "HTTPBearer": []
           }
-        ]
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminIncidentCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminIncidentCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v2/admin/operational-map": {
@@ -5444,6 +5499,117 @@
           "reason"
         ],
         "title": "AdminIncidentAuditEvent"
+      },
+      "AdminIncidentCreateRequest": {
+        "properties": {
+          "territory_code": {
+            "type": "string",
+            "maxLength": 3,
+            "minLength": 2,
+            "title": "Territory Code"
+          },
+          "longitude": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Longitude"
+          },
+          "latitude": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Latitude"
+          },
+          "canonical_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "territory_code",
+          "longitude",
+          "latitude"
+        ],
+        "title": "AdminIncidentCreateRequest",
+        "description": "Minimal human input for a private incident created by an administrator."
+      },
+      "AdminIncidentCreateResponse": {
+        "properties": {
+          "fire_id": {
+            "type": "string",
+            "title": "Fire Id"
+          },
+          "episode_id": {
+            "type": "string",
+            "title": "Episode Id"
+          },
+          "canonical_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Name"
+          },
+          "territory_code": {
+            "type": "string",
+            "title": "Territory Code"
+          },
+          "longitude": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Longitude"
+          },
+          "latitude": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Latitude"
+          },
+          "status": {
+            "$ref": "#/components/schemas/IncidentStatus"
+          },
+          "verification_state": {
+            "$ref": "#/components/schemas/VerificationState"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/PublicVisibility"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fire_id",
+          "episode_id",
+          "territory_code",
+          "longitude",
+          "latitude",
+          "status",
+          "verification_state",
+          "visibility",
+          "created_at"
+        ],
+        "title": "AdminIncidentCreateResponse"
       },
       "AdminIncidentDetail": {
         "properties": {
@@ -7670,6 +7836,11 @@
               }
             ],
             "title": "Attached Fire Id"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
           }
         },
         "additionalProperties": false,
@@ -7686,7 +7857,8 @@
           "received_at",
           "verification_state",
           "match_decision",
-          "state"
+          "state",
+          "version"
         ],
         "title": "AdminOperationalMapSignal",
         "description": "One persisted observation projected on the private anticipation map."

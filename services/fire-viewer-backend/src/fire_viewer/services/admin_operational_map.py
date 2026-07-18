@@ -279,6 +279,7 @@ def get_operational_map(session: Session) -> AdminOperationalMapResponse:
                 if observation.attached_incident is not None
                 else None
             ),
+            version=observation.version,
         )
         for observation in observations
     ]

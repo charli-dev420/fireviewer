@@ -38,6 +38,7 @@ describe('resolveAppRoute', () => {
     expect(resolveAdminRoute('/admin/validation')).toEqual({ kind: 'work-queue' });
     expect(resolveAdminRoute('/admin/file-de-traitement')).toEqual({ kind: 'work-queue' });
     expect(resolveAdminRoute('/admin/rapprochement-spatial')).toEqual({ kind: 'spatial-matching' });
+    expect(resolveAdminRoute('/admin/incidents/nouveau')).toEqual({ kind: 'new-incident' });
     expect(resolveAdminRoute('/admin/incidents/FR-83-00042/observations')).toEqual({ kind: 'incident-observations', fireId: 'FR-83-00042' });
     expect(resolveAdminRoute('/admin/incidents/FR-83-00042/sources-medias')).toEqual({ kind: 'incident-sources-media', fireId: 'FR-83-00042' });
     expect(resolveAdminRoute('/admin/incidents/FR-83-00042/modeles-pipeline')).toEqual({ kind: 'incident-models-pipeline', fireId: 'FR-83-00042' });

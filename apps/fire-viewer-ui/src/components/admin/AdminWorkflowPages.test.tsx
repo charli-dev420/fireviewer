@@ -8,6 +8,7 @@ import { AdminInformationEditorPage } from './AdminInformationEditorPage';
 import { AdminIncidentObservationsPage } from './AdminIncidentObservationsPage';
 import { AdminIncidentSourcesMediaPage } from './AdminIncidentSourcesMediaPage';
 import { AdminNewZonePage } from './AdminNewZonePage';
+import { AdminNewIncidentPage } from './AdminNewIncidentPage';
 import { AdminSpatialMatchingPage } from './AdminSpatialMatchingPage';
 import { AdminZonePrivatePreviewPage } from './AdminZonePrivatePreviewPage';
 
@@ -81,6 +82,30 @@ describe('pages de workflow administrateur', () => {
     expect(await screen.findByRole('heading', { name: /Dans quel projet ajouter la carte/ })).toBeVisible();
     expect(screen.queryByLabelText(/identifiant|longitude|x minimum|motif administratif/i)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Choisir ce projet' })).toHaveAttribute('href', '/admin/incidents/FR-26-00001/carte/importer');
+  });
+
+  it('crée une fiche incident avec une seule position copiée et sans formulaire technique', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response({
+      fire_id: 'FR-26-00001', episode_id: 'E01', canonical_name: 'Massif de Justin', territory_code: '26',
+      longitude: 5.3701, latitude: 44.7532, status: 'MONITORING', verification_state: 'UNVERIFIED',
+      visibility: 'LIMITED', created_at: '2026-07-18T21:00:00Z',
+    }, 201));
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderAdmin(<AdminNewIncidentPage />);
+
+    await user.type(screen.getByLabelText('Position du feu'), '44.7532, 5.3701');
+    await user.type(screen.getByLabelText('Département ou territoire'), '26');
+    await user.type(screen.getByLabelText(/Nom utile/), 'Massif de Justin');
+    await user.click(screen.getByRole('button', { name: 'Créer la fiche incident' }));
+
+    expect(await screen.findByRole('link', { name: 'Ouvrir FR-26-00001' })).toHaveAttribute('href', '/admin/incidents/FR-26-00001');
+    expect(fetchMock).toHaveBeenCalledWith(`${API_ORIGIN}/api/v2/admin/incidents`, expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ territory_code: '26', latitude: 44.7532, longitude: 5.3701, canonical_name: 'Massif de Justin' }),
+    }));
+    expect(screen.queryByLabelText(/incertitude|motif|^longitude$|^latitude$/i)).not.toBeInTheDocument();
   });
 
   it('place puis crée une information dans le repère local de sa zone', async () => {

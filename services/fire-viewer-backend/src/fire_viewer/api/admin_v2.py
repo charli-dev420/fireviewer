@@ -22,6 +22,8 @@ from fire_viewer.domain.schemas import (
     AdminBlobUploadGrantRequest,
     AdminBlobUploadGrantResponse,
     AdminDashboardResponse,
+    AdminIncidentCreateRequest,
+    AdminIncidentCreateResponse,
     AdminIncidentListResponse,
     AdminIncidentRepresentationAttachRequest,
     AdminIncidentRepresentationAttachResponse,
@@ -31,6 +33,7 @@ from fire_viewer.domain.schemas import (
     AdminWorkQueueResponse,
 )
 from fire_viewer.services.admin_dashboard import get_admin_dashboard
+from fire_viewer.services.admin_incident_creation import create_admin_incident
 from fire_viewer.services.admin_incidents import get_admin_work_queue, list_admin_incidents
 from fire_viewer.services.admin_operational_map import get_operational_map
 from fire_viewer.services.admin_representations import attach_incident_package
@@ -130,6 +133,30 @@ def incidents(
     _require_admin(actor)
     _private_read(response)
     return list_admin_incidents(session, settings=settings)
+
+
+@router.post("/incidents", response_model=AdminIncidentCreateResponse, status_code=201)
+def create_incident(
+    payload: AdminIncidentCreateRequest,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    trace_id: TraceIdDep,
+    idempotency_key: IdempotencyKeyDep,
+) -> AdminIncidentCreateResponse:
+    _require_admin(actor)
+    outcome = create_admin_incident(
+        session,
+        payload=payload,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        trace_id=trace_id,
+        settings=settings,
+    )
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Idempotent-Replay"] = "true" if outcome.replayed else "false"
+    return outcome.response
 
 
 @router.get("/operational-map", response_model=AdminOperationalMapResponse)

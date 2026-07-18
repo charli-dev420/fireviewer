@@ -59,7 +59,7 @@ const pendingSignal = {
   observation_id: 'obs-signal-001', source_key: 'firms-feed', source_type: 'sensor', longitude: 2.35, latitude: 48.86,
   horizontal_uncertainty_m: 450, territory_code: '75', canonical_name_hint: 'Signal Paris sud',
   observed_at: '2026-07-15T09:57:00Z', received_at: '2026-07-15T09:58:00Z', verification_state: 'PENDING_REVIEW',
-  match_decision: 'review', state: 'pending', proposed_fire_id: null, attached_fire_id: null,
+  match_decision: 'review', state: 'pending', proposed_fire_id: null, attached_fire_id: null, version: 1,
 };
 
 const attachedSignal = {
@@ -138,6 +138,7 @@ describe('surfaces de commandement administrateur', () => {
 
     await screen.findByRole('button', { name: 'FR-83-00042, Massif des Maures' });
     await user.click(screen.getByRole('button', { name: /Actifs\s*1/ }));
+    await user.click(screen.getByRole('button', { name: /À valider\s*1/ }));
     expect(screen.queryByRole('button', { name: 'FR-83-00042, Massif des Maures' })).not.toBeInTheDocument();
     const monitoringMarker = screen.getByRole('button', { name: 'FR-26-00001, Die–Pontaix' });
     await user.click(monitoringMarker);
@@ -162,11 +163,37 @@ describe('surfaces de commandement administrateur', () => {
     await user.click(pendingMarker);
     expect(screen.getByRole('heading', { name: 'Signal Paris sud' })).toBeVisible();
     expect(screen.getByText(/ne constitue pas encore un incident confirmé/)).toBeVisible();
-    expect(screen.getByRole('link', { name: /Examiner ce signal/ })).toHaveAttribute('href', '/admin/rapprochement-spatial');
+    expect(screen.getByRole('button', { name: /Créer la fiche incident/ })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Examiner avant' })).toHaveAttribute('href', '/admin/rapprochement-spatial');
 
     await user.click(screen.getByRole('button', { name: /Déjà rattachés\s*1/ }));
     expect(screen.getByRole('button', { name: 'Observation rattachée, Observation Loire, obs-signal-002' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: /Archivés\s*1/ }));
     expect(screen.getByRole('button', { name: 'FR-13-00009, Massif de l’Étoile' })).toBeVisible();
+  });
+
+  it('transforme directement un feu surveillé en fiche sans seconde recherche', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation((input, init) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/operator/observations/obs-signal-001/resolve')) {
+        return Promise.resolve(jsonResponse({ observation_id: 'obs-signal-001', fire_id: null, episode_id: null, version: 2 }));
+      }
+      return Promise.resolve(jsonResponse(mapPayload));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderWithApi(<AdminOperationalMapPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Signal à qualifier, Signal Paris sud, obs-signal-001' }));
+    await user.click(screen.getByRole('button', { name: /Créer la fiche incident/ }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const [, init] = fetchMock.mock.calls[1];
+    expect(fetchMock.mock.calls[1][0]).toBe(`${API_ORIGIN}/api/v1/operator/observations/obs-signal-001/resolve`);
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      action: 'create',
+      expected_version: 1,
+      reason: expect.stringContaining('feu surveillé'),
+    });
   });
 });

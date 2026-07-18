@@ -333,6 +333,7 @@ def test_operational_map_projects_pending_attached_and_archived_layers(
         "obs-map-attached-b",
     ]
     pending = next(item for item in body["signals"] if item["state"] == "pending")
+    assert pending["version"] == 1
     assert pending["proposed_fire_id"] == active_incident.fire_id
     assert pending["attached_fire_id"] is None
     attached = next(item for item in body["signals"] if item["state"] == "attached")

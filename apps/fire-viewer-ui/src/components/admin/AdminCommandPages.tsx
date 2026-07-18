@@ -1,8 +1,8 @@
 import { useCallback, useState, type CSSProperties } from 'react';
 import type { AdminOperationalMapIncident, AdminOperationalMapResponse, AdminOperationalMapSignal } from '../../lib/adminApi';
 import { PublicIcon } from '../public/PublicIcon';
-import { useAdminApi, useAdminQuery } from './AdminApiContext';
-import { AdminErrorState, AdminLoadingState, formatAdminDate } from './AdminPageState';
+import { useAdminApi, useAdminMutation, useAdminQuery } from './AdminApiContext';
+import { AdminErrorState, AdminLoadingState, AdminMutationFeedback, formatAdminDate } from './AdminPageState';
 import './AdminCommandPages.css';
 
 const MAP_ZOOM = 6;
@@ -13,7 +13,7 @@ const MAP_Y_MAX = 24;
 
 type MapLayer = 'active' | 'signals' | 'review' | 'monitoring' | 'attached' | 'archived';
 
-const DEFAULT_LAYERS: readonly MapLayer[] = ['active', 'signals', 'monitoring'];
+const DEFAULT_LAYERS: readonly MapLayer[] = ['active', 'signals', 'review', 'monitoring'];
 const LAYER_OPTIONS: readonly { readonly value: MapLayer; readonly label: string }[] = [
   { value: 'active', label: 'Actifs' },
   { value: 'signals', label: 'Nouveaux signaux' },
@@ -266,11 +266,17 @@ function SignalDecisionDrawer({
   onClose,
   onFocus,
   onNationalView,
+  onCreateIncident,
+  creatingIncident,
+  creationError,
 }: {
   readonly signal: AdminOperationalMapSignal;
   readonly onClose: () => void;
   readonly onFocus: () => void;
   readonly onNationalView: () => void;
+  readonly onCreateIncident: () => void;
+  readonly creatingIncident: boolean;
+  readonly creationError: unknown | null;
 }) {
   const isPending = signal.state === 'pending';
   const linkedFireId = signal.attached_fire_id ?? signal.proposed_fire_id;
@@ -305,10 +311,11 @@ function SignalDecisionDrawer({
 
       <section className={`admin-incident-drawer__decision ${isPending ? 'is-required' : ''}`}>
         <div><PublicIcon name={isPending ? 'shield' : 'check-circle'} size={22} /><span><strong>{isPending ? 'Décision humaine requise' : 'Rattachement enregistré'}</strong><small>{linkedFireId ? `Incident lié : ${linkedFireId}` : 'Aucun incident lié pour le moment.'}</small></span></div>
-        {isPending ? <a className="admin-incident-drawer__primary" href="/admin/rapprochement-spatial">Examiner ce signal <PublicIcon name="arrow" size={17} /></a> : null}
+        {isPending ? <button className="admin-incident-drawer__primary" type="button" disabled={creatingIncident} onClick={onCreateIncident}>{creatingIncident ? 'Création…' : 'Créer la fiche incident'} <PublicIcon name="arrow" size={17} /></button> : null}
+        {isPending ? <a className="admin-incident-drawer__secondary" href="/admin/rapprochement-spatial">Examiner avant</a> : null}
         {signal.attached_fire_id ? <a className="admin-incident-drawer__secondary" href={`/admin/incidents/${signal.attached_fire_id}`}>Ouvrir l’incident</a> : null}
-        {!signal.attached_fire_id ? <a className="admin-incident-drawer__secondary" href="/admin/validation">Voir les validations</a> : null}
       </section>
+      <AdminMutationFeedback error={creationError} succeeded={false} success="" />
 
       <div className="admin-incident-drawer__map-actions">
         <button type="button" onClick={onFocus}><PublicIcon name="crosshair" size={17} />Recentrer sur le signal</button>
@@ -322,6 +329,7 @@ function AdminNationalOperationsPage() {
   const api = useAdminApi();
   const load = useCallback((options: { signal?: AbortSignal }) => api.getOperationalMap(options), [api]);
   const { state, reload } = useAdminQuery(load, [load]);
+  const signalMutation = useAdminMutation();
   const data = state.kind === 'ready' ? state.data : null;
   const [layers, setLayers] = useState<ReadonlySet<MapLayer>>(() => new Set(DEFAULT_LAYERS));
   const [selectedItem, setSelectedItem] = useState<SelectedMapItem | null>(null);
@@ -371,6 +379,18 @@ function AdminNationalOperationsPage() {
   const focusSignal = (signal: AdminOperationalMapSignal) => {
     const position = mercatorPosition(signal.longitude, signal.latitude);
     focusPosition(position.left, position.top, 1.75);
+  };
+
+  const createIncidentFromSignal = async (signal: AdminOperationalMapSignal) => {
+    const result = await signalMutation.run(
+      `${signal.observation_id}:create:${signal.version}`,
+      (options) => api.resolveObservation(signal.observation_id, {
+        action: 'create',
+        expected_version: signal.version,
+        reason: 'Fiche incident créée depuis un feu surveillé sur la carte opérationnelle.',
+      }, options),
+    );
+    if (result?.fire_id) window.location.assign(`/admin/incidents/${result.fire_id}`);
   };
 
   const toggleLayer = (layer: MapLayer) => {
@@ -469,7 +489,7 @@ function AdminNationalOperationsPage() {
 
             <header className="admin-national-map__heading">
               <div><span>Centre opérationnel</span><h1>Vue nationale — France métropolitaine</h1><p>{data.summary.total_incidents} incident(s) · {data.summary.pending_signals} {data.summary.pending_signals === 1 ? 'nouveau signal' : 'nouveaux signaux'} · mise à jour {elapsedLabel(data.generated_at)}</p></div>
-              <button type="button" onClick={reload} aria-label="Actualiser la carte opérationnelle"><PublicIcon name="arrow" size={18} />Actualiser</button>
+              <div className="admin-national-map__heading-actions"><a href="/admin/incidents/nouveau?mode=map"><PublicIcon name="plus" size={17} />Créer</a><button type="button" onClick={reload} aria-label="Actualiser la carte opérationnelle"><PublicIcon name="arrow" size={18} />Actualiser</button></div>
             </header>
 
             <nav className="admin-national-map__filters" aria-label="Afficher ou masquer les couches de la carte">
@@ -504,6 +524,9 @@ function AdminNationalOperationsPage() {
               onClose={() => setDrawerOpen(false)}
               onFocus={() => focusSignal(selectedSignal)}
               onNationalView={() => setView(NATIONAL_VIEW)}
+              onCreateIncident={() => void createIncidentFromSignal(selectedSignal)}
+              creatingIncident={signalMutation.state.pending}
+              creationError={signalMutation.state.error}
             />
           ) : null}
 
