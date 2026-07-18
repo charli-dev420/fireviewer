@@ -8,6 +8,7 @@ import { AdminIncidentModelsPipelinePage } from './AdminIncidentModelsPipelinePa
 import { AdminIncidentObservationsPage } from './AdminIncidentObservationsPage';
 import { AdminIncidentSourcesMediaPage } from './AdminIncidentSourcesMediaPage';
 import { AdminIncidentSpatialReviewPage } from './AdminIncidentSpatialReviewPage';
+import { AdminIncidentSpatialPackagePage } from './AdminIncidentSpatialPackagePage';
 import { AdminIncidentsPage } from './AdminIncidentsPage';
 import { AdminInformationEditorPage } from './AdminInformationEditorPage';
 import { AdminNewZonePage } from './AdminNewZonePage';
@@ -56,6 +57,7 @@ export default function AdminApp({ route }: AdminAppProps) {
   else if (route.kind === 'incident-sources-media') page = <AdminIncidentSourcesMediaPage fireId={route.fireId} />;
   else if (route.kind === 'incident-models-pipeline') page = <AdminIncidentModelsPipelinePage fireId={route.fireId} />;
   else if (route.kind === 'incident-spatial-review') page = <AdminIncidentSpatialReviewPage fireId={route.fireId} />;
+  else if (route.kind === 'incident-spatial-package') page = <AdminIncidentSpatialPackagePage fireId={route.fireId} />;
   else if (route.kind === 'audit') page = <AdminAuditPage />;
   else if (route.kind === 'roles') page = <AdminRolesPage />;
   else if (route.kind === 'system') page = <AdminSystemPage />;

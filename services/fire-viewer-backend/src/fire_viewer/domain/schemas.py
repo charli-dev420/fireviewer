@@ -1193,6 +1193,28 @@ class AdminSpatialPackageFromBlobRequest(StrictModel):
     objects: list[AdminBlobObjectReference] = Field(min_length=3, max_length=100_000)
 
 
+class AdminIncidentSpatialPackageFromBlobRequest(AdminSpatialPackageFromBlobRequest):
+    zone_id: str = Field(min_length=3, max_length=64, pattern=r"^[A-Z][A-Z0-9-]*$")
+    revision: int = Field(ge=1)
+    expected_incident_version: int = Field(ge=1)
+    primary_profile: Literal["close", "local", "extended", "mobile", "desktop"] = "local"
+
+
+class AdminIncidentSpatialPackageImportResponse(StrictModel):
+    fire_id: str
+    episode_id: str
+    package_id: str
+    package_state: SpatialPackageState
+    zone_id: str
+    revision: int = Field(ge=1)
+    manifest_revision: int = Field(ge=1)
+    incident_version: int = Field(ge=1)
+    object_count: int = Field(ge=3)
+    total_size_bytes: int = Field(gt=0)
+    asset_count: int = Field(ge=1)
+    trace_id: str
+
+
 class AdminSpatialPackageRecoveryRequest(StrictModel):
     upload_id: str = Field(pattern=r"^[a-f0-9]{32}$")
     package_id: str = Field(min_length=3, max_length=96, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")

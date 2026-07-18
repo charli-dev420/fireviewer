@@ -13,12 +13,16 @@ const mocks = vi.hoisted(() => ({
     altitude_m: 320 + point[1],
   })),
   review: vi.fn(async () => ({})),
+  publish: vi.fn(async () => ({})),
+  changePublication: vi.fn(async () => ({})),
 }));
 
 vi.mock('./AdminApiContext', () => ({
   useAdminApi: () => ({
     projectIncidentGltfPick: mocks.project,
     reviewActiveFireZoneRevision: mocks.review,
+    publishSpatialPackage: mocks.publish,
+    changePublication: mocks.changePublication,
   }),
   useAdminQuery: () => ({
     state: {
@@ -31,6 +35,12 @@ vi.mock('./AdminApiContext', () => ({
           asset_version: null,
           sha256: null,
           package_id: 'fireviewer-die-pontaix-r1-v4',
+          zone_id: 'DIE-PONTAIX-08',
+          zone_revision: 1,
+          package_state: 'PREVIEWABLE',
+          publication_id: 'ZP-DIE-01',
+          publication_state: 'PREVIEWABLE',
+          publication_active: false,
           catalog_url: '/api/v1/incident/FR-26-00001/spatial-scene/catalog',
           files: {
             'terrain/T00/elevation.cog.tif': '/api/elevation',
@@ -64,13 +74,13 @@ describe('outils de revue spatiale 3D', () => {
     vi.clearAllMocks();
   });
 
-  it('active la vue FPS et permet de déplacer ou retirer un sommet du brouillon', async () => {
+  it('reste en vue orbitale et permet de déplacer ou retirer un sommet du brouillon', async () => {
     const user = userEvent.setup();
     render(<AdminIncidentSpatialReviewPage fireId="FR-26-00001" />);
 
-    await user.click(screen.getByRole('button', { name: 'Vue FPS' }));
-    expect(await screen.findByText('Moteur fps')).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Dessiner sur le terrain' }));
+    expect(await screen.findByText('Moteur orbit')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Vue FPS' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Tracer un nouveau contour' }));
     await user.click(screen.getByRole('button', { name: 'Cliquer le relief' }));
     expect(await screen.findByText('Sommet 1')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Déplacer' }));
@@ -89,5 +99,20 @@ describe('outils de revue spatiale 3D', () => {
       expect.objectContaining({ action: 'reject', expected_state: 'DRAFT' }),
       expect.objectContaining({ idempotencyKey: expect.stringMatching(/^zone-retract-/) }),
     );
+  });
+
+  it('publie la carte depuis le projet sans demander de zone ni de révision à l’opérateur', async () => {
+    const user = userEvent.setup();
+    render(<AdminIncidentSpatialReviewPage fireId="FR-26-00001" />);
+
+    await user.click(screen.getByRole('button', { name: 'Publier la carte' }));
+
+    expect(mocks.publish).toHaveBeenCalledWith(
+      'DIE-PONTAIX-08',
+      1,
+      expect.objectContaining({ package_id: 'fireviewer-die-pontaix-r1-v4' }),
+      expect.objectContaining({ idempotencyKey: expect.stringMatching(/^project-map-publish-/) }),
+    );
+    expect(await screen.findByText('Carte publiée sur le site public.')).toBeVisible();
   });
 });

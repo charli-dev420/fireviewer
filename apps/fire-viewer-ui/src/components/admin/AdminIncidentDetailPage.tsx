@@ -9,19 +9,6 @@ import {
   formatAdminDate,
 } from './AdminPageState';
 
-function spatialRevisionHref(model: {
-  readonly spatial_zone_id: string | null;
-  readonly spatial_zone_revision: number | null;
-  readonly asset_spatial_zone_id: string | null;
-  readonly asset_spatial_zone_revision: number | null;
-}): string | null {
-  const zoneId = model.spatial_zone_id ?? model.asset_spatial_zone_id;
-  const revision = model.spatial_zone_revision ?? model.asset_spatial_zone_revision;
-  return zoneId && revision
-    ? `/admin/zones/${encodeURIComponent(zoneId)}/revisions/${revision}`
-    : null;
-}
-
 const incidentStatuses = [
   'CANDIDATE',
   'UNDER_REVIEW',
@@ -76,8 +63,10 @@ export function AdminIncidentDetailPage({ fireId }: { readonly fireId: string })
 
   const incident = state.data;
   const current = incident.episodes.find((episode) => episode.is_current);
-  const spatialModel = incident.models.find((model) => spatialRevisionHref(model) !== null);
-  const spatialHref = spatialModel ? spatialRevisionHref(spatialModel) : null;
+  const hasSpatialMap = incident.models.some((model) => (
+    (model.spatial_zone_id && model.spatial_zone_revision)
+    || (model.asset_spatial_zone_id && model.asset_spatial_zone_revision)
+  ));
 
   const transition = async () => {
     if (!current || reason.trim().length < 10 || !status) return;
@@ -156,18 +145,17 @@ export function AdminIncidentDetailPage({ fireId }: { readonly fireId: string })
           </dl>
           <div className="admin-form-actions">
             <a className="button button--small" href={`/admin/incidents/${incident.fire_id}/observations`}>Valider les preuves</a>
-            <a className="button button--primary" href={`/admin/incidents/${incident.fire_id}/revue-spatiale`}>Ouvrir la carte 3D</a>
           </div>
         </section>
 
         <section id="publication" className="admin-detail-card admin-detail-advanced">
           <h3>Publication</h3>
-          <p>Contrôlez la carte associée, sa visibilité et son rendu public depuis un seul parcours.</p>
+          <p>{hasSpatialMap ? 'Le fond 3D est lié à ce projet. Gérez ici le périmètre et son rendu public.' : 'Commencez par ajouter le fond 3D directement dans ce projet.'}</p>
           <div className="admin-form-actions">
-            {spatialHref ? (
-              <a className="button button--primary" href={`${spatialHref}/preview`}>Gérer la publication de la carte</a>
+            {hasSpatialMap ? (
+              <a className="button button--primary" href={`/admin/incidents/${incident.fire_id}/revue-spatiale`}>Carte & périmètre</a>
             ) : (
-              <a className="button button--small" href="/admin/zones">Associer une carte 3D</a>
+              <a className="button button--primary" href={`/admin/incidents/${incident.fire_id}/carte/importer`}>Importer le fond 3D</a>
             )}
             <a className="button button--small" href={`/incendie/${encodeURIComponent(incident.fire_id)}`} target="_blank" rel="noreferrer">Voir la fiche publique</a>
           </div>
@@ -327,9 +315,7 @@ export function AdminIncidentDetailPage({ fireId }: { readonly fireId: string })
 
           <section className="admin-detail-card">
           <h3>Modèles et révisions</h3>
-          {incident.models.length ? incident.models.map((model) => {
-            const technicalRevisionHref = spatialRevisionHref(model);
-            return (
+          {incident.models.length ? incident.models.map((model) => (
               <div key={model.revision}>
                 <strong>Manifest v{model.revision}</strong> · épisode{' '}
                 <code>{model.episode_id}</code> · {model.asset_state ?? 'sans asset'}
@@ -339,16 +325,12 @@ export function AdminIncidentDetailPage({ fireId }: { readonly fireId: string })
                   {model.size_bytes ? ` · ${model.size_bytes.toLocaleString('fr-FR')} octets` : ''}
                 </small>
                 <small>
-                  {technicalRevisionHref ? (
-                    <a href={technicalRevisionHref}>
-                      Référence spatiale technique : {model.spatial_zone_id ?? model.asset_spatial_zone_id}{' '}
-                      r{model.spatial_zone_revision ?? model.asset_spatial_zone_revision}
-                    </a>
-                  ) : 'Aucune référence spatiale technique persistée.'}
+                  {(model.spatial_zone_id ?? model.asset_spatial_zone_id)
+                    ? `Référence technique : ${model.spatial_zone_id ?? model.asset_spatial_zone_id} r${model.spatial_zone_revision ?? model.asset_spatial_zone_revision}`
+                    : 'Aucune référence spatiale technique persistée.'}
                 </small>
               </div>
-            );
-          }) : <p>Aucune révision de modèle.</p>}
+          )) : <p>Aucune révision de modèle.</p>}
           <a className="button button--small" href={`/admin/incidents/${incident.fire_id}/modeles-pipeline`}>
             Ouvrir modèles et pipeline
           </a>

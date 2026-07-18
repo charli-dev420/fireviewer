@@ -11,8 +11,19 @@ import pytest
 from pydantic import SecretStr
 from sqlalchemy import select
 
-from fire_viewer.db.models import AuditEvent, SpatialPackage, SpatialPackageFile
-from fire_viewer.domain.enums import IncidentStatus, SpatialPackageFileKind
+from fire_viewer.db.models import (
+    AuditEvent,
+    ManifestRevision,
+    SpatialPackage,
+    SpatialPackageFile,
+    ZonePublication,
+)
+from fire_viewer.domain.enums import (
+    IncidentStatus,
+    SpatialPackageFileKind,
+    SpatialPackageState,
+    ZonePublicationState,
+)
 from fire_viewer.domain.schemas import AdminSpatialPackageFromBlobRequest
 from fire_viewer.services.spatial_package_blob_import import validate_blob_package
 from fire_viewer.storage import ObjectMetadata
@@ -366,6 +377,141 @@ def test_admin_finalizes_exact_blob_inventory_then_previews_and_publishes(
     )
     assert published.status_code == 200
     assert published.json()["publication"]["package_state"] == "PUBLISHED"
+
+
+def test_admin_imports_map_inside_incident_project_atomically(
+    client, settings, session, seed_incident
+) -> None:
+    incident, _episode = seed_incident(
+        fire_id="FR-26-00912",
+        sequence=912,
+        lon=5.2601,
+        lat=44.7555,
+        status=IncidentStatus.ACTIVE_CONFIRMED,
+    )
+    expected_incident_version = incident.version
+    _create_zone_and_revision(client)
+    documents, objects = _stage_blob_objects(
+        settings,
+        package_id="pkg-project-map-r1",
+    )
+
+    response = client.post(
+        f"/api/v2/admin/incidents/{incident.fire_id}/spatial-package/from-blob",
+        json={
+            "upload_id": _UPLOAD_ID,
+            "package_id": "pkg-project-map-r1",
+            "zone_id": "IMPORT-TEST-01",
+            "revision": 1,
+            "expected_incident_version": expected_incident_version,
+            "primary_profile": "local",
+            "reason": "Import du fond 3D directement depuis le projet incendie de test.",
+            "objects": objects,
+        },
+        headers=_headers("incident-project-map-import-0001"),
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.headers["Idempotent-Replay"] == "false"
+    assert response.json() == {
+        "fire_id": incident.fire_id,
+        "episode_id": "E01",
+        "package_id": "pkg-project-map-r1",
+        "package_state": "PREVIEWABLE",
+        "zone_id": "IMPORT-TEST-01",
+        "revision": 1,
+        "manifest_revision": 1,
+        "incident_version": expected_incident_version + 1,
+        "object_count": 4,
+        "total_size_bytes": sum(map(len, documents.values())),
+        "asset_count": 2,
+        "trace_id": response.json()["trace_id"],
+    }
+    session.expire_all()
+    package = session.scalar(
+        select(SpatialPackage).where(SpatialPackage.package_id == "pkg-project-map-r1")
+    )
+    assert package is not None
+    assert package.state == SpatialPackageState.PREVIEWABLE
+    publication = session.scalar(
+        select(ZonePublication).where(ZonePublication.spatial_package_id == package.id)
+    )
+    assert publication is not None
+    assert publication.state == ZonePublicationState.PREVIEWABLE
+    manifest = session.scalar(
+        select(ManifestRevision).where(
+            ManifestRevision.spatial_package_id == package.id,
+            ManifestRevision.is_current.is_(True),
+        )
+    )
+    assert manifest is not None
+    assert manifest.incident_id == incident.id
+    workspace = client.get(f"/api/v1/admin/incidents/{incident.fire_id}/spatial-review")
+    assert workspace.status_code == 200, workspace.text
+    scene = workspace.json()["scene"]
+    assert scene["zone_id"] == "IMPORT-TEST-01"
+    assert scene["zone_revision"] == 1
+    assert scene["package_id"] == "pkg-project-map-r1"
+    assert scene["package_state"] == "PREVIEWABLE"
+    assert scene["publication_id"] == publication.publication_id
+    assert scene["publication_state"] == "PREVIEWABLE"
+    assert scene["publication_active"] is False
+
+    replay = client.post(
+        f"/api/v2/admin/incidents/{incident.fire_id}/spatial-package/from-blob",
+        json={
+            "upload_id": _UPLOAD_ID,
+            "package_id": "pkg-project-map-r1",
+            "zone_id": "IMPORT-TEST-01",
+            "revision": 1,
+            "expected_incident_version": expected_incident_version,
+            "primary_profile": "local",
+            "reason": "Import du fond 3D directement depuis le projet incendie de test.",
+            "objects": objects,
+        },
+        headers=_headers("incident-project-map-import-0001"),
+    )
+    assert replay.status_code == 201
+    assert replay.headers["Idempotent-Replay"] == "true"
+    assert replay.json() == response.json()
+
+
+def test_incident_project_map_import_rolls_back_when_incident_version_is_stale(
+    client, settings, session, seed_incident
+) -> None:
+    incident, _episode = seed_incident(
+        fire_id="FR-26-00913",
+        sequence=913,
+        lon=5.2601,
+        lat=44.7555,
+        status=IncidentStatus.ACTIVE_CONFIRMED,
+    )
+    _create_zone_and_revision(client)
+    _documents, objects = _stage_blob_objects(
+        settings,
+        package_id="pkg-project-map-stale-r1",
+    )
+
+    response = client.post(
+        f"/api/v2/admin/incidents/{incident.fire_id}/spatial-package/from-blob",
+        json={
+            "upload_id": _UPLOAD_ID,
+            "package_id": "pkg-project-map-stale-r1",
+            "zone_id": "IMPORT-TEST-01",
+            "revision": 1,
+            "expected_incident_version": incident.version + 1,
+            "primary_profile": "local",
+            "reason": "Import refusé pour vérifier le rollback atomique du projet.",
+            "objects": objects,
+        },
+        headers=_headers("incident-project-map-import-stale-0001"),
+    )
+
+    assert response.status_code == 409
+    session.expire_all()
+    assert session.scalar(
+        select(SpatialPackage).where(SpatialPackage.package_id == "pkg-project-map-stale-r1")
+    ) is None
 
 
 def test_admin_recovers_a_complete_stored_upload_without_reupload(

@@ -400,43 +400,17 @@ def _kind_and_media_type(path: str) -> tuple[SpatialPackageFileKind, str]:
     raise BadRequestError("unsupported_package_file_type", "The package asset type is unsupported.")
 
 
-def import_blob_package(
+def persist_validated_blob_package(
     session: Session,
     *,
     zone_id: str,
     revision: int,
-    payload: AdminSpatialPackageFromBlobRequest,
     validated: ValidatedBlobPackage,
-    idempotency_key: str,
     actor: Actor,
-    trace_id: str,
     settings: Settings,
-) -> BlobSpatialImportOutcome:
-    endpoint = f"POST /api/v1/admin/zones/{zone_id}/revisions/{revision}/packages/from-blob"
-    request_hash = sha256_hex(
-        {"actor_id": actor.actor_id, "payload": payload.model_dump(mode="json")}
-    )
-    begin_write_transaction(session)
-    replay = find_replay(
-        session,
-        endpoint=endpoint,
-        idempotency_key=idempotency_key,
-        request_hash=request_hash,
-    )
-    if replay:
-        session.rollback()
-        return BlobSpatialImportOutcome(
-            AdminSpatialPackageImportEnvelope.model_validate(replay.response_body),
-            True,
-        )
-    revision_row = session.execute(
-        select(SpatialZoneRevision)
-        .join(SpatialZone)
-        .where(SpatialZone.zone_id == zone_id, SpatialZoneRevision.revision == revision)
-        .with_for_update()
-    ).scalar_one_or_none()
-    if revision_row is None:
-        raise NotFoundError("spatial_zone_revision", f"{zone_id}/revisions/{revision}")
+) -> SpatialPackage:
+    """Persist one validated Blob inventory inside an existing transaction."""
+
     if (
         session.execute(
             select(SpatialPackage.id).where(SpatialPackage.package_id == validated.package_id)
@@ -475,7 +449,7 @@ def import_blob_package(
     )
     session.add(package)
     session.flush()
-    files: list[SpatialPackageFile] = []
+    files = []
     for entry in validated.asset_catalog:
         kind, media_type = _kind_and_media_type(entry["path"])
         files.append(
@@ -491,6 +465,56 @@ def import_blob_package(
         )
     session.add_all(files)
     session.flush()
+    package.files = files
+    return package
+
+
+def import_blob_package(
+    session: Session,
+    *,
+    zone_id: str,
+    revision: int,
+    payload: AdminSpatialPackageFromBlobRequest,
+    validated: ValidatedBlobPackage,
+    idempotency_key: str,
+    actor: Actor,
+    trace_id: str,
+    settings: Settings,
+) -> BlobSpatialImportOutcome:
+    endpoint = f"POST /api/v1/admin/zones/{zone_id}/revisions/{revision}/packages/from-blob"
+    request_hash = sha256_hex(
+        {"actor_id": actor.actor_id, "payload": payload.model_dump(mode="json")}
+    )
+    begin_write_transaction(session)
+    replay = find_replay(
+        session,
+        endpoint=endpoint,
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
+    )
+    if replay:
+        session.rollback()
+        return BlobSpatialImportOutcome(
+            AdminSpatialPackageImportEnvelope.model_validate(replay.response_body),
+            True,
+        )
+    revision_row = session.execute(
+        select(SpatialZoneRevision)
+        .join(SpatialZone)
+        .where(SpatialZone.zone_id == zone_id, SpatialZoneRevision.revision == revision)
+        .with_for_update()
+    ).scalar_one_or_none()
+    if revision_row is None:
+        raise NotFoundError("spatial_zone_revision", f"{zone_id}/revisions/{revision}")
+    package = persist_validated_blob_package(
+        session,
+        zone_id=zone_id,
+        revision=revision,
+        validated=validated,
+        actor=actor,
+        settings=settings,
+    )
+    files = package.files
     response = AdminSpatialPackageImportEnvelope(
         package=AdminSpatialPackageImportResponse(
             package_id=package.package_id,

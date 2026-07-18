@@ -3854,6 +3854,131 @@
         }
       }
     },
+    "/api/v2/admin/incidents/{fire_id}/spatial-package/upload-grant": {
+      "post": {
+        "tags": [
+          "admin-v2"
+        ],
+        "summary": "Grant Incident Spatial Package Upload",
+        "operationId": "grant_incident_spatial_package_upload_api_v2_admin_incidents__fire_id__spatial_package_upload_grant_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fire_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^FR-[0-9A-Z]{2,3}-[0-9]{5}$",
+              "title": "Fire Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminBlobUploadGrantRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminBlobUploadGrantResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/incidents/{fire_id}/spatial-package/from-blob": {
+      "post": {
+        "tags": [
+          "admin-v2"
+        ],
+        "summary": "Finalize Incident Spatial Package From Blob",
+        "operationId": "finalize_incident_spatial_package_from_blob_api_v2_admin_incidents__fire_id__spatial_package_from_blob_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fire_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^FR-[0-9A-Z]{2,3}-[0-9]{5}$",
+              "title": "Fire Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminIncidentSpatialPackageFromBlobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminIncidentSpatialPackageImportResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/admin/packages/{package_id}/files/{file_id}": {
       "get": {
         "tags": [
@@ -6265,6 +6390,67 @@
             ],
             "title": "Package Id"
           },
+          "zone_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone Id"
+          },
+          "zone_revision": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone Revision"
+          },
+          "package_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package State"
+          },
+          "publication_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publication Id"
+          },
+          "publication_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publication State"
+          },
+          "publication_active": {
+            "type": "boolean",
+            "title": "Publication Active",
+            "default": false
+          },
           "catalog_url": {
             "anyOf": [
               {
@@ -6612,6 +6798,152 @@
           "version"
         ],
         "title": "AdminIncidentSpatialMarker"
+      },
+      "AdminIncidentSpatialPackageFromBlobRequest": {
+        "properties": {
+          "upload_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$",
+            "title": "Upload Id"
+          },
+          "package_id": {
+            "type": "string",
+            "maxLength": 96,
+            "minLength": 3,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "title": "Package Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason"
+          },
+          "objects": {
+            "items": {
+              "$ref": "#/components/schemas/AdminBlobObjectReference"
+            },
+            "type": "array",
+            "maxItems": 100000,
+            "minItems": 3,
+            "title": "Objects"
+          },
+          "zone_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9-]*$",
+            "title": "Zone Id"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          },
+          "expected_incident_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Incident Version"
+          },
+          "primary_profile": {
+            "type": "string",
+            "enum": [
+              "close",
+              "local",
+              "extended",
+              "mobile",
+              "desktop"
+            ],
+            "title": "Primary Profile",
+            "default": "local"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "upload_id",
+          "package_id",
+          "reason",
+          "objects",
+          "zone_id",
+          "revision",
+          "expected_incident_version"
+        ],
+        "title": "AdminIncidentSpatialPackageFromBlobRequest"
+      },
+      "AdminIncidentSpatialPackageImportResponse": {
+        "properties": {
+          "fire_id": {
+            "type": "string",
+            "title": "Fire Id"
+          },
+          "episode_id": {
+            "type": "string",
+            "title": "Episode Id"
+          },
+          "package_id": {
+            "type": "string",
+            "title": "Package Id"
+          },
+          "package_state": {
+            "$ref": "#/components/schemas/SpatialPackageState"
+          },
+          "zone_id": {
+            "type": "string",
+            "title": "Zone Id"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          },
+          "manifest_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Manifest Revision"
+          },
+          "incident_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Incident Version"
+          },
+          "object_count": {
+            "type": "integer",
+            "minimum": 3.0,
+            "title": "Object Count"
+          },
+          "total_size_bytes": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Total Size Bytes"
+          },
+          "asset_count": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Asset Count"
+          },
+          "trace_id": {
+            "type": "string",
+            "title": "Trace Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fire_id",
+          "episode_id",
+          "package_id",
+          "package_state",
+          "zone_id",
+          "revision",
+          "manifest_revision",
+          "incident_version",
+          "object_count",
+          "total_size_bytes",
+          "asset_count",
+          "trace_id"
+        ],
+        "title": "AdminIncidentSpatialPackageImportResponse"
       },
       "AdminIncidentSpatialReviewWorkspace": {
         "properties": {

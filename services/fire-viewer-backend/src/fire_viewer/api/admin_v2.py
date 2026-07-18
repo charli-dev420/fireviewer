@@ -16,13 +16,17 @@ from fire_viewer.api.dependencies import (
     TraceIdDep,
 )
 from fire_viewer.core.security import Actor, require_role
-from fire_viewer.db.models import ModelAsset, SpatialPackage, SpatialPackageFile
+from fire_viewer.db.models import IncidentSeries, ModelAsset, SpatialPackage, SpatialPackageFile
 from fire_viewer.domain.errors import ConflictError, NotFoundError
 from fire_viewer.domain.schemas import (
+    AdminBlobUploadGrantRequest,
+    AdminBlobUploadGrantResponse,
     AdminDashboardResponse,
     AdminIncidentListResponse,
     AdminIncidentRepresentationAttachRequest,
     AdminIncidentRepresentationAttachResponse,
+    AdminIncidentSpatialPackageFromBlobRequest,
+    AdminIncidentSpatialPackageImportResponse,
     AdminOperationalMapResponse,
     AdminWorkQueueResponse,
 )
@@ -30,6 +34,14 @@ from fire_viewer.services.admin_dashboard import get_admin_dashboard
 from fire_viewer.services.admin_incidents import get_admin_work_queue, list_admin_incidents
 from fire_viewer.services.admin_operational_map import get_operational_map
 from fire_viewer.services.admin_representations import attach_incident_package
+from fire_viewer.services.blob_uploads import (
+    ALLOWED_PACKAGE_CONTENT_TYPES,
+    create_blob_upload_grant,
+)
+from fire_viewer.services.incident_spatial_package_import import (
+    import_incident_spatial_package,
+)
+from fire_viewer.services.spatial_package_blob_import import validate_blob_package
 from fire_viewer.storage import build_object_store
 
 router = APIRouter(prefix="/api/v2/admin", tags=["admin-v2"])
@@ -152,6 +164,84 @@ def attach_representations(
         session,
         fire_id=fire_id,
         payload=payload,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        trace_id=trace_id,
+        settings=settings,
+    )
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Idempotent-Replay"] = "true" if outcome.replayed else "false"
+    return outcome.response
+
+
+@router.post(
+    "/incidents/{fire_id}/spatial-package/upload-grant",
+    response_model=AdminBlobUploadGrantResponse,
+    status_code=201,
+)
+def grant_incident_spatial_package_upload(
+    fire_id: Annotated[str, Path(pattern=r"^FR-[0-9A-Z]{2,3}-[0-9]{5}$")],
+    payload: AdminBlobUploadGrantRequest,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> AdminBlobUploadGrantResponse:
+    _require_admin(actor)
+    if (
+        session.execute(
+            select(IncidentSeries.id).where(IncidentSeries.fire_id == fire_id)
+        ).scalar_one_or_none()
+        is None
+    ):
+        raise NotFoundError("incident", fire_id)
+    if (
+        session.execute(
+            select(SpatialPackage.id).where(SpatialPackage.package_id == payload.package_id)
+        ).scalar_one_or_none()
+        is not None
+    ):
+        raise ConflictError(
+            "spatial_package_already_exists",
+            "The package identifier is already registered.",
+        )
+    grant = create_blob_upload_grant(payload=payload, actor=actor, settings=settings)
+    return AdminBlobUploadGrantResponse(
+        upload_id=grant.upload_id,
+        pathname_prefix=grant.pathname_prefix,
+        upload_grant=grant.token,
+        expires_at=grant.expires_at,
+        maximum_file_size_bytes=settings.zone_upload_max_bytes,
+        allowed_content_types=list(ALLOWED_PACKAGE_CONTENT_TYPES),
+    )
+
+
+@router.post(
+    "/incidents/{fire_id}/spatial-package/from-blob",
+    response_model=AdminIncidentSpatialPackageImportResponse,
+    status_code=201,
+)
+def finalize_incident_spatial_package_from_blob(
+    fire_id: Annotated[str, Path(pattern=r"^FR-[0-9A-Z]{2,3}-[0-9]{5}$")],
+    payload: AdminIncidentSpatialPackageFromBlobRequest,
+    response: Response,
+    actor: ActorDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    trace_id: TraceIdDep,
+    idempotency_key: IdempotencyKeyDep,
+) -> AdminIncidentSpatialPackageImportResponse:
+    _require_admin(actor)
+    validated = validate_blob_package(
+        zone_id=payload.zone_id,
+        revision=payload.revision,
+        payload=payload,
+        settings=settings,
+    )
+    outcome = import_incident_spatial_package(
+        session,
+        fire_id=fire_id,
+        payload=payload,
+        validated=validated,
         idempotency_key=idempotency_key,
         actor=actor,
         trace_id=trace_id,

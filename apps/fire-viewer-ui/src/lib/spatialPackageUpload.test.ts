@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AdminApiClient } from './adminApi';
 import {
   prepareSpatialPackage,
+  uploadPreparedIncidentSpatialPackage,
   uploadPreparedSpatialPackage,
   type BlobUploader,
   type PreparedSpatialPackage,
@@ -118,6 +119,8 @@ describe('envoi direct vers Vercel Blob', () => {
   it('utilise le multipart privé puis finalise exactement les objets reçus', async () => {
     const prepared: PreparedSpatialPackage = {
       packageId: 'pkg-zone-r2',
+      zoneId: ZONE_ID,
+      revision: REVISION,
       assetCount: 1,
       files: [
         { path: 'package-manifest.json', file: new File(['manifest'], 'package-manifest.json'), contentType: 'application/json' },
@@ -191,6 +194,51 @@ describe('envoi direct vers Vercel Blob', () => {
     expect(progress.mock.calls.at(-1)?.[0]).toMatchObject({ phase: 'finalizing', percentage: 100 });
   });
 
+  it('finalise dans le projet sans appeler le parcours technique de zone', async () => {
+    const prepared = await prepareSpatialPackage(await validFiles());
+    const finalizeProject = vi.fn().mockResolvedValue({
+      fire_id: 'FR-26-00001', episode_id: 'E01', package_id: prepared.packageId,
+      package_state: 'PREVIEWABLE', zone_id: prepared.zoneId, revision: prepared.revision,
+      manifest_revision: 2, incident_version: 8, object_count: prepared.files.length,
+      total_size_bytes: prepared.totalSizeBytes, asset_count: prepared.assetCount,
+      trace_id: 'trace-project-finalize',
+    });
+    const api = {
+      createIncidentSpatialPackageUploadGrant: vi.fn().mockResolvedValue({
+        upload_id: UPLOAD_ID, pathname_prefix: `packages/${UPLOAD_ID}`, upload_grant: 'grant-project',
+        expires_at: '2026-07-14T10:10:00Z', maximum_file_size_bytes: 5_000_000_000,
+        allowed_content_types: ['application/json', 'model/gltf-binary'],
+      }),
+      createSpatialPackageUploadGrant: vi.fn(),
+      getBlobUploadTokenUrl: () => 'https://api.example.test/api/v1/admin/blob-upload-token',
+      refreshAdminSession: vi.fn().mockResolvedValue(undefined),
+      finalizeIncidentSpatialPackageFromBlob: finalizeProject,
+      finalizeSpatialPackageFromBlob: vi.fn(),
+    } as unknown as AdminApiClient;
+    const uploader = vi.fn(async (pathname: string, file: File, options: Parameters<BlobUploader>[2]) => {
+      options.onUploadProgress({ loaded: file.size, total: file.size, percentage: 100 });
+      return { pathname, contentType: options.contentType };
+    });
+
+    const result = await uploadPreparedIncidentSpatialPackage(
+      api, 'FR-26-00001', 7, prepared,
+      'Import du fond 3D depuis le projet incendie.', 'project-import-0001', vi.fn(),
+      { uploader },
+    );
+
+    expect(result.package_state).toBe('PREVIEWABLE');
+    expect(api.createSpatialPackageUploadGrant).not.toHaveBeenCalled();
+    expect(api.finalizeSpatialPackageFromBlob).not.toHaveBeenCalled();
+    expect(finalizeProject).toHaveBeenCalledWith(
+      'FR-26-00001',
+      expect.objectContaining({
+        zone_id: ZONE_ID, revision: REVISION, expected_incident_version: 7,
+        package_id: prepared.packageId,
+      }),
+      { idempotencyKey: 'project-import-0001', signal: undefined },
+    );
+  });
+
   it('maintient la session admin active pendant un transfert long et avant la finalisation', async () => {
     const files = Array.from({ length: 3 }, (_, index) => ({
       path: `assets/tile-${index}.fwtile`,
@@ -199,6 +247,8 @@ describe('envoi direct vers Vercel Blob', () => {
     }));
     const prepared: PreparedSpatialPackage = {
       packageId: 'pkg-session-r2',
+      zoneId: ZONE_ID,
+      revision: REVISION,
       assetCount: files.length,
       files,
       totalSizeBytes: files.reduce((total, item) => total + item.file.size, 0),
@@ -252,6 +302,8 @@ describe('envoi direct vers Vercel Blob', () => {
     }));
     const prepared: PreparedSpatialPackage = {
       packageId: 'pkg-concurrent-r2',
+      zoneId: ZONE_ID,
+      revision: REVISION,
       assetCount: files.length,
       files,
       totalSizeBytes: files.reduce((total, item) => total + item.file.size, 0),
@@ -305,6 +357,8 @@ describe('envoi direct vers Vercel Blob', () => {
   it('arrête le lot avec le chemin en erreur après épuisement des tentatives', async () => {
     const prepared: PreparedSpatialPackage = {
       packageId: 'pkg-failure-r2',
+      zoneId: ZONE_ID,
+      revision: REVISION,
       assetCount: 1,
       files: [{
         path: 'assets/broken.fwtile',
@@ -342,6 +396,8 @@ describe('envoi direct vers Vercel Blob', () => {
   it('réessaie uniquement la finalisation sans renvoyer les objets', async () => {
     const prepared: PreparedSpatialPackage = {
       packageId: 'pkg-finalization-r2',
+      zoneId: ZONE_ID,
+      revision: REVISION,
       assetCount: 1,
       files: [{
         path: 'assets/final.fwtile',

@@ -155,6 +155,36 @@ describe('client API d’administration', () => {
     expect(JSON.parse(String(init?.body))).toMatchObject({ upload_id: 'a'.repeat(32), objects });
   });
 
+  it('finalise la carte directement dans le projet incendie', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
+    const objects = [
+      { path: 'package-manifest.json', pathname: `packages/${'a'.repeat(32)}/package-manifest.json`, size_bytes: 100, content_type: 'application/json' },
+      { path: 'catalog.json', pathname: `packages/${'a'.repeat(32)}/catalog.json`, size_bytes: 156, content_type: 'application/json' },
+      { path: 'assets/model.glb', pathname: `packages/${'a'.repeat(32)}/assets/model.glb`, size_bytes: 200, content_type: 'model/gltf-binary' },
+    ];
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response({
+      fire_id: 'FR-26-00001', episode_id: 'E01', package_id: 'pkg-die-r1', package_state: 'PREVIEWABLE',
+      zone_id: 'DIE-PONTAIX-08', revision: 1, manifest_revision: 2, incident_version: 8,
+      object_count: 3, total_size_bytes: 456, asset_count: 1, trace_id: 'trace-project-map',
+    }, 201));
+    const client = new AdminApiClient({ session: SESSION, fetchImpl: fetchMock });
+
+    await expect(client.finalizeIncidentSpatialPackageFromBlob('FR-26-00001', {
+      upload_id: 'a'.repeat(32), package_id: 'pkg-die-r1', zone_id: 'DIE-PONTAIX-08', revision: 1,
+      expected_incident_version: 7, primary_profile: 'local',
+      reason: 'Import du fond 3D directement depuis le projet incendie.', objects,
+    }, { idempotencyKey: 'project-map-finalize-0001' })).resolves.toMatchObject({
+      fire_id: 'FR-26-00001', package_state: 'PREVIEWABLE', manifest_revision: 2,
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe(`${API_ORIGIN}/api/v2/admin/incidents/FR-26-00001/spatial-package/from-blob`);
+    expect((init?.headers as Record<string, string>)['Idempotency-Key']).toBe('project-map-finalize-0001');
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      package_id: 'pkg-die-r1', zone_id: 'DIE-PONTAIX-08', expected_incident_version: 7,
+    });
+  });
+
   it('reprend un upload Blob stocké sans renvoyer son inventaire depuis le navigateur', async () => {
     vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response({

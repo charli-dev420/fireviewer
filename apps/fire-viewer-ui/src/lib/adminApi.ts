@@ -113,7 +113,7 @@ export interface AdminActiveFireZoneRevision {
 }
 export interface AdminIncidentSpatialReviewWorkspace {
   readonly fire_id: string; readonly episode_id: string;
-  readonly scene: { readonly asset_url: string | null; readonly asset_version: number | null; readonly sha256: string | null; readonly package_id: string | null; readonly catalog_url: string | null; readonly files: Readonly<Record<string, string>>; readonly origin_wgs84: readonly [number, number, number]; readonly local_frame: 'ENU'; readonly gltf_profile: 'gltf-eun-negz-metric-v1' } | null;
+  readonly scene: { readonly asset_url: string | null; readonly asset_version: number | null; readonly sha256: string | null; readonly package_id: string | null; readonly zone_id: string | null; readonly zone_revision: number | null; readonly package_state: string | null; readonly publication_id: string | null; readonly publication_state: string | null; readonly publication_active: boolean; readonly catalog_url: string | null; readonly files: Readonly<Record<string, string>>; readonly origin_wgs84: readonly [number, number, number]; readonly local_frame: 'ENU'; readonly gltf_profile: 'gltf-eun-negz-metric-v1' } | null;
   readonly markers: readonly AdminIncidentSpatialMarker[];
   readonly zone_revisions: readonly AdminActiveFireZoneRevision[];
   readonly agent_reviews: readonly { readonly review_id: string; readonly batch_id: string; readonly state: string; readonly reason_codes: readonly string[]; readonly completed_at: string | null; readonly result: Readonly<Record<string, unknown>> | null }[];
@@ -328,6 +328,21 @@ export interface AdminSpatialPackageImport {
   readonly total_size_bytes: number;
   readonly asset_count: number;
   readonly validation_summary: string;
+  readonly trace_id: string;
+}
+
+export interface AdminIncidentSpatialPackageImport {
+  readonly fire_id: string;
+  readonly episode_id: string;
+  readonly package_id: string;
+  readonly package_state: 'PREVIEWABLE';
+  readonly zone_id: string;
+  readonly revision: number;
+  readonly manifest_revision: number;
+  readonly incident_version: number;
+  readonly object_count: number;
+  readonly total_size_bytes: number;
+  readonly asset_count: number;
   readonly trace_id: string;
 }
 
@@ -609,6 +624,26 @@ function parseZonePrivatePreview(value: unknown): AdminZonePrivatePreview {
   return { zone_id: readString(value.zone_id, 'zone_id', { max: 64 })!, revision: readPositiveInteger(value.revision, 'revision'), preview_scope: readEnum(value.preview_scope, 'preview_scope', ['private-admin']), package_id: readString(value.package_id, 'package_id', { nullable: true, max: 128 }), package_state: readString(value.package_state, 'package_state', { nullable: true, max: 64 }), publication_id: readString(value.publication_id, 'publication_id', { nullable: true, max: 128 }), publication_state: readString(value.publication_state, 'publication_state', { nullable: true, max: 64 }), publication_active: value.publication_active, linked_fire_ids: value.linked_fire_ids.map((fireId) => readString(fireId, 'linked_fire_id', { max: 32 })!), verification_report: value.verification_report, preview_package_ids: previewPackageIds, scene, files: value.files.map((file) => { if (!isRecord(file) || !hasExactKeys(file, ['file_id', 'path', 'kind', 'sha256', 'size_bytes', 'media_type'])) throw new Error('Fichier preview invalide.'); return { file_id: readPositiveInteger(file.file_id, 'file_id'), path: readString(file.path, 'path', { nullable: true, max: 512 }), kind: readString(file.kind, 'kind', { max: 64 })!, sha256: readString(file.sha256, 'sha256', { max: 64 })!, size_bytes: readPositiveInteger(file.size_bytes, 'size_bytes'), media_type: readString(file.media_type, 'media_type', { max: 128 })! }; }) };
 }
 
+function parseIncidentSpatialPackageImport(value: unknown): AdminIncidentSpatialPackageImport {
+  if (!isRecord(value) || !hasExactKeys(value, ['fire_id', 'episode_id', 'package_id', 'package_state', 'zone_id', 'revision', 'manifest_revision', 'incident_version', 'object_count', 'total_size_bytes', 'asset_count', 'trace_id'])) {
+    throw new Error('Import de carte du projet invalide.');
+  }
+  return {
+    fire_id: readString(value.fire_id, 'fire_id', { max: 32 })!,
+    episode_id: readString(value.episode_id, 'episode_id', { max: 96 })!,
+    package_id: readString(value.package_id, 'package_id', { max: 96 })!,
+    package_state: readEnum(value.package_state, 'package_state', ['PREVIEWABLE']),
+    zone_id: readString(value.zone_id, 'zone_id', { max: 64 })!,
+    revision: readPositiveInteger(value.revision, 'revision'),
+    manifest_revision: readPositiveInteger(value.manifest_revision, 'manifest_revision'),
+    incident_version: readPositiveInteger(value.incident_version, 'incident_version'),
+    object_count: readPositiveInteger(value.object_count, 'object_count'),
+    total_size_bytes: readPositiveInteger(value.total_size_bytes, 'total_size_bytes'),
+    asset_count: readPositiveInteger(value.asset_count, 'asset_count'),
+    trace_id: parseTraceId(value.trace_id),
+  };
+}
+
 function parseSpatialPackagePublication(value: unknown): AdminSpatialPackagePublication {
   if (!isRecord(value) || !hasExactKeys(value, ['publication', 'trace_id']) || !isRecord(value.publication)) throw new Error('Publication spatiale invalide.');
   const publication = value.publication;
@@ -787,7 +822,23 @@ function parseIncidentSpatialReviewWorkspace(value: unknown): AdminIncidentSpati
   if (value.scene !== null) {
     if (!isRecord(value.scene) || (value.scene.files !== undefined && !isRecord(value.scene.files)) || !Array.isArray(value.scene.origin_wgs84) || value.scene.origin_wgs84.length !== 3) throw new Error('Scène 3D invalide.');
     const sceneFiles = isRecord(value.scene.files) ? value.scene.files : {};
-    scene = { asset_url: value.scene.asset_url === undefined ? null : readString(value.scene.asset_url, 'asset_url', { nullable: true, max: 2_048 }), asset_version: value.scene.asset_version === undefined || value.scene.asset_version === null ? null : readPositiveInteger(value.scene.asset_version, 'asset_version'), sha256: value.scene.sha256 === undefined ? null : readString(value.scene.sha256, 'sha256', { nullable: true, max: 64 }), package_id: value.scene.package_id === undefined ? null : readString(value.scene.package_id, 'package_id', { nullable: true, max: 96 }), catalog_url: value.scene.catalog_url === undefined ? null : readString(value.scene.catalog_url, 'catalog_url', { nullable: true, max: 2_048 }), files: Object.fromEntries(Object.entries(sceneFiles).map(([path, url]) => [path, readString(url, `files.${path}`, { max: 2_048 })!])), origin_wgs84: [readFiniteNumber(value.scene.origin_wgs84[0], 'origin.lon'), readFiniteNumber(value.scene.origin_wgs84[1], 'origin.lat'), readFiniteNumber(value.scene.origin_wgs84[2], 'origin.alt')], local_frame: readEnum(value.scene.local_frame, 'local_frame', ['ENU'] as const), gltf_profile: readEnum(value.scene.gltf_profile, 'gltf_profile', ['gltf-eun-negz-metric-v1'] as const) };
+    scene = {
+      asset_url: value.scene.asset_url === undefined ? null : readString(value.scene.asset_url, 'asset_url', { nullable: true, max: 2_048 }),
+      asset_version: value.scene.asset_version === undefined || value.scene.asset_version === null ? null : readPositiveInteger(value.scene.asset_version, 'asset_version'),
+      sha256: value.scene.sha256 === undefined ? null : readString(value.scene.sha256, 'sha256', { nullable: true, max: 64 }),
+      package_id: value.scene.package_id === undefined ? null : readString(value.scene.package_id, 'package_id', { nullable: true, max: 96 }),
+      zone_id: value.scene.zone_id === undefined ? null : readString(value.scene.zone_id, 'zone_id', { nullable: true, max: 64 }),
+      zone_revision: value.scene.zone_revision === undefined || value.scene.zone_revision === null ? null : readPositiveInteger(value.scene.zone_revision, 'zone_revision'),
+      package_state: value.scene.package_state === undefined ? null : readString(value.scene.package_state, 'package_state', { nullable: true, max: 64 }),
+      publication_id: value.scene.publication_id === undefined ? null : readString(value.scene.publication_id, 'publication_id', { nullable: true, max: 96 }),
+      publication_state: value.scene.publication_state === undefined ? null : readString(value.scene.publication_state, 'publication_state', { nullable: true, max: 64 }),
+      publication_active: value.scene.publication_active === true,
+      catalog_url: value.scene.catalog_url === undefined ? null : readString(value.scene.catalog_url, 'catalog_url', { nullable: true, max: 2_048 }),
+      files: Object.fromEntries(Object.entries(sceneFiles).map(([path, url]) => [path, readString(url, `files.${path}`, { max: 2_048 })!])),
+      origin_wgs84: [readFiniteNumber(value.scene.origin_wgs84[0], 'origin.lon'), readFiniteNumber(value.scene.origin_wgs84[1], 'origin.lat'), readFiniteNumber(value.scene.origin_wgs84[2], 'origin.alt')],
+      local_frame: readEnum(value.scene.local_frame, 'local_frame', ['ENU'] as const),
+      gltf_profile: readEnum(value.scene.gltf_profile, 'gltf_profile', ['gltf-eun-negz-metric-v1'] as const),
+    };
   }
   return {
     fire_id: readString(value.fire_id, 'fire_id', { max: 32 })!, episode_id: readString(value.episode_id, 'episode_id', { max: 16 })!, scene,
@@ -1309,6 +1360,23 @@ export class AdminApiClient {
     catch { throw new AdminApiError('parse', 'L’autorisation d’envoi du package spatial est invalide.'); }
   }
 
+  async createIncidentSpatialPackageUploadGrant(
+    fireId: string,
+    input: { readonly package_id: string; readonly file_count: number; readonly total_size_bytes: number },
+    options: AdminRequestOptions = {},
+  ): Promise<AdminBlobUploadGrant> {
+    if (!/^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(fireId) || input.package_id.trim().length < 3 || !Number.isSafeInteger(input.file_count) || input.file_count < 3 || !Number.isSafeInteger(input.total_size_bytes) || input.total_size_bytes < 1) {
+      throw new AdminApiError('configuration', 'La demande d’envoi de la carte du projet est invalide.');
+    }
+    const payload = await this.requestV2(`/incidents/${encodeURIComponent(fireId)}/spatial-package/upload-grant`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }, options);
+    try { return parseBlobUploadGrant(payload); }
+    catch { throw new AdminApiError('parse', 'L’autorisation d’envoi de la carte du projet est invalide.'); }
+  }
+
   async finalizeSpatialPackageFromBlob(
     zoneId: string,
     revision: number,
@@ -1326,6 +1394,32 @@ export class AdminApiClient {
     );
     try { return parseSpatialPackageImport(payload); }
     catch { throw new AdminApiError('parse', 'La réponse de finalisation du package spatial est invalide.'); }
+  }
+
+  async finalizeIncidentSpatialPackageFromBlob(
+    fireId: string,
+    input: {
+      readonly upload_id: string;
+      readonly package_id: string;
+      readonly zone_id: string;
+      readonly revision: number;
+      readonly expected_incident_version: number;
+      readonly primary_profile: 'local';
+      readonly reason: string;
+      readonly objects: readonly AdminBlobObjectReference[];
+    },
+    options: AdminRequestOptions,
+  ): Promise<AdminIncidentSpatialPackageImport> {
+    if (!/^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(fireId) || !/^[a-f0-9]{32}$/.test(input.upload_id) || input.package_id.trim().length < 3 || !/^[A-Z][A-Z0-9-]{2,63}$/.test(input.zone_id) || !Number.isSafeInteger(input.revision) || input.revision < 1 || !Number.isSafeInteger(input.expected_incident_version) || input.expected_incident_version < 1 || input.reason.trim().length < 10 || input.objects.length < 3) {
+      throw new AdminApiError('configuration', 'La finalisation de la carte du projet est invalide.');
+    }
+    const payload = await this.postJsonV2(
+      `/incidents/${encodeURIComponent(fireId)}/spatial-package/from-blob`,
+      input,
+      options,
+    );
+    try { return parseIncidentSpatialPackageImport(payload); }
+    catch { throw new AdminApiError('parse', 'La réponse de finalisation de la carte du projet est invalide.'); }
   }
 
   async recoverSpatialPackageFromBlob(

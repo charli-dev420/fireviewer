@@ -25,7 +25,9 @@ from fire_viewer.db.models import (
     ModelAsset,
     Observation,
     SpatialPackage,
+    SpatialZone,
     SpatialZoneRevision,
+    ZonePublication,
 )
 from fire_viewer.domain.enums import (
     ActiveFireZoneReviewState,
@@ -96,6 +98,22 @@ def _scene(
     )
     if spatial_revision is None:
         return None, None
+    zone_id = session.execute(
+        select(SpatialZone.zone_id).where(SpatialZone.id == spatial_revision.spatial_zone_id)
+    ).scalar_one()
+    publication = (
+        session.execute(
+            select(ZonePublication)
+            .where(
+                ZonePublication.spatial_package_id == manifest.package.id,
+                ZonePublication.spatial_zone_revision_id == spatial_revision.id,
+            )
+            .order_by(ZonePublication.id.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        if manifest.package is not None
+        else None
+    )
     origin = (
         spatial_revision.origin_lon,
         spatial_revision.origin_lat,
@@ -107,6 +125,12 @@ def _scene(
             asset_version=manifest.asset.version if manifest.asset is not None else None,
             sha256=manifest.asset.sha256 if manifest.asset is not None else None,
             package_id=manifest.package.package_id if manifest.package is not None else None,
+            zone_id=zone_id,
+            zone_revision=spatial_revision.revision,
+            package_state=manifest.package.state.value if manifest.package is not None else None,
+            publication_id=publication.publication_id if publication is not None else None,
+            publication_state=publication.state.value if publication is not None else None,
+            publication_active=publication.is_active if publication is not None else False,
             catalog_url=(
                 f"/api/v1/incident/{incident.fire_id}/spatial-scene/catalog"
                 if manifest.package is not None

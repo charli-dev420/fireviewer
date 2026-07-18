@@ -18,6 +18,7 @@ export type AdminRoute =
   | { kind: 'incident-sources-media'; fireId: string }
   | { kind: 'incident-models-pipeline'; fireId: string }
   | { kind: 'incident-spatial-review'; fireId: string }
+  | { kind: 'incident-spatial-package'; fireId: string }
   | { kind: 'audit' }
   | { kind: 'roles' }
   | { kind: 'system' }
@@ -68,6 +69,9 @@ export function resolveAdminRoute(pathname: string): AdminRoute {
     if (segments[3] === 'sources-medias') return { kind: 'incident-sources-media', fireId: segments[2] };
     if (segments[3] === 'modeles-pipeline') return { kind: 'incident-models-pipeline', fireId: segments[2] };
     if (segments[3] === 'revue-spatiale') return { kind: 'incident-spatial-review', fireId: segments[2] };
+  }
+  if (segments.length === 5 && segments[0] === 'admin' && segments[1] === 'incidents' && /^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(segments[2]) && segments[3] === 'carte' && segments[4] === 'importer') {
+    return { kind: 'incident-spatial-package', fireId: segments[2] };
   }
   if (segments.length === 3 && segments[0] === 'admin' && segments[1] === 'incidents' && /^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(segments[2])) return { kind: 'incident-detail', fireId: segments[2] };
 

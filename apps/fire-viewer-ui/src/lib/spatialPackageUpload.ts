@@ -3,6 +3,7 @@ import type {
   AdminApiClient,
   AdminBlobObjectReference,
   AdminBlobUploadGrant,
+  AdminIncidentSpatialPackageImport,
   AdminSpatialPackageImport,
 } from './adminApi';
 
@@ -42,6 +43,8 @@ export interface PreparedPackageFile {
 
 export interface PreparedSpatialPackage {
   readonly packageId: string;
+  readonly zoneId: string;
+  readonly revision: number;
   readonly files: readonly PreparedPackageFile[];
   readonly totalSizeBytes: number;
   readonly assetCount: number;
@@ -201,8 +204,8 @@ function mapSelectedFiles(files: readonly File[], expectedPaths: readonly string
 
 export async function prepareSpatialPackage(
   selectedFiles: FileList | readonly File[],
-  expectedZoneId: string,
-  expectedRevision: number,
+  expectedZoneId?: string,
+  expectedRevision?: number,
 ): Promise<PreparedSpatialPackage> {
   const files = Array.from(selectedFiles);
   if (files.length < 3) throw new Error('Le dossier doit contenir le manifeste, le catalogue et au moins un asset.');
@@ -239,12 +242,21 @@ export async function prepareSpatialPackage(
   if (digest(catalogReference.sha256, 'Empreinte de catalog.json') !== await sha256Hex(catalogFile)) {
     throw new Error('L’empreinte de catalog.json diffère du manifeste.');
   }
-  if (!Array.isArray(manifest.zones) || !manifest.zones.some((zone) => {
-    if (!zone || typeof zone !== 'object') return false;
+  const declaredTargets = Array.isArray(manifest.zones) ? manifest.zones.flatMap((zone) => {
+    if (!zone || typeof zone !== 'object') return [];
     const record = zone as Record<string, unknown>;
-    return record.zone_id === expectedZoneId && record.revision_id === `R${expectedRevision}`;
-  })) {
-    throw new Error('Le manifeste ne cible pas cette zone et cette révision.');
+    if (typeof record.zone_id !== 'string' || !/^[A-Z][A-Z0-9-]{2,63}$/.test(record.zone_id) || typeof record.revision_id !== 'string' || !/^R[1-9][0-9]*$/.test(record.revision_id)) return [];
+    return [{ zoneId: record.zone_id, revision: Number(record.revision_id.slice(1)) }];
+  }) : [];
+  if (declaredTargets.length !== 1) {
+    throw new Error('Le manifeste doit déclarer exactement une carte et une version technique.');
+  }
+  const target = declaredTargets[0]!;
+  if ((expectedZoneId === undefined) !== (expectedRevision === undefined)) {
+    throw new Error('La cible technique attendue est incomplète.');
+  }
+  if (expectedZoneId !== undefined && (target.zoneId !== expectedZoneId || target.revision !== expectedRevision)) {
+    throw new Error('Le manifeste ne cible pas cette carte et cette version technique.');
   }
 
   const assets = collectCatalogAssets(catalog);
@@ -264,6 +276,8 @@ export async function prepareSpatialPackage(
   }));
   return {
     packageId,
+    zoneId: target.zoneId,
+    revision: target.revision,
     files: preparedFiles,
     totalSizeBytes: preparedFiles.reduce((total, item) => total + item.file.size, 0),
     assetCount: assets.length,
@@ -310,18 +324,29 @@ export async function uploadPreparedSpatialPackage(
     readonly finalizationAttempts?: number;
     readonly finalizationRetryDelayMs?: number;
     readonly sessionKeepAliveIntervalMs?: number;
+    readonly incidentTarget?: {
+      readonly fireId: string;
+      readonly expectedIncidentVersion: number;
+    };
   } = {},
-): Promise<AdminSpatialPackageImport> {
-  const grant: AdminBlobUploadGrant = await api.createSpatialPackageUploadGrant(
-    zoneId,
-    revision,
-    {
-      package_id: prepared.packageId,
-      file_count: prepared.files.length,
-      total_size_bytes: prepared.totalSizeBytes,
-    },
-    { signal: options.signal },
-  );
+): Promise<AdminSpatialPackageImport | AdminIncidentSpatialPackageImport> {
+  const grantInput = {
+    package_id: prepared.packageId,
+    file_count: prepared.files.length,
+    total_size_bytes: prepared.totalSizeBytes,
+  };
+  const grant: AdminBlobUploadGrant = options.incidentTarget
+    ? await api.createIncidentSpatialPackageUploadGrant(
+      options.incidentTarget.fireId,
+      grantInput,
+      { signal: options.signal },
+    )
+    : await api.createSpatialPackageUploadGrant(
+      zoneId,
+      revision,
+      grantInput,
+      { signal: options.signal },
+    );
   const uploader = options.uploader ?? defaultUploader;
   const concurrency = Math.max(1, Math.min(8, Math.trunc(options.concurrency ?? DEFAULT_UPLOAD_CONCURRENCY)));
   const uploadAttempts = Math.max(1, Math.min(5, Math.trunc(options.uploadAttempts ?? DEFAULT_UPLOAD_ATTEMPTS)));
@@ -469,6 +494,22 @@ export async function uploadPreparedSpatialPackage(
   let finalizationError: unknown = null;
   for (let attempt = 1; attempt <= finalizationAttempts; attempt += 1) {
     try {
+      if (options.incidentTarget) {
+        return await api.finalizeIncidentSpatialPackageFromBlob(
+          options.incidentTarget.fireId,
+          {
+            upload_id: grant.upload_id,
+            package_id: prepared.packageId,
+            zone_id: prepared.zoneId,
+            revision: prepared.revision,
+            expected_incident_version: options.incidentTarget.expectedIncidentVersion,
+            primary_profile: 'local',
+            reason,
+            objects: finalizedObjects,
+          },
+          { idempotencyKey, signal: options.signal },
+        );
+      }
       return await api.finalizeSpatialPackageFromBlob(
         zoneId,
         revision,
@@ -491,4 +532,28 @@ export async function uploadPreparedSpatialPackage(
     `Finalisation du package impossible après ${finalizationAttempts} tentatives : ${errorMessage(finalizationError)}.`,
     { cause: finalizationError },
   );
+}
+
+export async function uploadPreparedIncidentSpatialPackage(
+  api: AdminApiClient,
+  fireId: string,
+  expectedIncidentVersion: number,
+  prepared: PreparedSpatialPackage,
+  reason: string,
+  idempotencyKey: string,
+  onProgress: (progress: SpatialPackageUploadProgress) => void,
+  options: Omit<NonNullable<Parameters<typeof uploadPreparedSpatialPackage>[7]>, 'incidentTarget'> = {},
+): Promise<AdminIncidentSpatialPackageImport> {
+  const result = await uploadPreparedSpatialPackage(
+    api,
+    prepared.zoneId,
+    prepared.revision,
+    prepared,
+    reason,
+    idempotencyKey,
+    onProgress,
+    { ...options, incidentTarget: { fireId, expectedIncidentVersion } },
+  );
+  if (!('fire_id' in result)) throw new Error('La carte finalisée n’a pas été rattachée au projet.');
+  return result;
 }

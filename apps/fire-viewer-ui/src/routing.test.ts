@@ -42,6 +42,7 @@ describe('resolveAppRoute', () => {
     expect(resolveAdminRoute('/admin/incidents/FR-83-00042/sources-medias')).toEqual({ kind: 'incident-sources-media', fireId: 'FR-83-00042' });
     expect(resolveAdminRoute('/admin/incidents/FR-83-00042/modeles-pipeline')).toEqual({ kind: 'incident-models-pipeline', fireId: 'FR-83-00042' });
     expect(resolveAdminRoute('/admin/incidents/FR-83-00042/revue-spatiale')).toEqual({ kind: 'incident-spatial-review', fireId: 'FR-83-00042' });
+    expect(resolveAdminRoute('/admin/incidents/FR-83-00042/carte/importer')).toEqual({ kind: 'incident-spatial-package', fireId: 'FR-83-00042' });
     expect(resolveAdminRoute('/admin/zones/DIE-PONTAIX-08')).toEqual({
       kind: 'zone-detail',
       zoneId: 'DIE-PONTAIX-08',

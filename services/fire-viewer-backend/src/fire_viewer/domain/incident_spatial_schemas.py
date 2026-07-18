@@ -17,6 +17,12 @@ class AdminIncidentScene(StrictSpatialReviewModel):
     asset_version: int | None = Field(default=None, ge=1)
     sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     package_id: str | None = None
+    zone_id: str | None = None
+    zone_revision: int | None = Field(default=None, ge=1)
+    package_state: str | None = None
+    publication_id: str | None = None
+    publication_state: str | None = None
+    publication_active: bool = False
     catalog_url: str | None = None
     files: dict[str, str] = Field(default_factory=dict, max_length=2_000)
     origin_wgs84: tuple[float, float, float]

@@ -90,46 +90,18 @@ def _is_tiled_scene(files: list[SpatialPackageFile]) -> bool:
     )
 
 
-def attach_incident_package(
+def attach_incident_package_in_transaction(
     session: Session,
     *,
-    fire_id: str,
+    incident: IncidentSeries,
+    package: SpatialPackage,
     payload: AdminIncidentRepresentationAttachRequest,
-    idempotency_key: str,
     actor: Actor,
     trace_id: str,
     settings: Settings,
-) -> RepresentationAttachmentOutcome:
-    endpoint = f"POST /api/v2/admin/incidents/{fire_id}/representations"
-    request_hash = sha256_hex(
-        {
-            "actor_id": actor.actor_id,
-            "fire_id": fire_id,
-            "payload": payload.model_dump(mode="json"),
-        }
-    )
-    begin_write_transaction(session)
-    replay = find_replay(
-        session,
-        endpoint=endpoint,
-        idempotency_key=idempotency_key,
-        request_hash=request_hash,
-    )
-    if replay:
-        session.rollback()
-        return RepresentationAttachmentOutcome(
-            AdminIncidentRepresentationAttachResponse.model_validate(replay.response_body),
-            True,
-        )
+) -> AdminIncidentRepresentationAttachResponse:
+    """Attach a locked package to a locked incident without committing the transaction."""
 
-    incident = session.execute(
-        select(IncidentSeries)
-        .where(IncidentSeries.fire_id == fire_id)
-        .options(selectinload(IncidentSeries.episodes))
-        .with_for_update()
-    ).scalar_one_or_none()
-    if incident is None:
-        raise NotFoundError("incident", fire_id)
     if incident.version != payload.expected_incident_version:
         raise ConflictError(
             "stale_incident_version",
@@ -142,18 +114,6 @@ def attach_incident_package(
             "incident_has_no_current_episode",
             "The incident has no current episode.",
         )
-
-    package = session.execute(
-        select(SpatialPackage)
-        .where(SpatialPackage.package_id == payload.package_id)
-        .options(
-            selectinload(SpatialPackage.files),
-            selectinload(SpatialPackage.spatial_zone_revision),
-        )
-        .with_for_update()
-    ).scalar_one_or_none()
-    if package is None:
-        raise NotFoundError("spatial_package", payload.package_id)
     if package.state not in {SpatialPackageState.PREVIEWABLE, SpatialPackageState.PUBLISHED}:
         raise ConflictError(
             "spatial_package_not_attachable",
@@ -164,6 +124,7 @@ def attach_incident_package(
             "spatial_package_has_no_revision",
             "The package is not bound to a spatial zone revision.",
         )
+
     tiled_scene = _is_tiled_scene(package.files)
     profiles = {} if tiled_scene else _profiles(package.files)
     primary_profile: str | None = None
@@ -293,6 +254,69 @@ def attach_incident_package(
             "primary_profile": primary_profile,
             "scene_kind": "tiled" if tiled_scene else "single_asset",
         },
+    )
+    return response
+
+
+def attach_incident_package(
+    session: Session,
+    *,
+    fire_id: str,
+    payload: AdminIncidentRepresentationAttachRequest,
+    idempotency_key: str,
+    actor: Actor,
+    trace_id: str,
+    settings: Settings,
+) -> RepresentationAttachmentOutcome:
+    endpoint = f"POST /api/v2/admin/incidents/{fire_id}/representations"
+    request_hash = sha256_hex(
+        {
+            "actor_id": actor.actor_id,
+            "fire_id": fire_id,
+            "payload": payload.model_dump(mode="json"),
+        }
+    )
+    begin_write_transaction(session)
+    replay = find_replay(
+        session,
+        endpoint=endpoint,
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
+    )
+    if replay:
+        session.rollback()
+        return RepresentationAttachmentOutcome(
+            AdminIncidentRepresentationAttachResponse.model_validate(replay.response_body),
+            True,
+        )
+
+    incident = session.execute(
+        select(IncidentSeries)
+        .where(IncidentSeries.fire_id == fire_id)
+        .options(selectinload(IncidentSeries.episodes))
+        .with_for_update()
+    ).scalar_one_or_none()
+    if incident is None:
+        raise NotFoundError("incident", fire_id)
+    package = session.execute(
+        select(SpatialPackage)
+        .where(SpatialPackage.package_id == payload.package_id)
+        .options(
+            selectinload(SpatialPackage.files),
+            selectinload(SpatialPackage.spatial_zone_revision),
+        )
+        .with_for_update()
+    ).scalar_one_or_none()
+    if package is None:
+        raise NotFoundError("spatial_package", payload.package_id)
+    response = attach_incident_package_in_transaction(
+        session,
+        incident=incident,
+        package=package,
+        payload=payload,
+        actor=actor,
+        trace_id=trace_id,
+        settings=settings,
     )
     store_response(
         session,

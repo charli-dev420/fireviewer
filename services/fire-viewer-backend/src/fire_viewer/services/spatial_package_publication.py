@@ -386,6 +386,76 @@ def _assert_required_preview_files(package: SpatialPackage) -> None:
         )
 
 
+def make_spatial_package_previewable(
+    session: Session,
+    *,
+    revision: SpatialZoneRevision,
+    package: SpatialPackage,
+    reason: str,
+    actor: Actor,
+    trace_id: str,
+) -> ZonePublication:
+    """Validate and expose a freshly imported package inside the caller transaction."""
+
+    if package.state != SpatialPackageState.DRAFT or package.spatial_zone_revision_id is not None:
+        raise ConflictError(
+            "spatial_package_not_draft",
+            "Only an unattached draft package can enter registry validation.",
+        )
+    _assert_required_preview_files(package)
+    package.verification_report = {
+        "status": "passed",
+        "scope": "registered-metadata-and-immutable-inventory",
+        "checks": ["manifest-metadata", "immutable-file-inventory", "preview-assets"],
+        "scene_kind": (
+            "remote_tiles"
+            if {
+                SpatialPackageFileKind.FWTILE,
+                SpatialPackageFileKind.FWTERRAIN,
+            }.issubset({file.kind for file in package.files})
+            else "single_asset"
+        ),
+        "package_id": package.package_id,
+    }
+    package.verified_at = utcnow()
+    package.spatial_zone_revision_id = revision.id
+    package.state = SpatialPackageState.VERIFIED
+    session.flush()
+    publication = _create_verified_publication(
+        session,
+        revision=revision,
+        package=package,
+        reason=reason,
+        actor=actor,
+        trace_id=trace_id,
+    )
+    package.state = SpatialPackageState.PREVIEWABLE
+    _transition_publication(
+        session,
+        publication=publication,
+        target=ZonePublicationState.PREVIEWABLE,
+        action="preview_enabled",
+        reason=reason,
+        actor=actor,
+        trace_id=trace_id,
+    )
+    record_operator_audit(
+        session,
+        actor=actor,
+        action="spatial_package.imported_for_incident",
+        target_type="spatial_package",
+        target_id=package.package_id,
+        reason=reason,
+        trace_id=trace_id,
+        after=_package_snapshot(package),
+        payload={
+            "zone_revision_id": revision.id,
+            "publication_id": publication.publication_id,
+        },
+    )
+    return publication
+
+
 def validate_spatial_package(
     session: Session,
     *,
