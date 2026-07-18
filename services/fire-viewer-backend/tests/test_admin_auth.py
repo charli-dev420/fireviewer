@@ -146,7 +146,7 @@ def test_local_admin_session_returns_in_memory_csrf_and_protects_logout(tmp_path
     assert expired.status_code == 401
 
 
-def test_local_admin_publication_requires_password_reauthentication(tmp_path) -> None:
+def test_local_admin_publication_uses_authenticated_session(tmp_path) -> None:
     password = "correct horse battery staple"
     settings = Settings(
         _env_file=None,
@@ -182,25 +182,18 @@ def test_local_admin_publication_requires_password_reauthentication(tmp_path) ->
             assert login.status_code == 200, login.text
             csrf = login.json()["csrf_token"]
             headers = {"X-CSRF-Token": csrf, "Idempotency-Key": "publish-reauth-test"}
-            missing = client.post(
+            accepted = client.post(
                 "/api/v1/admin/publications", json=publication, headers=headers
             )
-            wrong = client.post(
+            rejected_legacy_secret = client.post(
                 "/api/v1/admin/publications",
                 json={**publication, "admin_password": "incorrect password"},
-                headers=headers,
-            )
-            accepted = client.post(
-                "/api/v1/admin/publications",
-                json={**publication, "admin_password": password},
                 headers=headers,
             )
     finally:
         application.state.engine.dispose()
 
-    assert missing.status_code == 401
-    assert wrong.status_code == 401
-    assert missing.json()["detail"] == "Administrator reauthentication is required."
-    assert wrong.json()["detail"] == "Administrator reauthentication is required."
     assert accepted.status_code == 404
+    assert rejected_legacy_secret.status_code == 422
     assert "admin_password" not in accepted.text
+    assert "incorrect password" not in rejected_legacy_secret.text

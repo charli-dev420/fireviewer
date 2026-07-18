@@ -14,20 +14,20 @@ export interface AdminOperationDefinition {
 export const ADMIN_OPERATIONS: readonly AdminOperationDefinition[] = [
   { id: 'dashboard', label: 'Tableau de bord', href: '/admin', group: 'pilotage', icon: 'chart', availability: 'available', description: 'Décisions, alertes et état des services.' },
   { id: 'operational-map', label: 'Carte opérationnelle', href: '/admin/carte-operationnelle', group: 'pilotage', icon: 'map', availability: 'available', description: 'Carte nationale interne des incidents et représentations 3D.' },
-  { id: 'work-queue', label: 'File de traitement', href: '/admin/file-de-traitement', group: 'pilotage', icon: 'data', availability: 'available', description: 'Observations, rapprochements, épisodes à revoir et signalements ouverts.' },
+  { id: 'work-queue', label: 'Validation', href: '/admin/validation', group: 'pilotage', icon: 'data', availability: 'available', description: 'Tout ce qui attend une décision humaine.' },
   { id: 'incidents', label: 'Incidents', href: '/admin/incidents', group: 'operations', icon: 'flame', availability: 'available', description: 'Dossiers fire_id, épisodes, observations, modèles et audit.' },
   { id: 'spatial-matching', label: 'Rapprochement spatial', href: '/admin/rapprochement-spatial', group: 'operations', icon: 'target', availability: 'available', description: 'Revue motivée des candidats fire_id et episode_id proposés.' },
   { id: 'reports', label: 'Signalements', href: '/admin/signalements', group: 'operations', icon: 'users', availability: 'available', description: 'Traitement audité des erreurs signalées par le public.' },
   { id: 'publications', label: 'Publications', href: '/admin/publications', group: 'operations', icon: 'share', availability: 'available', description: 'Registre, retrait et restauration auditables des packages publiés.' },
   { id: 'audit', label: 'Audit global', href: '/admin/audit', group: 'governance', icon: 'data', availability: 'available', description: 'Journal global append-only sans snapshots exposés.' },
   { id: 'roles', label: 'Rôles et accès', href: '/admin/roles', group: 'governance', icon: 'users', availability: 'available', description: 'Rôles effectifs du jeton et catalogue serveur.' },
-  { id: 'system', label: 'État du système', href: '/admin/systeme', group: 'governance', icon: 'monitor', availability: 'available', description: 'État observé de l’API, base, files et packages.' },
+  { id: 'system', label: 'Système', href: '/admin/systeme', group: 'governance', icon: 'monitor', availability: 'available', description: 'Files, modèles, erreurs, accès et réglages.' },
   { id: 'configuration', label: 'Configuration', href: '/admin/configuration', group: 'governance', icon: 'data', availability: 'available', description: 'Paramètres sûrs consultables, sans secret ni mutation locale.' },
 ] as const;
 
 /** Références spatiales techniques, distinctes de l’identité incidente. */
 export const ADMIN_ZONE_TOOLS: readonly AdminOperationDefinition[] = [
-  { id: 'zones', label: 'Modèles et zones', href: '/admin/zones', group: 'production', icon: 'database', availability: 'available', description: 'Importer, documenter et administrer les packages 3D préparés hors site.' },
+  { id: 'zones', label: 'Cartes 3D', href: '/admin/zones', group: 'production', icon: 'database', availability: 'available', description: 'Importer, vérifier et publier les cartes 3D.' },
   { id: 'new-zone', label: 'Nouvelle zone', href: '/admin/zones/nouvelle', group: 'production', icon: 'plus-circle', availability: 'available', description: 'Déclarer une nouvelle zone logique locale.' },
 ] as const;
 

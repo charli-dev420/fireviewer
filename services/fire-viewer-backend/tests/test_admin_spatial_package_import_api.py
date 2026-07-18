@@ -12,7 +12,7 @@ from pydantic import SecretStr
 from sqlalchemy import select
 
 from fire_viewer.db.models import AuditEvent, SpatialPackage, SpatialPackageFile
-from fire_viewer.domain.enums import SpatialPackageFileKind
+from fire_viewer.domain.enums import IncidentStatus, SpatialPackageFileKind
 from fire_viewer.domain.schemas import AdminSpatialPackageFromBlobRequest
 from fire_viewer.services.spatial_package_blob_import import validate_blob_package
 from fire_viewer.storage import ObjectMetadata
@@ -262,8 +262,15 @@ def test_large_blob_inventory_uses_one_listing_and_two_metadata_heads(settings) 
 
 
 def test_admin_finalizes_exact_blob_inventory_then_previews_and_publishes(
-    client, settings, session
+    client, settings, session, seed_incident
 ) -> None:
+    incident, _episode = seed_incident(
+        fire_id="FR-26-00902",
+        sequence=902,
+        lon=5.2601,
+        lat=44.7555,
+        status=IncidentStatus.ACTIVE_CONFIRMED,
+    )
     _create_zone_and_revision(client)
     documents, objects = _stage_blob_objects(settings, package_id="pkg-import-test-r1")
 
@@ -336,6 +343,17 @@ def test_admin_finalizes_exact_blob_inventory_then_previews_and_publishes(
     assert image.status_code == 200
     assert image.headers["Cache-Control"] == "no-store"
     assert image.content == _PNG
+    attached = client.post(
+        f"/api/v2/admin/incidents/{incident.fire_id}/representations",
+        json={
+            "package_id": "pkg-import-test-r1",
+            "expected_incident_version": incident.version,
+            "primary_profile": "local",
+            "reason": "Rattachement explicite du package importé à l'incident de test.",
+        },
+        headers=_headers("spatial-import-attach-0001"),
+    )
+    assert attached.status_code == 200, attached.text
     published = client.post(
         "/api/v1/admin/publications",
         json={

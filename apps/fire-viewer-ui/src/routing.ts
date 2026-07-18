@@ -54,7 +54,7 @@ export function resolveAdminRoute(pathname: string): AdminRoute {
   if (normalizedPath === '/admin') return { kind: 'dashboard' };
   if (normalizedPath === '/admin/carte-operationnelle') return { kind: 'operational-map' };
   if (normalizedPath === '/admin/signalements') return { kind: 'reports' };
-  if (normalizedPath === '/admin/file-de-traitement') return { kind: 'work-queue' };
+  if (normalizedPath === '/admin/validation' || normalizedPath === '/admin/file-de-traitement') return { kind: 'work-queue' };
   if (normalizedPath === '/admin/rapprochement-spatial') return { kind: 'spatial-matching' };
   if (normalizedPath === '/admin/audit') return { kind: 'audit' };
   if (normalizedPath === '/admin/roles') return { kind: 'roles' };

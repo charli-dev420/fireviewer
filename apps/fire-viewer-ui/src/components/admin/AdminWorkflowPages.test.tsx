@@ -80,9 +80,9 @@ describe('pages de workflow administrateur', () => {
     await user.type(screen.getByLabelText('X maximum'), '100');
     await user.type(screen.getByLabelText('Y maximum'), '100');
     await user.type(screen.getByLabelText('Motif administratif'), 'Création de test.');
-    await user.click(screen.getByRole('button', { name: 'Créer la zone' }));
+    await user.click(screen.getByRole('button', { name: 'Créer la carte' }));
 
-    expect(await screen.findByRole('heading', { name: 'Zone créée' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Carte créée' })).toBeVisible();
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
     expect(init.headers).toEqual(expect.objectContaining({ 'Idempotency-Key': expect.stringMatching(/^admin-ui-/) }));
     expect(JSON.parse(String(init.body))).toMatchObject({ zone_id: 'TEST-ZONE-01' });
@@ -187,7 +187,7 @@ describe('pages de workflow administrateur', () => {
     });
   });
 
-  it('réauthentifie l’administrateur dans le formulaire réel de publication', async () => {
+  it('publie depuis l’aperçu avec la session administrateur active', async () => {
     vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
     const preview = {
       zone_id: 'TEST-ZONE-01',
@@ -198,6 +198,7 @@ describe('pages de workflow administrateur', () => {
       publication_id: 'publication-001',
       publication_state: 'PREVIEWABLE',
       publication_active: false,
+      linked_fire_ids: ['FR-26-00001'],
       verification_report: { status: 'verified' },
       preview_package_ids: ['pkg-zone-r2'],
       scene: null,
@@ -224,10 +225,10 @@ describe('pages de workflow administrateur', () => {
     const user = userEvent.setup();
     renderAdmin(<AdminZonePrivatePreviewPage zoneId="TEST-ZONE-01" revision={2} />);
 
-    await screen.findByRole('heading', { name: 'Publier ce package' });
-    await user.type(screen.getByLabelText('Motif'), 'Publication après validation visuelle privée.');
-    await user.type(screen.getByLabelText('Mot de passe administrateur'), 'correct horse battery staple');
-    await user.click(screen.getByRole('button', { name: 'Publier ce package' }));
+    await screen.findByRole('heading', { name: 'Publier sur l’incident' });
+    expect(screen.queryByLabelText('Mot de passe administrateur')).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('Motif de l’action'), 'Publication après validation visuelle privée.');
+    await user.click(screen.getByRole('button', { name: 'Publier sur l’incident' }));
 
     expect(await screen.findByText('Publication publication-001 activée.')).toBeVisible();
     const publicationCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/api/v1/admin/publications'));
@@ -237,7 +238,81 @@ describe('pages de workflow administrateur', () => {
       revision: 2,
       package_id: 'pkg-zone-r2',
       reason: 'Publication après validation visuelle privée.',
-      admin_password: 'correct horse battery staple',
+    });
+  });
+
+  it('rattache et publie une carte en une seule action utilisateur', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
+    const preview = {
+      zone_id: 'DIE-PONTAIX-08', revision: 1, preview_scope: 'private-admin',
+      package_id: 'pkg-die-r1', package_state: 'PREVIEWABLE', publication_id: 'publication-die-r1',
+      publication_state: 'PREVIEWABLE', publication_active: false, linked_fire_ids: [],
+      verification_report: { status: 'verified' }, preview_package_ids: ['pkg-die-r1'], scene: null, files: [],
+    };
+    const incident = {
+      fire_id: 'FR-26-00001', canonical_name: 'Incendie de Die', territory_code: '26', visibility: 'PUBLIC',
+      current_episode_id: 'E01', status: 'ACTIVE_CONFIRMED', verification_state: 'VERIFIED',
+      corroborating_source_count: 3, estimated_area_ha: 1200, evacuation_established: false,
+      model_generation_eligible: true, review_required: false, last_observed_at: '2026-07-18T00:00:00Z',
+      pending_observation_count: 0, version: 7, episodes: [], observations: [], sources: [], models: [], audit: [],
+    };
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith('/incidents/FR-26-00001') && init?.method === 'GET') return response(incident);
+      if (url.endsWith('/incidents/FR-26-00001/representations') && init?.method === 'POST') {
+        return response({ fire_id: 'FR-26-00001', episode_id: 'E01', package_id: 'pkg-die-r1', manifest_revision: 2, primary_asset_id: null, model_asset_ids: [], incident_version: 8, trace_id: 'trace-attach' });
+      }
+      if (url.endsWith('/publications') && init?.method === 'POST') {
+        return response({ publication: { zone_id: 'DIE-PONTAIX-08', revision: 1, package_id: 'pkg-die-r1', package_state: 'PUBLISHED', publication_id: 'publication-die-r1', publication_state: 'PUBLISHED', is_active: true }, trace_id: 'trace-publish' });
+      }
+      if (url.endsWith('/png')) return new Response(new Blob(['png']), { status: 200, headers: { 'Content-Type': 'image/png' } });
+      return response(preview);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderAdmin(<AdminZonePrivatePreviewPage zoneId="DIE-PONTAIX-08" revision={1} />);
+
+    await user.type(await screen.findByLabelText('Incident qui affichera la carte'), 'FR-26-00001');
+    await user.type(screen.getByLabelText('Motif de l’action'), 'Publication de la carte validée sur l’incident de Die.');
+    await user.click(screen.getByRole('button', { name: 'Publier sur l’incident' }));
+
+    expect(await screen.findByText('Publication publication-die-r1 activée.')).toBeVisible();
+    const mutations = fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST').map(([url]) => String(url));
+    expect(mutations).toEqual([
+      `${API_ORIGIN}/api/v2/admin/incidents/FR-26-00001/representations`,
+      `${API_ORIGIN}/api/v1/admin/publications`,
+    ]);
+  });
+
+  it('retire une carte publiée sans supprimer son historique', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
+    const preview = {
+      zone_id: 'TEST-ZONE-01', revision: 2, preview_scope: 'private-admin',
+      package_id: 'pkg-zone-r2', package_state: 'PUBLISHED',
+      publication_id: 'publication-001', publication_state: 'PUBLISHED', publication_active: true,
+      linked_fire_ids: ['FR-26-00001'],
+      verification_report: { status: 'verified' }, preview_package_ids: ['pkg-zone-r2'], scene: null, files: [],
+    };
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
+      if (String(input).endsWith('/publications/publication-001/withdraw') && init?.method === 'POST') {
+        return response({ publication: { ...preview, state: 'WITHDRAWN', is_active: false }, trace_id: 'trace-withdraw' });
+      }
+      if (String(input).endsWith('/png')) return new Response(new Blob(['png']), { status: 200, headers: { 'Content-Type': 'image/png' } });
+      return response(preview);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderAdmin(<AdminZonePrivatePreviewPage zoneId="TEST-ZONE-01" revision={2} />);
+
+    await screen.findByRole('heading', { name: 'Retirer du public' });
+    await user.type(screen.getByLabelText('Motif de l’action'), 'Retrait demandé après contrôle administratif.');
+    await user.click(screen.getByRole('button', { name: 'Retirer du public' }));
+
+    expect(await screen.findByText('La carte a été retirée du site public.')).toBeVisible();
+    const withdrawCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/publications/publication-001/withdraw'));
+    expect(JSON.parse(String(withdrawCall?.[1]?.body))).toEqual({
+      reason: 'Retrait demandé après contrôle administratif.',
+      confirm_publication_id: 'publication-001',
     });
   });
 
@@ -247,6 +322,7 @@ describe('pages de workflow administrateur', () => {
       zone_id: 'TEST-ZONE-01', revision: 2, preview_scope: 'private-admin',
       package_id: 'pkg-unity-r2', package_state: 'PREVIEWABLE',
       publication_id: 'publication-unity', publication_state: 'PREVIEWABLE', publication_active: false,
+      linked_fire_ids: [],
       verification_report: { status: 'passed', scene_kind: 'remote_tiles' },
       preview_package_ids: ['pkg-unity-r2'],
       scene: {
@@ -259,6 +335,9 @@ describe('pages de workflow administrateur', () => {
     renderAdmin(<AdminZonePrivatePreviewPage zoneId="TEST-ZONE-01" revision={2} />);
 
     expect(await screen.findByText('Scène Unity orbit · accès include')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Publier sur l’incident' })).toBeDisabled();
+    expect(screen.getByLabelText('Incident qui affichera la carte')).toHaveAttribute('placeholder', 'FR-26-00001');
+    expect(screen.queryByRole('button', { name: 'Associer cette carte' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Vue FPS' }));
     expect(await screen.findByText('Scène Unity fps · accès include')).toBeVisible();
   });

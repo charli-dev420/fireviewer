@@ -9,7 +9,6 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    SecretStr,
     StringConstraints,
     WithJsonSchema,
     field_validator,
@@ -1213,10 +1212,6 @@ class AdminSpatialPackageActionRequest(StrictModel):
 class AdminSpatialPackagePublicationRequest(AdminSpatialPackageActionRequest):
     zone_id: str = Field(min_length=3, max_length=64, pattern=r"^[A-Z][A-Z0-9-]*$")
     revision: int = Field(ge=1)
-
-
-class AdminSpatialPackagePublishRequest(AdminSpatialPackagePublicationRequest):
-    admin_password: SecretStr | None = Field(default=None, min_length=1, max_length=1024)
 
 
 class AdminSpatialPackagePublicationResponse(StrictModel):

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAdminApi, useAdminMutation, useAdminQuery } from './AdminApiContext';
 import { AdminIncidentWorkspaceNav } from './AdminIncidentWorkspaceNav';
 import {
-  AdminEmptyState,
   AdminErrorState,
   AdminLoadingState,
   AdminPageHeader,
@@ -77,6 +76,8 @@ export function AdminIncidentDetailPage({ fireId }: { readonly fireId: string })
 
   const incident = state.data;
   const current = incident.episodes.find((episode) => episode.is_current);
+  const spatialModel = incident.models.find((model) => spatialRevisionHref(model) !== null);
+  const spatialHref = spatialModel ? spatialRevisionHref(spatialModel) : null;
 
   const transition = async () => {
     if (!current || reason.trim().length < 10 || !status) return;
@@ -144,7 +145,7 @@ export function AdminIncidentDetailPage({ fireId }: { readonly fireId: string })
       <AdminIncidentWorkspaceNav fireId={incident.fire_id} active="dossier" />
 
       <div className="admin-detail-grid">
-        <section className="admin-detail-card">
+        <section className="admin-detail-card admin-detail-advanced">
           <h3>Cycle de vie</h3>
           <dl>
             <div><dt>Statut</dt><dd><AdminStateLabel value={incident.status} /></dd></div>
@@ -153,8 +154,28 @@ export function AdminIncidentDetailPage({ fireId }: { readonly fireId: string })
             <div><dt>Revue</dt><dd>{incident.review_required ? 'Requise' : 'À jour'}</dd></div>
             <div><dt>Version incident</dt><dd>{incident.version}</dd></div>
           </dl>
+          <div className="admin-form-actions">
+            <a className="button button--small" href={`/admin/incidents/${incident.fire_id}/observations`}>Valider les preuves</a>
+            <a className="button button--primary" href={`/admin/incidents/${incident.fire_id}/revue-spatiale`}>Ouvrir la carte 3D</a>
+          </div>
         </section>
 
+        <section id="publication" className="admin-detail-card admin-detail-advanced">
+          <h3>Publication</h3>
+          <p>Contrôlez la carte associée, sa visibilité et son rendu public depuis un seul parcours.</p>
+          <div className="admin-form-actions">
+            {spatialHref ? (
+              <a className="button button--primary" href={`${spatialHref}/preview`}>Gérer la publication de la carte</a>
+            ) : (
+              <a className="button button--small" href="/admin/zones">Associer une carte 3D</a>
+            )}
+            <a className="button button--small" href={`/incendie/${encodeURIComponent(incident.fire_id)}`} target="_blank" rel="noreferrer">Voir la fiche publique</a>
+          </div>
+        </section>
+
+        <details id="infos-stats" className="admin-section admin-disclosure admin-detail-advanced">
+          <summary>Modifier l’incident</summary>
+          <div className="admin-detail-grid">
         <section className="admin-detail-card">
           <h3>Profil opérationnel</h3>
           <p>
@@ -250,9 +271,14 @@ export function AdminIncidentDetailPage({ fireId }: { readonly fireId: string })
             Appliquer la transition
           </button>
         </section>
+          </div>
+        </details>
 
-        <section className="admin-detail-card">
-          <h3>Épisodes</h3>
+        <details id="history" className="admin-section admin-disclosure admin-detail-advanced">
+          <summary>Historique, sources et détails techniques</summary>
+          <div className="admin-detail-grid">
+          <section className="admin-detail-card">
+            <h3>Épisodes</h3>
           {incident.episodes.map((episode) => (
             <div key={episode.episode_id}>
               <strong>{episode.episode_id}</strong> · {episode.status} ·{' '}
@@ -263,9 +289,9 @@ export function AdminIncidentDetailPage({ fireId }: { readonly fireId: string })
               </small>
             </div>
           ))}
-        </section>
+          </section>
 
-        <section className="admin-detail-card">
+          <section className="admin-detail-card">
           <h3>Observations et rattachement</h3>
           {incident.observations.length ? incident.observations.map((item) => (
             <div key={item.observation_id}>
@@ -281,9 +307,9 @@ export function AdminIncidentDetailPage({ fireId }: { readonly fireId: string })
           <a className="button button--small" href={`/admin/incidents/${incident.fire_id}/observations`}>
             Ouvrir les observations
           </a>
-        </section>
+          </section>
 
-        <section className="admin-detail-card">
+          <section className="admin-detail-card">
           <h3>Sources</h3>
           {incident.sources.length ? incident.sources.map((source) => (
             <div key={source.source_key}>
@@ -297,9 +323,9 @@ export function AdminIncidentDetailPage({ fireId }: { readonly fireId: string })
           <a className="button button--small" href={`/admin/incidents/${incident.fire_id}/sources-medias`}>
             Ouvrir sources et médias
           </a>
-        </section>
+          </section>
 
-        <section className="admin-detail-card">
+          <section className="admin-detail-card">
           <h3>Modèles et révisions</h3>
           {incident.models.length ? incident.models.map((model) => {
             const technicalRevisionHref = spatialRevisionHref(model);
@@ -326,9 +352,9 @@ export function AdminIncidentDetailPage({ fireId }: { readonly fireId: string })
           <a className="button button--small" href={`/admin/incidents/${incident.fire_id}/modeles-pipeline`}>
             Ouvrir modèles et pipeline
           </a>
-        </section>
+          </section>
 
-        <section className="admin-detail-card">
+          <section className="admin-detail-card">
           <h3>Audit</h3>
           {incident.audit.length ? incident.audit.map((event) => (
             <div key={event.event_id}>
@@ -338,17 +364,12 @@ export function AdminIncidentDetailPage({ fireId }: { readonly fireId: string })
               </small>
             </div>
           )) : <p>Aucun événement d’audit lié.</p>}
-        </section>
+          </section>
+          </div>
+        </details>
       </div>
 
       {mutation.state.error ? <AdminErrorState error={mutation.state.error} /> : null}
-      <AdminEmptyState title="Limites de cette passe">
-        <span>
-          Les liens vers une zone technique ne sont ajoutés que lorsqu’un rattachement
-          explicite est exposé par le contrat. La production et le chargement des modèles
-          restent hors de cette passe.
-        </span>
-      </AdminEmptyState>
     </section>
   );
 }

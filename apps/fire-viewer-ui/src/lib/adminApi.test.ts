@@ -189,7 +189,7 @@ describe('client API d’administration', () => {
     });
   });
 
-  it('transmet le mot de passe uniquement dans la requête de publication', async () => {
+  it('publie avec la session administrateur active sans retransmettre de secret', async () => {
     vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response({
       publication: {
@@ -208,7 +208,6 @@ describe('client API d’administration', () => {
     await client.publishSpatialPackage('TEST-ZONE-01', 2, {
       package_id: 'pkg-zone-r2',
       reason: 'Publication après contrôle de l’aperçu privé.',
-      admin_password: 'correct horse battery staple',
     }, { idempotencyKey: 'publication-0001' });
 
     const [url, init] = fetchMock.mock.calls[0] ?? [];
@@ -219,7 +218,27 @@ describe('client API d’administration', () => {
       revision: 2,
       package_id: 'pkg-zone-r2',
       reason: 'Publication après contrôle de l’aperçu privé.',
-      admin_password: 'correct horse battery staple',
+    });
+  });
+
+  it('rattache explicitement un package spatial à un incident', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response({
+      fire_id: 'FR-26-00001', episode_id: 'E01', package_id: 'pkg-zone-r2', manifest_revision: 3,
+      primary_asset_id: null, model_asset_ids: [], incident_version: 8, trace_id: 'trace-attach',
+    }));
+    const client = new AdminApiClient({ session: SESSION, fetchImpl: fetchMock });
+
+    await expect(client.attachSpatialPackageToIncident('FR-26-00001', {
+      package_id: 'pkg-zone-r2', expected_incident_version: 7,
+      reason: 'Rattachement de la carte validée à l’incident de Die.',
+    }, { idempotencyKey: 'attach-package-0001' })).resolves.toMatchObject({ manifest_revision: 3 });
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe(`${API_ORIGIN}/api/v2/admin/incidents/FR-26-00001/representations`);
+    expect(JSON.parse(String(init?.body))).toEqual({
+      package_id: 'pkg-zone-r2', expected_incident_version: 7, primary_profile: 'local',
+      reason: 'Rattachement de la carte validée à l’incident de Die.',
     });
   });
 

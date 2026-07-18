@@ -43,9 +43,7 @@ export function AdminZoneDetailPage({ zoneId }: AdminZoneDetailPageProps) {
   const { state, reload } = useAdminQuery(load, [load]);
   const [form, setForm] = useState(emptyAdminZoneForm);
   const [formError, setFormError] = useState<string | null>(null);
-  const [visibilityReason, setVisibilityReason] = useState('');
   const updateMutation = useAdminMutation();
-  const visibilityMutation = useAdminMutation();
 
   useEffect(() => {
     if (state.kind === 'ready') {
@@ -72,19 +70,6 @@ export function AdminZoneDetailPage({ zoneId }: AdminZoneDetailPageProps) {
     if (result) reload();
   };
 
-  const changeVisibility = async (visibility: 'PUBLISHED' | 'HIDDEN') => {
-    const reason = visibilityReason.trim();
-    if (!reason) return;
-    const result = await visibilityMutation.run(
-      JSON.stringify({ visibility, reason }),
-      (options) => api.setZoneVisibility(zoneId, visibility, reason, options),
-    );
-    if (result) {
-      setVisibilityReason('');
-      reload();
-    }
-  };
-
   if (state.kind === 'loading') return <AdminLoadingState label="Chargement de la zone privée…" />;
   if (state.kind === 'error') return <AdminErrorState error={state.error} onRetry={reload} />;
 
@@ -98,12 +83,26 @@ export function AdminZoneDetailPage({ zoneId }: AdminZoneDetailPageProps) {
         title={zone.label}
         actions={<a className="button button--small" href="/admin/zones">Toutes les zones</a>}
       >
-        <p><code>{zone.zone_id}</code> · <AdminStateLabel value={zone.visibility} /></p>
+        <p><code>{zone.zone_id}</code> · espace de travail 3D privé</p>
       </AdminPageHeader>
 
       <div className="admin-zone-layout">
-        <form className="admin-form-card" onSubmit={(event) => void submitEdit(event)}>
-          <h3>Définition de la zone</h3>
+        <section className="admin-action-card">
+          <h3>Carte 3D</h3>
+          <p>Créez une révision, importez le dossier Unity, vérifiez la scène puis publiez le package depuis son aperçu. C’est l’unique parcours de publication de la carte.</p>
+          <a className="button button--primary" href={newRevisionHref}>Créer une révision 3D</a>
+        </section>
+        <section className="admin-action-card">
+          <h3>Calques et informations</h3>
+          <p>Ajoutez des repères ou informations positionnées dans cette zone. Ils restent modifiables avant leur exposition publique.</p>
+          <a className="button button--small" href={newInformationHref}>Ajouter une information</a>
+        </section>
+      </div>
+
+      <details className="admin-section admin-disclosure">
+        <summary>Paramètres techniques de la zone</summary>
+        <form className="admin-form-card admin-form-card--embedded" onSubmit={(event) => void submitEdit(event)}>
+          <p>Ces paramètres définissent l’emprise locale. Ils ne publient ni la carte ni le package Unity.</p>
           <AdminZoneFormFields
             value={form}
             onChange={(next) => { setForm(next); setFormError(null); }}
@@ -112,55 +111,18 @@ export function AdminZoneDetailPage({ zoneId }: AdminZoneDetailPageProps) {
             disabled={updateMutation.state.pending}
           />
           {formError ? <div className="admin-feedback admin-feedback--error" role="alert">{formError}</div> : null}
-          <AdminMutationFeedback
-            error={updateMutation.state.error}
-            succeeded={updateMutation.state.succeeded}
-            success="La définition de la zone a été mise à jour."
-          />
           <div className="admin-form-actions">
             <button className="button button--primary" type="submit" disabled={updateMutation.state.pending}>
-              {updateMutation.state.pending ? 'Enregistrement…' : 'Enregistrer les modifications'}
+              {updateMutation.state.pending ? 'Enregistrement…' : 'Enregistrer les paramètres'}
             </button>
           </div>
         </form>
-
-        <aside className="admin-side-stack" aria-label="Actions de zone">
-          <section className="admin-action-card">
-            <h3>Visibilité publique</h3>
-            <p>La publication rend uniquement cette zone disponible au frontend public. Aucune autre zone n’est affectée.</p>
-            <label className="admin-field" htmlFor="zone-visibility-reason">
-              <span>Motif de publication ou de masquage</span>
-              <textarea
-                id="zone-visibility-reason"
-                value={visibilityReason}
-                onChange={(event) => setVisibilityReason(event.currentTarget.value)}
-                maxLength={500}
-                rows={3}
-                disabled={visibilityMutation.state.pending}
-              />
-            </label>
-            <AdminMutationFeedback
-              error={visibilityMutation.state.error}
-              succeeded={visibilityMutation.state.succeeded}
-              success="La visibilité de la zone a été modifiée."
-            />
-            <div className="admin-action-card__buttons">
-              <button type="button" className="button button--primary" disabled={visibilityMutation.state.pending || visibilityReason.trim().length === 0 || zone.visibility === 'PUBLISHED'} onClick={() => void changeVisibility('PUBLISHED')}>Publier la zone</button>
-              <button type="button" className="button button--small" disabled={visibilityMutation.state.pending || visibilityReason.trim().length === 0 || zone.visibility === 'HIDDEN'} onClick={() => void changeVisibility('HIDDEN')}>Masquer la zone</button>
-            </div>
-          </section>
-          <section className="admin-action-card">
-            <h3>Package spatial</h3>
-            <p>Créez une révision ENU immuable, ouvrez-la puis choisissez le dossier produit localement pour l’envoyer directement au stockage privé.</p>
-            <a className="button button--small" href={newRevisionHref}>Créer une révision</a>
-          </section>
-          <section className="admin-action-card">
-            <h3>Informations positionnées</h3>
-            <p>Ajoutez seulement des informations situées dans l’emprise locale de cette zone.</p>
-            <a className="button button--small" href={newInformationHref}>Ajouter une information</a>
-          </section>
-        </aside>
-      </div>
+      </details>
+      <AdminMutationFeedback
+        error={updateMutation.state.error}
+        succeeded={updateMutation.state.succeeded}
+        success="La définition de la zone a été mise à jour."
+      />
 
       <section className="admin-section" aria-labelledby="admin-zone-information-title">
         <div className="admin-section__heading">

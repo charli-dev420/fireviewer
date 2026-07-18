@@ -5,13 +5,8 @@ import {
   AdminErrorState,
   AdminLoadingState,
   AdminPageHeader,
-  AdminStateLabel,
   formatAdminDate,
 } from './AdminPageState';
-
-function formatBounds(bounds: readonly [number, number, number, number]): string {
-  return `${bounds[0].toLocaleString('fr-FR')} / ${bounds[1].toLocaleString('fr-FR')} — ${bounds[2].toLocaleString('fr-FR')} / ${bounds[3].toLocaleString('fr-FR')}`;
-}
 
 export function AdminZonesPage() {
   const api = useAdminApi();
@@ -21,18 +16,18 @@ export function AdminZonesPage() {
   return (
     <section aria-labelledby="admin-zones-title">
       <AdminPageHeader
-        title="Zones administrées"
-        actions={<a className="button button--primary" href="/admin/zones/nouvelle">Créer une zone</a>}
+        title="Cartes 3D"
+        actions={<a className="button button--primary" href="/admin/zones/nouvelle">Ajouter une carte</a>}
       >
-        <p>Chaque zone est autonome et reste limitée à son emprise locale déclarée.</p>
+        <p>Importez, vérifiez et publiez chaque carte depuis un parcours unique.</p>
       </AdminPageHeader>
 
       {state.kind === 'loading' ? <AdminLoadingState label="Chargement des zones administrées…" /> : null}
       {state.kind === 'error' ? <AdminErrorState error={state.error} onRetry={reload} /> : null}
       {state.kind === 'ready' && state.data.length === 0 ? (
         <AdminEmptyState
-          title="Aucune zone administrée"
-          action={<a className="button button--primary" href="/admin/zones/nouvelle">Créer la première zone</a>}
+          title="Aucune carte 3D"
+          action={<a className="button button--primary" href="/admin/zones/nouvelle">Ajouter la première carte</a>}
         >
           Créez une zone logique, puis une révision et importez le dossier du package produit localement.
         </AdminEmptyState>
@@ -42,9 +37,7 @@ export function AdminZonesPage() {
           <table className="admin-table">
             <thead>
               <tr>
-                <th scope="col">Zone</th>
-                <th scope="col">Visibilité</th>
-                <th scope="col">Emprise Lambert-93</th>
+                <th scope="col">Carte</th>
                 <th scope="col">Mise à jour</th>
                 <th scope="col"><span className="sr-only">Ouvrir</span></th>
               </tr>
@@ -56,10 +49,8 @@ export function AdminZonesPage() {
                     <a href={`/admin/zones/${encodeURIComponent(zone.zone_id)}`}>{zone.label}</a>
                     <small>{zone.zone_id}</small>
                   </th>
-                  <td><AdminStateLabel value={zone.visibility} /></td>
-                  <td className="admin-table__muted">{formatBounds(zone.bounds_l93_m)}</td>
                   <td className="admin-table__muted">{formatAdminDate(zone.updated_at)}</td>
-                  <td><a className="button button--small" href={`/admin/zones/${encodeURIComponent(zone.zone_id)}`}>Gérer</a></td>
+                  <td><a className="button button--small" href={`/admin/zones/${encodeURIComponent(zone.zone_id)}`}>Ouvrir</a></td>
                 </tr>
               ))}
             </tbody>

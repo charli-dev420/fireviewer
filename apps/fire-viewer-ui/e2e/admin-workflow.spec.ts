@@ -244,7 +244,7 @@ async function installAdminApiContract(page: Page): Promise<{ readonly requests:
 }
 
 test.describe('Administration privée des zones', () => {
-  test('authentifie, crée, modifie, publie, positionne et revoit sans charger de carte binaire', async ({ page }) => {
+  test('authentifie, crée, modifie, positionne et revoit sans charger de carte binaire', async ({ page }) => {
     const contract = await installAdminApiContract(page);
     const forbiddenRequests: string[] = [];
     const failedRequests: string[] = [];
@@ -271,11 +271,11 @@ test.describe('Administration privée des zones', () => {
       await page.getByLabel('Identifiant').fill(ADMIN_USERNAME);
       await page.getByLabel('Mot de passe').fill(ADMIN_PASSWORD);
       await page.getByRole('button', { name: 'Ouvrir l’administration' }).click();
-      await expect(page.getByRole('heading', { name: 'Zones administrées' })).toBeVisible();
-      await expect(page.getByText('Aucune zone administrée')).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Cartes 3D' })).toBeVisible();
+      await expect(page.getByText('Aucune carte 3D')).toBeVisible();
 
-      await page.getByRole('link', { name: 'Créer une zone', exact: true }).click();
-      await expect(page.getByRole('heading', { name: 'Créer une zone' })).toBeVisible();
+      await page.getByRole('link', { name: 'Ajouter une carte', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Préparer une carte 3D' })).toBeVisible();
       await page.getByLabel('Identifiant stable').fill(ZONE_ID);
       await page.getByLabel('Nom public').fill('Seconde zone rurale');
       await page.getByLabel('Description').fill('Zone rurale synthétique et indépendante.');
@@ -284,26 +284,22 @@ test.describe('Administration privée des zones', () => {
       await page.getByLabel('X maximum').fill('892000');
       await page.getByLabel('Y maximum').fill('6413000');
       await page.getByLabel('Motif administratif').fill('Création de la seconde zone de test.');
-      await page.getByRole('button', { name: 'Créer la zone' }).click();
-      await expect(page.getByRole('heading', { name: 'Zone créée' })).toBeVisible();
-      await page.getByRole('link', { name: 'Ouvrir la zone' }).click();
+      await page.getByRole('button', { name: 'Créer la carte' }).click();
+      await expect(page.getByRole('heading', { name: 'Carte créée' })).toBeVisible();
+      await page.getByRole('link', { name: 'Continuer' }).click();
       await expect(page).toHaveURL(new RegExp(`/admin/zones/${ZONE_ID}$`));
       await expect(page.getByRole('heading', { name: 'Seconde zone rurale' })).toBeVisible();
     });
 
-    await test.step('modification et visibilité explicite', async () => {
+    await test.step('modification technique sans faux contrôle de publication', async () => {
+      await page.getByText('Paramètres techniques de la zone').click();
       await page.getByLabel('Nom public').fill('Seconde zone rurale vérifiée');
       await page.getByLabel('Motif administratif').fill('Correction éditoriale après contrôle humain.');
-      await page.getByRole('button', { name: 'Enregistrer les modifications' }).click();
+      await page.getByRole('button', { name: 'Enregistrer les paramètres' }).click();
       await expect(page.getByText('La définition de la zone a été mise à jour.')).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Seconde zone rurale vérifiée' })).toBeVisible();
-      await page.getByLabel('Motif de publication ou de masquage').fill('Contrôle humain terminé.');
-      await page.getByRole('button', { name: 'Publier la zone' }).click();
-      await expect.poll(() => contract.requests.some((request) => request.url.endsWith(`/zones/${ZONE_ID}/visibility`) && request.method === 'POST')).toBe(true);
-      await expect(page.getByText('PUBLISHED', { exact: true })).toBeVisible();
-      await page.getByLabel('Motif de publication ou de masquage').fill('Masquage de vérification.');
-      await page.getByRole('button', { name: 'Masquer la zone' }).click();
-      await expect(page.getByText('HIDDEN', { exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Publier la zone' })).toHaveCount(0);
+      await expect(page.getByText(/unique parcours de publication de la carte/i)).toBeVisible();
     });
 
     await test.step('création puis revue d’une information dans l’emprise locale', async () => {
@@ -330,7 +326,7 @@ test.describe('Administration privée des zones', () => {
     const mutationRequests = protectedRequests.filter((request) => ['POST', 'PATCH'].includes(request.method));
     expect(protectedRequests.length).toBeGreaterThan(6);
     expect(protectedRequests.every((request) => request.url.startsWith(`${ADMIN_API_ORIGIN}/api/v1/admin/`))).toBe(true);
-    expect(mutationRequests.length).toBeGreaterThanOrEqual(6);
+    expect(mutationRequests.length).toBeGreaterThanOrEqual(4);
     expect(mutationRequests.every((request) => Boolean(request.idempotencyKey))).toBe(true);
     expect(mutationRequests.every((request) => request.csrfToken === ADMIN_CSRF)).toBe(true);
     // Les liens `<a>` rechargent la page : la validation de session initiée

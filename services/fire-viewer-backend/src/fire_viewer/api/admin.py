@@ -21,6 +21,8 @@ from fire_viewer.core.time import utcnow
 from fire_viewer.db.models import (
     AdminLocalSession,
     AdminLoginAttempt,
+    IncidentSeries,
+    ManifestRevision,
     SpatialPackage,
     SpatialZone,
     SpatialZoneRevision,
@@ -73,7 +75,6 @@ from fire_viewer.domain.schemas import (
     AdminSpatialPackageImportEnvelope,
     AdminSpatialPackagePublicationEnvelope,
     AdminSpatialPackagePublicationRequest,
-    AdminSpatialPackagePublishRequest,
     AdminSpatialPackageRecoveryRequest,
     AdminSystemStatus,
     AdminWorkQueueResponse,
@@ -199,6 +200,7 @@ class AdminPrivatePreviewResponse(StrictModel):
     publication_id: str | None
     publication_state: str | None
     publication_active: bool
+    linked_fire_ids: list[str] = Field(default_factory=list)
     verification_report: dict[str, object]
     preview_package_ids: list[str] = Field(default_factory=list)
     scene: AdminPrivatePreviewScene | None = None
@@ -1084,8 +1086,29 @@ def get_private_preview(
         )
         if package
         and tiled
-        and package.state in {SpatialPackageState.PREVIEWABLE, SpatialPackageState.PUBLISHED}
+        and package.state
+        in {
+            SpatialPackageState.PREVIEWABLE,
+            SpatialPackageState.PUBLISHED,
+            SpatialPackageState.WITHDRAWN,
+        }
         else None
+    )
+    linked_fire_ids = (
+        list(
+            session.execute(
+                select(IncidentSeries.fire_id)
+                .join(ManifestRevision, ManifestRevision.incident_id == IncidentSeries.id)
+                .where(
+                    ManifestRevision.spatial_package_id == package.id,
+                    ManifestRevision.is_current.is_(True),
+                )
+                .distinct()
+                .order_by(IncidentSeries.fire_id)
+            ).scalars()
+        )
+        if package
+        else []
     )
     return AdminPrivatePreviewResponse(
         zone_id=zone_id,
@@ -1096,9 +1119,12 @@ def get_private_preview(
         publication_id=publication.publication_id if publication else None,
         publication_state=str(publication.state) if publication else None,
         publication_active=publication.is_active if publication else False,
+        linked_fire_ids=linked_fire_ids,
         verification_report=package.verification_report if package else {},
         preview_package_ids=[
-            item.package_id for item in packages if str(item.state) in {"PREVIEWABLE", "PUBLISHED"}
+            item.package_id
+            for item in packages
+            if str(item.state) in {"PREVIEWABLE", "PUBLISHED", "WITHDRAWN"}
         ],
         scene=scene,
         files=[
@@ -1146,7 +1172,11 @@ def get_private_preview_catalog(
     ).scalar_one_or_none()
     if package is None:
         raise NotFoundError("spatial_package", package_id)
-    if package.state not in {SpatialPackageState.PREVIEWABLE, SpatialPackageState.PUBLISHED}:
+    if package.state not in {
+        SpatialPackageState.PREVIEWABLE,
+        SpatialPackageState.PUBLISHED,
+        SpatialPackageState.WITHDRAWN,
+    }:
         raise ConflictError(
             "spatial_package_preview_not_enabled",
             "Private tiled preview requires a previewable package.",
@@ -1204,7 +1234,7 @@ def get_private_preview_png(
     ).scalar_one_or_none()
     if package is None:
         raise NotFoundError("spatial_package", package_id)
-    if str(package.state) not in {"PREVIEWABLE", "PUBLISHED"}:
+    if str(package.state) not in {"PREVIEWABLE", "PUBLISHED", "WITHDRAWN"}:
         raise ConflictError(
             "spatial_package_preview_not_enabled",
             "Private binary preview requires a previewable package.",
@@ -1323,7 +1353,7 @@ def restore_publication(
 
 @router.post("/publications", response_model=AdminSpatialPackagePublicationEnvelope)
 def publish_revision(
-    payload: AdminSpatialPackagePublishRequest,
+    payload: AdminSpatialPackagePublicationRequest,
     response: Response,
     actor: ActorDep,
     session: SessionDep,
@@ -1332,22 +1362,9 @@ def publish_revision(
     idempotency_key: IdempotencyKeyDep,
 ) -> AdminSpatialPackagePublicationEnvelope:
     _require_admin(actor)
-    if settings.auth_mode == "local_admin":
-        password = payload.admin_password
-        if (
-            password is None
-            or not settings.local_admin_password_hash
-            or not verify_local_password(
-                password.get_secret_value(), settings.local_admin_password_hash
-            )
-        ):
-            raise UnauthorizedError("Administrator reauthentication is required.")
-    publication_payload = AdminSpatialPackagePublicationRequest.model_validate(
-        payload.model_dump(exclude={"admin_password"})
-    )
     outcome = publish_spatial_package(
         session,
-        payload=publication_payload,
+        payload=payload,
         idempotency_key=idempotency_key,
         actor=actor,
         trace_id=trace_id,

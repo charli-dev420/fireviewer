@@ -74,7 +74,7 @@ export function AdminSpatialMatchingPage() {
 
   return (
     <section aria-labelledby="admin-spatial-matching-title">
-      <AdminPageHeader title="Rapprochement spatial" actions={<a className="button button--secondary" href="/admin/file-de-traitement">Retour à la file</a>}>
+      <AdminPageHeader title="Rapprochement spatial" actions={<a className="button button--secondary" href="/admin/validation">Retour à la validation</a>}>
         <p>Examinez chaque observation non résolue à partir de ses coordonnées, de son incertitude et des motifs proposés. La distance seule ne suffit jamais et aucune fusion n’est automatique.</p>
       </AdminPageHeader>
 

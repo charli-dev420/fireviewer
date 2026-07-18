@@ -313,6 +313,7 @@ export interface AdminZonePrivatePreview {
   readonly publication_id: string | null;
   readonly publication_state: string | null;
   readonly publication_active: boolean;
+  readonly linked_fire_ids: readonly string[];
   readonly verification_report: Readonly<Record<string, unknown>>;
   readonly preview_package_ids: readonly string[];
   readonly scene: { readonly catalog_url: string; readonly files: Readonly<Record<string, string>> } | null;
@@ -594,7 +595,7 @@ function parseBlobUploadGrant(value: unknown): AdminBlobUploadGrant {
 }
 
 function parseZonePrivatePreview(value: unknown): AdminZonePrivatePreview {
-  if (!isRecord(value) || !hasExactKeys(value, ['zone_id', 'revision', 'preview_scope', 'package_id', 'package_state', 'publication_id', 'publication_state', 'publication_active', 'verification_report', 'preview_package_ids', 'scene', 'files']) || !isRecord(value.verification_report) || !Array.isArray(value.preview_package_ids) || !Array.isArray(value.files) || typeof value.publication_active !== 'boolean') throw new Error('Aperçu privé invalide.');
+  if (!isRecord(value) || !hasExactKeys(value, ['zone_id', 'revision', 'preview_scope', 'package_id', 'package_state', 'publication_id', 'publication_state', 'publication_active', 'linked_fire_ids', 'verification_report', 'preview_package_ids', 'scene', 'files']) || !isRecord(value.verification_report) || !Array.isArray(value.preview_package_ids) || !Array.isArray(value.linked_fire_ids) || !Array.isArray(value.files) || typeof value.publication_active !== 'boolean') throw new Error('Aperçu privé invalide.');
   const previewPackageIds = value.preview_package_ids.map((item) => readString(item, 'preview_package_ids', { max: 96 })!);
   if (new Set(previewPackageIds).size !== previewPackageIds.length) throw new Error('Aperçu privé invalide.');
   let scene: AdminZonePrivatePreview['scene'] = null;
@@ -605,7 +606,7 @@ function parseZonePrivatePreview(value: unknown): AdminZonePrivatePreview {
       files: Object.fromEntries(Object.entries(value.scene.files).map(([path, url]) => [path, readString(url, `scene.files.${path}`, { max: 2_048 })!])),
     };
   }
-  return { zone_id: readString(value.zone_id, 'zone_id', { max: 64 })!, revision: readPositiveInteger(value.revision, 'revision'), preview_scope: readEnum(value.preview_scope, 'preview_scope', ['private-admin']), package_id: readString(value.package_id, 'package_id', { nullable: true, max: 128 }), package_state: readString(value.package_state, 'package_state', { nullable: true, max: 64 }), publication_id: readString(value.publication_id, 'publication_id', { nullable: true, max: 128 }), publication_state: readString(value.publication_state, 'publication_state', { nullable: true, max: 64 }), publication_active: value.publication_active, verification_report: value.verification_report, preview_package_ids: previewPackageIds, scene, files: value.files.map((file) => { if (!isRecord(file) || !hasExactKeys(file, ['file_id', 'path', 'kind', 'sha256', 'size_bytes', 'media_type'])) throw new Error('Fichier preview invalide.'); return { file_id: readPositiveInteger(file.file_id, 'file_id'), path: readString(file.path, 'path', { nullable: true, max: 512 }), kind: readString(file.kind, 'kind', { max: 64 })!, sha256: readString(file.sha256, 'sha256', { max: 64 })!, size_bytes: readPositiveInteger(file.size_bytes, 'size_bytes'), media_type: readString(file.media_type, 'media_type', { max: 128 })! }; }) };
+  return { zone_id: readString(value.zone_id, 'zone_id', { max: 64 })!, revision: readPositiveInteger(value.revision, 'revision'), preview_scope: readEnum(value.preview_scope, 'preview_scope', ['private-admin']), package_id: readString(value.package_id, 'package_id', { nullable: true, max: 128 }), package_state: readString(value.package_state, 'package_state', { nullable: true, max: 64 }), publication_id: readString(value.publication_id, 'publication_id', { nullable: true, max: 128 }), publication_state: readString(value.publication_state, 'publication_state', { nullable: true, max: 64 }), publication_active: value.publication_active, linked_fire_ids: value.linked_fire_ids.map((fireId) => readString(fireId, 'linked_fire_id', { max: 32 })!), verification_report: value.verification_report, preview_package_ids: previewPackageIds, scene, files: value.files.map((file) => { if (!isRecord(file) || !hasExactKeys(file, ['file_id', 'path', 'kind', 'sha256', 'size_bytes', 'media_type'])) throw new Error('Fichier preview invalide.'); return { file_id: readPositiveInteger(file.file_id, 'file_id'), path: readString(file.path, 'path', { nullable: true, max: 512 }), kind: readString(file.kind, 'kind', { max: 64 })!, sha256: readString(file.sha256, 'sha256', { max: 64 })!, size_bytes: readPositiveInteger(file.size_bytes, 'size_bytes'), media_type: readString(file.media_type, 'media_type', { max: 128 })! }; }) };
 }
 
 function parseSpatialPackagePublication(value: unknown): AdminSpatialPackagePublication {
@@ -1259,6 +1260,20 @@ export class AdminApiClient {
     return endpoint(this.origin, '/blob-upload-token');
   }
 
+  private postJsonV2(path: string, payload: object, options: AdminRequestOptions): Promise<unknown> {
+    if (!options.idempotencyKey || options.idempotencyKey.length > 128) {
+      throw new AdminApiError('configuration', 'Une clé d’idempotence est requise pour cette action.');
+    }
+    return this.requestV2(path, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': options.idempotencyKey,
+      },
+      body: JSON.stringify(payload),
+    }, options);
+  }
+
   async refreshAdminSession(options: AdminRequestOptions = {}): Promise<void> {
     const payload = await this.request('/session', { method: 'GET' }, options);
     if (
@@ -1348,9 +1363,9 @@ export class AdminApiClient {
     catch { throw new AdminApiError('parse', 'La réponse de prévisualisation est invalide.'); }
   }
 
-  async publishSpatialPackage(zoneId: string, revision: number, input: { readonly package_id: string; readonly reason: string; readonly admin_password?: string }, options: AdminRequestOptions): Promise<AdminSpatialPackagePublication> {
+  async publishSpatialPackage(zoneId: string, revision: number, input: { readonly package_id: string; readonly reason: string }, options: AdminRequestOptions): Promise<AdminSpatialPackagePublication> {
     const normalized = normalizeZoneId(zoneId);
-    if (!Number.isSafeInteger(revision) || revision < 1 || input.package_id.trim().length < 3 || input.reason.trim().length < 10 || (input.admin_password !== undefined && input.admin_password.length === 0)) throw new AdminApiError('configuration', 'La publication du package est invalide.');
+    if (!Number.isSafeInteger(revision) || revision < 1 || input.package_id.trim().length < 3 || input.reason.trim().length < 10) throw new AdminApiError('configuration', 'La publication du package est invalide.');
     const payload = await this.postJson('/publications', { zone_id: normalized, revision, ...input }, options);
     try { return parseSpatialPackagePublication(payload); }
     catch { throw new AdminApiError('parse', 'La réponse de publication est invalide.'); }
@@ -1503,6 +1518,31 @@ export class AdminApiClient {
     const payload = await this.request(`/incidents/${encodeURIComponent(fireId)}`, { method: 'GET' }, options);
     try { return parseIncidentDetail(payload); }
     catch { throw new AdminApiError('parse', 'Le détail de l’incident est invalide.'); }
+  }
+
+  async attachSpatialPackageToIncident(
+    fireId: string,
+    input: { readonly package_id: string; readonly expected_incident_version: number; readonly reason: string },
+    options: AdminRequestOptions,
+  ): Promise<{ readonly fire_id: string; readonly package_id: string; readonly manifest_revision: number; readonly incident_version: number }> {
+    if (!/^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(fireId) || input.package_id.trim().length < 3 || !Number.isSafeInteger(input.expected_incident_version) || input.expected_incident_version < 1 || input.reason.trim().length < 10) {
+      throw new AdminApiError('configuration', 'Le rattachement du package à l’incident est invalide.');
+    }
+    const payload = await this.postJsonV2(`/incidents/${encodeURIComponent(fireId)}/representations`, {
+      ...input,
+      primary_profile: 'local',
+    }, options);
+    if (!isRecord(payload)) throw new AdminApiError('parse', 'La réponse de rattachement est invalide.');
+    try {
+      return {
+        fire_id: readString(payload.fire_id, 'fire_id', { max: 32 })!,
+        package_id: readString(payload.package_id, 'package_id', { max: 96 })!,
+        manifest_revision: readPositiveInteger(payload.manifest_revision, 'manifest_revision'),
+        incident_version: readPositiveInteger(payload.incident_version, 'incident_version'),
+      };
+    } catch {
+      throw new AdminApiError('parse', 'La réponse de rattachement est invalide.');
+    }
   }
 
   async getIncidentObservations(fireId: string, options: AdminRequestOptions = {}): Promise<AdminIncidentObservationsWorkspace> {

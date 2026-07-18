@@ -48,7 +48,7 @@ function priorityHref(kind: string, fireId: string | null): string {
   if (kind === 'report') return '/admin/signalements';
   if (kind === 'observation') return '/admin/rapprochement-spatial';
   if (kind === 'model_package' || kind === 'job') return fireId ? `/admin/incidents/${fireId}/modeles-pipeline` : '/admin/zones';
-  return fireId ? `/admin/incidents/${fireId}` : '/admin/file-de-traitement';
+  return fireId ? `/admin/incidents/${fireId}` : '/admin/validation';
 }
 
 function Panel({ title, icon, action, children, className = '' }: {
@@ -75,10 +75,10 @@ export function AdminDashboardPage() {
   return (
     <div className="admin-dashboard-page">
       <AdminCommandHero
-        title="Poste de veille"
-        subtitle="Ce qui demande une décision maintenant"
+        title="Administration"
+        subtitle="Valider les preuves, suivre les incidents et gérer les cartes 3D"
         generatedAt={dashboard?.generated_at}
-        status={dashboard ? 'API disponible · données privées synchronisées' : undefined}
+        status={dashboard ? 'Données à jour' : undefined}
         image={heroDashboard}
       />
       <div className="admin-dashboard-page__content">
@@ -87,19 +87,19 @@ export function AdminDashboardPage() {
         {dashboard ? (
           <>
             <div className="admin-dashboard-page__summary">
-              <a className="admin-command-button admin-command-button--primary" href="/admin/file-de-traitement">
-                <PublicIcon name="data" size={18} />Ouvrir la file de traitement <span>{dashboard.queue.total}</span>
+              <a className="admin-command-button admin-command-button--primary" href="/admin/validation">
+                <PublicIcon name="data" size={18} />À valider <span>{dashboard.queue.total}</span>
               </a>
               <dl>
-                <div><dt>Critiques</dt><dd>{dashboard.queue.critical}</dd></div>
-                <div><dt>Priorité haute</dt><dd>{dashboard.queue.high}</dd></div>
-                <div><dt>Modèles à revoir</dt><dd>{dashboard.queue.models_to_review}</dd></div>
+                <div><dt>Incidents actifs</dt><dd>{dashboard.map_summary.active_incidents}</dd></div>
+                <div><dt>Avec carte 3D</dt><dd>{dashboard.map_summary.incidents_with_models}</dd></div>
+                <div><dt>À revoir</dt><dd>{dashboard.map_summary.incidents_requiring_review}</dd></div>
               </dl>
             </div>
 
             <div className="admin-dashboard-page__grid">
               <div className="admin-dashboard-page__main">
-                <Panel title="À prendre en charge" action={<a href="/admin/file-de-traitement">Voir toute la file</a>}>
+                <Panel title="À valider" action={<a href="/admin/validation">Tout voir</a>}>
                   {dashboard.priorities.length ? (
                     <ul className="admin-priority-list">
                       {dashboard.priorities.slice(0, 6).map((item) => (
@@ -115,25 +115,10 @@ export function AdminDashboardPage() {
                   ) : <p className="admin-command-panel__empty">Aucune décision urgente dans la file persistée.</p>}
                 </Panel>
 
-                <Panel title="Publications récentes" icon="share" action={<a href="/admin/publications">Voir toutes</a>}>
-                  {dashboard.recent_publications.length ? (
-                    <ul className="admin-publication-list">
-                      {dashboard.recent_publications.map((publication) => (
-                        <li key={publication.publication_id}>
-                          <PublicIcon name="share" size={17} />
-                          <span><strong>{publication.state.replaceAll('_', ' ')}</strong><small>{publication.linked_fire_ids.join(', ') || publication.zone_id}</small></span>
-                          <span>{publication.actor_id}</span>
-                          <time dateTime={publication.updated_at}>{elapsedLabel(publication.updated_at)}</time>
-                          <a href="/admin/publications" aria-label={`Ouvrir la publication ${publication.publication_id}`}><PublicIcon name="chevron-right" size={16} /></a>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : <p className="admin-command-panel__empty">Aucune publication récente.</p>}
-                </Panel>
               </div>
 
               <aside className="admin-dashboard-page__aside">
-                <Panel title="Veille active" icon="shield" action={<a href="/admin/incidents">Voir tout</a>}>
+                <Panel title="Incidents actifs" icon="shield" action={<a href="/admin/incidents">Tout voir</a>}>
                   {dashboard.watchlist.length ? (
                     <ul className="admin-watch-list">
                       {dashboard.watchlist.slice(0, 5).map((incident) => (
@@ -147,20 +132,6 @@ export function AdminDashboardPage() {
                   ) : <p className="admin-command-panel__empty">Aucun incident actif à surveiller.</p>}
                 </Panel>
 
-                <Panel title="Système" icon="monitor">
-                  <ul className="admin-system-list">
-                    <li><span className="is-ok" /><strong>API</strong><small>Opérationnelle</small></li>
-                    <li><span className={dashboard.system.database.reachable ? 'is-ok' : 'is-error'} /><strong>Base</strong><small>{dashboard.system.database.reachable ? 'Opérationnelle' : 'Indisponible'}</small></li>
-                    <li><span className={dashboard.system.queues.jobs_quarantined ? 'is-warning' : 'is-ok'} /><strong>File de jobs</strong><small>{dashboard.system.queues.jobs_quarantined ? `${dashboard.system.queues.jobs_quarantined} en quarantaine` : `${dashboard.system.queues.jobs_active} actif(s)`}</small></li>
-                    <li><span className="is-neutral" /><strong>Worker</strong><small>{dashboard.system.worker_heartbeat.replaceAll('_', ' ')}</small></li>
-                  </ul>
-                </Panel>
-
-                <a className="admin-map-summary" href="/admin/carte-operationnelle">
-                  <PublicIcon name="map" size={25} />
-                  <span><strong>{dashboard.map_summary.total_incidents} incidents cartographiés</strong><small>{dashboard.map_summary.incidents_with_models} avec représentation 3D</small></span>
-                  <PublicIcon name="arrow" size={18} />
-                </a>
               </aside>
             </div>
             <p className="admin-dashboard-page__safety"><PublicIcon name="info" size={18} />Aucune sortie automatisée n’est publiée sans validation humaine.</p>
@@ -312,7 +283,7 @@ export function AdminOperationalMapPage() {
               <strong>{data.summary.incidents_requiring_review} incident(s) à revoir</strong>
               <span>{data.summary.model_updates_available} mise(s) à jour de modèle</span>
               <span>{data.summary.incidents_with_models} incident(s) avec 3D</span>
-              <a href="/admin/file-de-traitement">Ouvrir la file <PublicIcon name="arrow" size={18} /></a>
+              <a href="/admin/validation">Ouvrir la validation <PublicIcon name="arrow" size={18} /></a>
             </div>
 
             <section className="admin-map-page__mobile-list" aria-label="Incidents visibles">

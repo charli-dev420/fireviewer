@@ -4651,6 +4651,27 @@ svg {
 .admin-incident-workspace-nav a { padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; color: var(--ink-700); font-size: 0.75rem; font-weight: 760; text-decoration: none; }
 .admin-incident-workspace-nav a:hover, .admin-incident-workspace-nav a:focus-visible { border-color: var(--accent); color: var(--ink-950); }
 .admin-incident-workspace-nav a[aria-current='page'] { border-color: var(--accent); background: var(--accent); color: #fff; }
+.admin-incident-workspace-nav details { position: relative; }
+.admin-incident-workspace-nav summary { padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; color: var(--ink-700); cursor: pointer; font-size: 0.75rem; font-weight: 760; }
+.admin-incident-workspace-nav details > div { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 7px; }
+.admin-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.admin-detail-card { min-width: 0; padding: 18px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-sm); }
+.admin-detail-card h3 { margin: 0 0 10px; color: var(--ink-950); font-size: 1rem; }
+.admin-detail-card > p { margin: 0 0 14px; color: var(--ink-600); font-size: 0.78rem; line-height: 1.55; }
+.admin-detail-card dl { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.admin-detail-card dt { color: var(--ink-600); font-size: 0.64rem; font-weight: 820; letter-spacing: 0.04em; text-transform: uppercase; }
+.admin-detail-card dd { margin: 5px 0 0; color: var(--ink-950); font-size: 0.82rem; font-weight: 720; }
+.admin-detail-card > label { display: grid; gap: 6px; margin-top: 12px; color: var(--ink-800); font-size: 0.76rem; font-weight: 720; }
+.admin-detail-card > label:has(input[type='checkbox']) { display: flex; align-items: center; font-weight: 650; }
+.admin-detail-card input:not([type='checkbox']),
+.admin-detail-card select,
+.admin-detail-card textarea { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid var(--border-strong); border-radius: 7px; color: var(--ink-950); background: #fff; font: inherit; }
+.admin-detail-card textarea { resize: vertical; }
+.admin-detail-card > div:not(.admin-form-actions) { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); color: var(--ink-800); font-size: 0.76rem; line-height: 1.5; overflow-wrap: anywhere; }
+.admin-detail-card small { display: block; margin-top: 4px; color: var(--ink-600); font-size: 0.68rem; font-weight: 550; }
+.admin-detail-card .admin-form-actions { margin-top: 16px; }
+.admin-detail-advanced { grid-column: 1 / -1; }
+.admin-detail-advanced > .admin-detail-grid { padding: 18px; }
 .admin-observation-list, .admin-source-list, .admin-model-list { display: grid; gap: 14px; padding: 18px; }
 .admin-observation-record, .admin-source-record, .admin-model-record { padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
 .admin-observation-record > header, .admin-source-record > header, .admin-model-record > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
@@ -4691,6 +4712,30 @@ svg {
 
 .admin-form-card { display: grid; gap: 20px; padding: 22px; }
 .admin-form-card--narrow { width: min(700px, 100%); }
+.admin-form-card--embedded { margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+.admin-disclosure > summary { padding: 18px 20px; cursor: pointer; color: var(--ink-900); font-weight: 760; }
+.admin-disclosure[open] > summary { border-bottom: 1px solid var(--border); }
+.admin-disclosure .admin-preview-report { margin: 18px 20px; }
+.admin-publication-workflow__status { padding: 18px 20px; color: var(--ink-600); }
+.admin-publication-cards { display: grid; gap: 14px; }
+.admin-publication-card { overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-sm); }
+.admin-publication-card > header { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 17px 19px; border-bottom: 1px solid var(--border); }
+.admin-publication-card h2 { margin: 0; color: var(--ink-950); font-size: 1rem; }
+.admin-publication-card header p { margin: 4px 0 0; color: var(--ink-600); font-size: 0.7rem; }
+.admin-publication-card header > strong { padding: 6px 9px; border-radius: 999px; font-size: 0.68rem; }
+.admin-publication-card header > strong.is-public { color: #17603a; background: #e6f5ec; }
+.admin-publication-card header > strong.is-private { color: #8b3f0c; background: #fff0e3; }
+.admin-publication-card__body { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 17px 19px; }
+.admin-publication-card__body > div { display: grid; gap: 4px; }
+.admin-publication-card__body span { color: var(--ink-600); font-size: 0.65rem; font-weight: 820; letter-spacing: 0.04em; text-transform: uppercase; }
+.admin-publication-card__body a:not(.button) { color: var(--ink-950); font-size: 0.8rem; font-weight: 760; }
+.admin-publication-card__body strong { color: #9a3518; font-size: 0.8rem; }
+.admin-publication-card__control { border-top: 1px solid var(--border); }
+.admin-publication-card__control summary { padding: 12px 19px; color: var(--ink-600); cursor: pointer; font-size: 0.72rem; font-weight: 720; }
+.admin-publication-card__control[open] { padding-bottom: 16px; }
+.admin-publication-card__control label { display: grid; gap: 6px; margin: 0 19px 10px; color: var(--ink-800); font-size: 0.72rem; font-weight: 720; }
+.admin-publication-card__control textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--border-strong); border-radius: 7px; resize: vertical; }
+.admin-publication-card__control .button { margin-left: 19px; }
 .admin-form-card h3,
 .admin-action-card h3,
 .admin-result-card h3,
@@ -4827,14 +4872,18 @@ svg {
   .admin-shell__nav { justify-content: flex-start; }
   .admin-shell__content { width: min(100% - 28px, 1220px); padding-top: 20px; }
   .admin-page-header { align-items: flex-start; flex-direction: column; }
+  .admin-publication-card > header,
+  .admin-publication-card__body { align-items: flex-start; flex-direction: column; }
   .admin-zone-layout,
   .admin-form-grid,
   .admin-preview-images,
   .admin-status-grid,
   .admin-role-grid,
   .admin-metric-grid,
+  .admin-detail-grid,
   .admin-spatial-review__facts,
   .admin-spatial-review__decision { grid-template-columns: 1fr; }
+  .admin-detail-card dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-field--wide { grid-column: auto; }
   .admin-coordinate-grid { grid-template-columns: 1fr; }
   .admin-section__heading,

@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
+from sqlalchemy import select
+
 from fire_viewer.db.models import (
     SpatialPackage,
     SpatialPackageFile,
     SpatialZone,
     SpatialZoneRevision,
 )
-from fire_viewer.domain.enums import SpatialPackageFileKind, SpatialPackageState
+from fire_viewer.domain.enums import IncidentStatus, SpatialPackageFileKind, SpatialPackageState
 from fire_viewer.domain.spatial import RAF20_GRID_SHA256
 
 
@@ -117,7 +121,16 @@ def _headers(key: str) -> dict[str, str]:
     return {"Idempotency-Key": key}
 
 
-def test_admin_can_validate_preview_and_publish_registered_spatial_package(client, session) -> None:
+def test_admin_can_validate_preview_link_and_publish_registered_spatial_package(
+    client, session, seed_incident
+) -> None:
+    incident, _episode = seed_incident(
+        fire_id="FR-26-00901",
+        sequence=901,
+        lon=5.2601,
+        lat=44.7555,
+        status=IncidentStatus.ACTIVE_CONFIRMED,
+    )
     _seed_draft_package(session)
     base = "/api/v1/admin/zones/PACKAGE-WORKFLOW-01/revisions/1"
     validation = client.post(
@@ -147,6 +160,18 @@ def test_admin_can_validate_preview_and_publish_registered_spatial_package(clien
     assert preview.json()["publication"]["package_state"] == "PREVIEWABLE"
     assert preview.json()["publication"]["publication_state"] == "PREVIEWABLE"
 
+    attached = client.post(
+        f"/api/v2/admin/incidents/{incident.fire_id}/representations",
+        json={
+            "package_id": "pkg-workflow-01",
+            "expected_incident_version": incident.version,
+            "primary_profile": "local",
+            "reason": "Rattachement explicite de la carte à l'incident de test.",
+        },
+        headers=_headers("package-workflow-attach-0001"),
+    )
+    assert attached.status_code == 200, attached.text
+
     publication = client.post(
         "/api/v1/admin/publications",
         json={
@@ -167,7 +192,38 @@ def test_admin_can_validate_preview_and_publish_registered_spatial_package(clien
     assert descriptor.json()["package_state"] == "PUBLISHED"
     assert descriptor.json()["publication_state"] == "PUBLISHED"
     assert descriptor.json()["publication_active"] is True
+    assert descriptor.json()["linked_fire_ids"] == [incident.fire_id]
     assert "s3://" not in str(descriptor.json())
+
+    revision_record = session.scalar(
+        select(SpatialZoneRevision).where(SpatialZoneRevision.revision == 1)
+    )
+    assert revision_record is not None
+    other_package = SpatialPackage(
+        package_id="pkg-workflow-same-revision-draft",
+        manifest_uri="s3://private/pkg-workflow-same-revision-draft/manifest.json",
+        manifest_sha256="f" * 64,
+        manifest_size_bytes=256,
+        storage_uri="s3://private/pkg-workflow-same-revision-draft/",
+        state=SpatialPackageState.DRAFT,
+        provenance={"pipeline": "test"},
+        verification_report={},
+        created_by="test",
+    )
+    session.add(other_package)
+    session.flush()
+    other_package.verification_report = {"status": "passed", "checks": ["test"]}
+    other_package.verified_at = datetime.now(UTC)
+    other_package.state = SpatialPackageState.VERIFIED
+    session.flush()
+    other_package.spatial_zone_revision_id = revision_record.id
+    session.commit()
+
+    publications = client.get("/api/v1/admin/publications")
+    assert publications.status_code == 200
+    assert [item["publication_id"] for item in publications.json()["publications"]] == [
+        publication.json()["publication"]["publication_id"]
+    ]
 
 
 def test_admin_rejects_preview_when_the_registered_package_has_no_png(client, session) -> None:

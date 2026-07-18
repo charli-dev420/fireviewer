@@ -3007,6 +3007,86 @@
         }
       }
     },
+    "/api/v1/admin/zones/{zone_id}/revisions/{revision}/packages/recover-from-blob": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Recover Zone Package From Blob",
+        "description": "Finalize an interrupted upload by rebuilding its bounded Blob inventory.",
+        "operationId": "recover_zone_package_from_blob_api_v1_admin_zones__zone_id__revisions__revision__packages_recover_from_blob_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 64,
+              "pattern": "^[A-Z][A-Z0-9-]*$",
+              "title": "Zone Id"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Revision"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSpatialPackageRecoveryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSpatialPackageImportEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/zones/{zone_id}/revisions/{revision}/validations": {
       "post": {
         "tags": [
@@ -3223,6 +3303,75 @@
         }
       }
     },
+    "/api/v1/admin/zones/{zone_id}/revisions/{revision}/preview/packages/{package_id}/catalog": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Private Preview Catalog",
+        "operationId": "get_private_preview_catalog_api_v1_admin_zones__zone_id__revisions__revision__preview_packages__package_id__catalog_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 64,
+              "pattern": "^[A-Z][A-Z0-9-]*$",
+              "title": "Zone Id"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Revision"
+            }
+          },
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 96,
+              "title": "Package Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/zones/{zone_id}/revisions/{revision}/preview/packages/{package_id}/png": {
       "get": {
         "tags": [
@@ -3372,7 +3521,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AdminSpatialPackagePublishRequest"
+                "$ref": "#/components/schemas/AdminSpatialPackagePublicationRequest"
               }
             }
           }
@@ -7018,6 +7167,21 @@
       },
       "AdminPrivatePreviewFile": {
         "properties": {
+          "file_id": {
+            "type": "integer",
+            "title": "File Id"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
           "kind": {
             "type": "string",
             "title": "Kind"
@@ -7038,6 +7202,8 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
+          "file_id",
+          "path",
           "kind",
           "sha256",
           "size_bytes",
@@ -7108,6 +7274,13 @@
             "type": "boolean",
             "title": "Publication Active"
           },
+          "linked_fire_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Linked Fire Ids"
+          },
           "verification_report": {
             "additionalProperties": true,
             "type": "object",
@@ -7119,6 +7292,16 @@
             },
             "type": "array",
             "title": "Preview Package Ids"
+          },
+          "scene": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdminPrivatePreviewScene"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "files": {
             "items": {
@@ -7142,6 +7325,28 @@
           "verification_report"
         ],
         "title": "AdminPrivatePreviewResponse"
+      },
+      "AdminPrivatePreviewScene": {
+        "properties": {
+          "catalog_url": {
+            "type": "string",
+            "title": "Catalog Url"
+          },
+          "files": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Files"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "catalog_url",
+          "files"
+        ],
+        "title": "AdminPrivatePreviewScene"
       },
       "AdminPublicConfiguration": {
         "properties": {
@@ -7555,6 +7760,43 @@
         ],
         "title": "AdminSpatialPackagePublicationEnvelope"
       },
+      "AdminSpatialPackagePublicationRequest": {
+        "properties": {
+          "package_id": {
+            "type": "string",
+            "maxLength": 96,
+            "minLength": 3,
+            "title": "Package Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason"
+          },
+          "zone_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9-]*$",
+            "title": "Zone Id"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "package_id",
+          "reason",
+          "zone_id",
+          "revision"
+        ],
+        "title": "AdminSpatialPackagePublicationRequest"
+      },
       "AdminSpatialPackagePublicationResponse": {
         "properties": {
           "zone_id": {
@@ -7598,12 +7840,18 @@
         ],
         "title": "AdminSpatialPackagePublicationResponse"
       },
-      "AdminSpatialPackagePublishRequest": {
+      "AdminSpatialPackageRecoveryRequest": {
         "properties": {
+          "upload_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$",
+            "title": "Upload Id"
+          },
           "package_id": {
             "type": "string",
             "maxLength": 96,
             "minLength": 3,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
             "title": "Package Id"
           },
           "reason": {
@@ -7611,44 +7859,16 @@
             "maxLength": 500,
             "minLength": 10,
             "title": "Reason"
-          },
-          "zone_id": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 3,
-            "pattern": "^[A-Z][A-Z0-9-]*$",
-            "title": "Zone Id"
-          },
-          "revision": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "Revision"
-          },
-          "admin_password": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 1024,
-                "minLength": 1,
-                "format": "password",
-                "writeOnly": true
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Admin Password"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
+          "upload_id",
           "package_id",
-          "reason",
-          "zone_id",
-          "revision"
+          "reason"
         ],
-        "title": "AdminSpatialPackagePublishRequest"
+        "title": "AdminSpatialPackageRecoveryRequest"
       },
       "AdminStorageConfiguration": {
         "properties": {

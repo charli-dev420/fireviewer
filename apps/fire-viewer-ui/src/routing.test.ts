@@ -35,6 +35,7 @@ describe('resolveAppRoute', () => {
   it('aligne les identifiants et révisions administratifs avec le contrat API', () => {
     expect(resolveAdminRoute('/admin')).toEqual({ kind: 'dashboard' });
     expect(resolveAdminRoute('/admin/carte-operationnelle')).toEqual({ kind: 'operational-map' });
+    expect(resolveAdminRoute('/admin/validation')).toEqual({ kind: 'work-queue' });
     expect(resolveAdminRoute('/admin/file-de-traitement')).toEqual({ kind: 'work-queue' });
     expect(resolveAdminRoute('/admin/rapprochement-spatial')).toEqual({ kind: 'spatial-matching' });
     expect(resolveAdminRoute('/admin/incidents/FR-83-00042/observations')).toEqual({ kind: 'incident-observations', fireId: 'FR-83-00042' });

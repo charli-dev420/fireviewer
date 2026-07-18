@@ -161,6 +161,7 @@ function adminFetchResponse(input: RequestInfo | URL): Response {
   if (url.pathname === '/api/v2/admin/dashboard') return jsonResponse(adminDashboard());
   if (url.pathname === '/api/v2/admin/operational-map') return jsonResponse(adminOperationalMap());
   if (url.pathname === '/api/v2/admin/incidents') return jsonResponse({ incidents: [] });
+  if (url.pathname === '/api/v2/admin/work-queue') return jsonResponse({ generated_at: '2026-07-15T10:00:00Z', observations: [], incidents: [], reports: [] });
   if (url.pathname === '/api/v1/admin/incidents/FR-83-00042/observations') return jsonResponse({ fire_id: 'FR-83-00042', observations: [] });
   if (url.pathname === '/api/v1/admin/incidents/FR-83-00042/sources-media') return jsonResponse({ fire_id: 'FR-83-00042', sources: [], media_references: [] });
   if (url.pathname === '/api/v1/admin/incidents/FR-83-00042/models-pipeline') return jsonResponse({ fire_id: 'FR-83-00042', models: [], jobs: [] });
@@ -168,7 +169,7 @@ function adminFetchResponse(input: RequestInfo | URL): Response {
     return jsonResponse({ revision: 2, spatial_profile_version: '2.0', origin_l93_ngf: [870000, 6410000, 190], horizontal_crs: 'EPSG:2154', vertical_crs: 'EPSG:5720', ground_model: 'MNT_LIDAR_HD', ground_resolution_m: 0.5, surface_height_reference: 'MNS_RELATIVE_TO_MNT', origin_wgs84: [5.1, 44.8, 240], local_frame: 'ENU', meters_per_unit: 1, vertical_datum: 'NGF-IGN69', bounds_m: { east: [-20, 20], north: [-20, 20], up: [0, 120] } });
   }
   if (url.pathname === '/api/v1/admin/zones/ALPES-TEST/revisions/2/preview') {
-    return jsonResponse({ zone_id: 'ALPES-TEST', revision: 2, preview_scope: 'private-admin', package_id: null, package_state: null, publication_id: null, publication_state: null, publication_active: false, verification_report: {}, preview_package_ids: [], scene: null, files: [] });
+    return jsonResponse({ zone_id: 'ALPES-TEST', revision: 2, preview_scope: 'private-admin', package_id: null, package_state: null, publication_id: null, publication_state: null, publication_active: false, linked_fire_ids: [], verification_report: {}, preview_package_ids: [], scene: null, files: [] });
   }
   const detail = url.pathname.match(/^\/api\/v1\/admin\/zones\/([A-Z0-9-]+)$/);
   if (detail) return jsonResponse(adminDetail(detail[1]));
@@ -407,14 +408,14 @@ describe('Routage administrateur privé', () => {
   });
 
   it.each([
-    ['/admin', 'Poste de veille'],
+    ['/admin', 'Administration'],
     ['/admin/carte-operationnelle', 'Carte opérationnelle nationale'],
-    ['/admin/zones', 'Zones administrées'],
-    ['/admin/zones/nouvelle', 'Créer une zone'],
+    ['/admin/zones', 'Cartes 3D'],
+    ['/admin/zones/nouvelle', 'Préparer une carte 3D'],
     ['/admin/zones/ALPES-TEST', 'Zone ALPES-TEST'],
     ['/admin/zones/ALPES-TEST/revisions/nouvelle', 'Créer une révision spatiale'],
     ['/admin/zones/ALPES-TEST/revisions/2', 'Révision 2'],
-    ['/admin/zones/ALPES-TEST/revisions/2/preview', 'Aperçu privé — Révision 2'],
+    ['/admin/zones/ALPES-TEST/revisions/2/preview', 'Carte 3D — Révision 2'],
     ['/admin/zones/ALPES-TEST/information/nouvelle', 'Ajouter une information — ALPES-TEST'],
     ['/admin/zones/ALPES-TEST/information/info-001', 'Modifier une information — ALPES-TEST'],
     ['/admin/incidents', 'Incidents'],
@@ -430,8 +431,12 @@ describe('Routage administrateur privé', () => {
     expect(await screen.findByRole('link', { name: 'FireWarning, tableau de bord administrateur' })).toBeVisible();
     expect(screen.getByText('Session vérifiée')).toBeVisible();
     expect(await screen.findByRole('heading', { name: heading })).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Modèles et zones' })).toHaveAttribute('href', '/admin/zones');
-    expect(screen.getByRole('link', { name: 'Nouvelle zone' })).toHaveAttribute('href', '/admin/zones/nouvelle');
+    expect(screen.getByRole('link', { name: 'Tableau de bord' })).toHaveAttribute('href', '/admin');
+    expect(screen.getByRole('link', { name: 'Incidents' })).toHaveAttribute('href', '/admin/incidents');
+    expect(screen.getByRole('link', { name: 'Validation' })).toHaveAttribute('href', '/admin/validation');
+    expect(screen.getByRole('link', { name: 'Système' })).toHaveAttribute('href', '/admin/systeme');
+    expect(screen.queryByRole('link', { name: 'Cartes 3D' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Nouvelle zone' })).not.toBeInTheDocument();
     expect(manifestClient.getDataMode).not.toHaveBeenCalled();
     expect(manifestClient.loadViewerManifest).not.toHaveBeenCalled();
     expect(screen.queryByText('Démonstration fictive')).not.toBeInTheDocument();
@@ -450,10 +455,10 @@ describe('Routage administrateur privé', () => {
     const sessionCallsBefore = fetchMock.mock.calls.filter(
       ([input]) => String(input).endsWith('/api/v1/admin/session'),
     ).length;
-    await user.click(screen.getByRole('link', { name: 'Modèles et zones' }));
+    await user.click(screen.getByRole('link', { name: 'Validation' }));
 
-    expect(await screen.findByRole('heading', { name: 'Zones administrées' })).toBeVisible();
-    expect(window.location.pathname).toBe('/admin/zones');
+    expect(await screen.findByRole('heading', { name: 'Validation' })).toBeVisible();
+    expect(window.location.pathname).toBe('/admin/validation');
     const sessionCallsAfter = fetchMock.mock.calls.filter(
       ([input]) => String(input).endsWith('/api/v1/admin/session'),
     ).length;

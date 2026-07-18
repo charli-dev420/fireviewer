@@ -76,10 +76,10 @@ describe('surfaces de commandement administrateur', () => {
 
     renderWithApi(<AdminDashboardPage />);
 
-    expect(await screen.findByRole('heading', { name: 'Poste de veille' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Administration' })).toBeVisible();
     expect(screen.getByText('Publication à valider')).toBeVisible();
     expect(screen.getByText(/FR-83-00042 · Massif des Maures/)).toBeVisible();
-    expect(screen.getByRole('link', { name: /Ouvrir la file de traitement/ })).toHaveAttribute('href', '/admin/file-de-traitement');
+    expect(screen.getByRole('link', { name: /À valider 2/ })).toHaveAttribute('href', '/admin/validation');
     expect(fetchMock).toHaveBeenCalledWith(`${API_ORIGIN}/api/v2/admin/dashboard`, expect.objectContaining({ method: 'GET' }));
     expect(document.body.textContent).not.toContain('/api/v2/admin/packages/pkg-maures-v2/files/3');
   });

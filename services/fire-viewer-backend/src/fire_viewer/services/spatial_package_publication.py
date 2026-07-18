@@ -53,9 +53,6 @@ def list_publications(
 ) -> AdminPublicationListResponse:
     statement = (
         select(ZonePublication)
-        .join(SpatialZone)
-        .join(SpatialZoneRevision)
-        .join(SpatialPackage)
         .options(
             selectinload(ZonePublication.zone), selectinload(ZonePublication.spatial_zone_revision)
         )
@@ -621,6 +618,18 @@ def publish_spatial_package(
         raise ConflictError(
             "spatial_package_not_previewable",
             "A package and its publication must both be previewable before publication.",
+        )
+    linked_manifest = session.execute(
+        select(ManifestRevision.id).where(
+            ManifestRevision.spatial_package_id == package.id,
+            ManifestRevision.spatial_zone_revision_id == revision_row.id,
+            ManifestRevision.is_current.is_(True),
+        )
+    ).scalar_one_or_none()
+    if linked_manifest is None:
+        raise ConflictError(
+            "spatial_package_not_linked_to_incident",
+            "Attach the package to an incident before publishing it.",
         )
 
     active_publication = session.execute(

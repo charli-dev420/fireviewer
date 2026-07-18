@@ -149,6 +149,8 @@ def test_admin_private_preview_exposes_metadata_without_private_file_locations(
     assert payload["package_id"] == "pkg-die-pontaix-private-preview"
     assert payload["files"] == [
         {
+            "file_id": 1,
+            "path": None,
             "kind": "GLB",
             "sha256": "b" * 64,
             "size_bytes": 1024,

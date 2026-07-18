@@ -12,19 +12,21 @@ describe('AdminShell', () => {
     window.history.replaceState({}, '', '/');
   });
 
-  it('expose seulement les surfaces opérationnelles raccordées et les outils techniques', () => {
-    window.history.replaceState({}, '', '/admin/zones/nouvelle');
+  it('montre uniquement les quatre blocs principaux', () => {
+    window.history.replaceState({}, '', '/admin/zones');
     render(<AdminShell><p>Contenu de test</p></AdminShell>);
 
     expect(ADMIN_OPERATIONS).toHaveLength(11);
-    for (const operation of ADMIN_OPERATIONS) {
-      expect(screen.getByRole('link', { name: operation.label })).toHaveAttribute('href', operation.href);
-    }
     expect(screen.getByRole('link', { name: 'Tableau de bord' })).toHaveAttribute('href', '/admin');
-    expect(screen.getByRole('link', { name: 'Carte opérationnelle' })).toHaveAttribute('href', '/admin/carte-operationnelle');
-    expect(screen.getByRole('link', { name: 'Modèles et zones' })).toHaveAttribute('href', '/admin/zones');
-    expect(screen.getByRole('link', { name: 'Nouvelle zone' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: 'Modèles et zones' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'Validation' })).toHaveAttribute('href', '/admin/validation');
+    expect(screen.getByRole('link', { name: 'Incidents' })).toHaveAttribute('href', '/admin/incidents');
+    expect(screen.getByRole('link', { name: 'Système' })).toHaveAttribute('href', '/admin/systeme');
+    expect(screen.queryByRole('link', { name: 'Cartes 3D' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Publications' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Audit global' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Nouvelle zone' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Configuration' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Validation' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('n expose pas de surface placeholder', () => {
@@ -38,9 +40,9 @@ describe('AdminShell', () => {
     window.addEventListener('popstate', navigation, { once: true });
     render(<AdminShell><p>Contenu de test</p></AdminShell>);
 
-    await user.click(screen.getByRole('link', { name: 'Modèles et zones' }));
+    await user.click(screen.getByRole('link', { name: 'Validation' }));
 
-    expect(window.location.pathname).toBe('/admin/zones');
+    expect(window.location.pathname).toBe('/admin/validation');
     expect(navigation).toHaveBeenCalledOnce();
     expect(screen.getByText('Contenu de test')).toBeVisible();
   });

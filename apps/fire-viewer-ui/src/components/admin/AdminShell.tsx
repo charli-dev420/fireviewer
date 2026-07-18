@@ -14,12 +14,14 @@ interface AdminShellProps {
   readonly onSignOut?: () => void;
 }
 
-const GROUP_LABELS: Readonly<Record<AdminOperationDefinition['group'], string>> = {
-  pilotage: 'Pilotage',
-  operations: 'Opérations',
-  production: 'Production 3D',
-  governance: 'Gouvernance',
-};
+const PRIMARY_OPERATION_IDS = ['dashboard', 'incidents', 'work-queue', 'system'] as const;
+
+function primaryActivePath(pathname: string, resolvedPath: string | null): string | null {
+  if (/^\/admin\/(?:zones|publications|rapprochement-spatial|signalements)(?:\/|$)/.test(pathname)) return '/admin/validation';
+  if (/^\/admin\/(?:audit|roles|configuration)(?:\/|$)/.test(pathname)) return '/admin/systeme';
+  if (pathname === '/admin/carte-operationnelle') return '/admin/incidents';
+  return resolvedPath;
+}
 
 function navigateWithinAdmin(destination: string): void {
   const url = new URL(destination, window.location.href);
@@ -38,10 +40,11 @@ function AdminNavigationLink({ item, active }: { readonly item: AdminOperationDe
 
 export function AdminShell({ children, onSignOut }: AdminShellProps) {
   const currentPath = typeof window === 'undefined' ? '' : window.location.pathname;
-  const activePath = resolveActiveAdminPath(currentPath);
+  const activePath = primaryActivePath(currentPath, resolveActiveAdminPath(currentPath));
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState('');
   const operations = [...ADMIN_OPERATIONS, ...ADMIN_ZONE_TOOLS];
+  const primaryOperations = PRIMARY_OPERATION_IDS.map((id) => operations.find((item) => item.id === id)).filter((item): item is AdminOperationDefinition => Boolean(item));
 
   const followAdminLink = (event: MouseEvent<HTMLDivElement>) => {
     if (
@@ -90,13 +93,10 @@ export function AdminShell({ children, onSignOut }: AdminShellProps) {
         <form className="admin-operation-shell__search" role="search" onSubmit={submitSearch}>
           <PublicIcon name="search" size={19} />
           <label className="sr-only" htmlFor="admin-global-search">Rechercher dans l’administration</label>
-          <input id="admin-global-search" value={search} onChange={(event) => setSearch(event.currentTarget.value)} placeholder="Rechercher un incident, une contribution ou un identifiant" />
+          <input id="admin-global-search" value={search} onChange={(event) => setSearch(event.currentTarget.value)} placeholder="Rechercher un incident" />
           <button type="submit">Rechercher</button>
         </form>
         <nav className="admin-operation-shell__account" aria-label="Session administrateur">
-          <a className="admin-operation-shell__notification" href="/admin/file-de-traitement" aria-label="Ouvrir la file de traitement">
-            <PublicIcon name="bell" size={23} />
-          </a>
           <div className="admin-operation-shell__profile">
             <PublicIcon name="user" size={20} />
             <span><strong>Administration locale</strong><small>Session vérifiée</small></span>
@@ -109,21 +109,15 @@ export function AdminShell({ children, onSignOut }: AdminShellProps) {
       <div className="admin-operation-shell__body">
         <aside className={`admin-operation-shell__sidebar ${menuOpen ? 'is-open' : ''}`} aria-label="Navigation des opérations">
           <nav onClick={() => setMenuOpen(false)}>
-            {(['pilotage', 'operations', 'production', 'governance'] as const).map((group) => {
-              const items = operations.filter((item) => item.group === group);
-              if (!items.length) return null;
-              return (
-                <section className="admin-operation-shell__nav-group" key={group} aria-labelledby={`admin-nav-${group}`}>
-                  <h2 id={`admin-nav-${group}`}>{GROUP_LABELS[group]}</h2>
-                  <div className="admin-operation-shell__nav-list">
-                    {items.map((item) => <AdminNavigationLink key={item.id} item={item} active={activePath === item.href} />)}
-                  </div>
-                </section>
-              );
-            })}
+            <section className="admin-operation-shell__nav-group" aria-labelledby="admin-nav-essential">
+              <h2 id="admin-nav-essential">Navigation</h2>
+              <div className="admin-operation-shell__nav-list">
+                {primaryOperations.map((item) => <AdminNavigationLink key={item.id} item={item} active={activePath === item.href} />)}
+              </div>
+            </section>
           </nav>
           <div className="admin-operation-shell__admin-mark"><PublicIcon name="shield" size={21} /><strong>ADMIN</strong></div>
-          <p className="admin-operation-shell__audit-note">Vue interne · non publique<br />Toute action sensible est auditée.</p>
+          <p className="admin-operation-shell__audit-note">Les actions sensibles sont enregistrées automatiquement.</p>
         </aside>
 
         <main id="admin-main-content" className="admin-operation-shell__content">{children}</main>
