@@ -15,13 +15,15 @@ export function AdminIncidentObservationsPage({ fireId }: { readonly fireId: str
   const load = useCallback((options: { signal?: AbortSignal }) => api.getIncidentObservations(fireId, options), [api, fireId]);
   const { state, reload } = useAdminQuery(load, [load]);
   const mutation = useAdminMutation();
-  const [reasons, setReasons] = useState<Record<string, string>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const [publishExactLocations, setPublishExactLocations] = useState<Record<string, boolean>>({});
   const [resolved, setResolved] = useState<string | null>(null);
 
   const resolve = async (observationId: string, action: 'attach' | 'reject', version: number) => {
-    const reason = reasons[observationId]?.trim() ?? '';
-    if (reason.length < 10) return;
+    const note = notes[observationId]?.trim() ?? '';
+    const reason = action === 'attach'
+      ? `Observation rattachée manuellement à ${fireId} depuis sa fiche.${note ? ` Note : ${note}` : ''}`
+      : `Observation rejetée manuellement depuis la fiche de ${fireId}.${note ? ` Note : ${note}` : ''}`;
     const publishSpatialEvidence = action === 'attach' && Boolean(publishExactLocations[observationId]);
     const result = await mutation.run(
       `${observationId}:${action}:${version}:${fireId}:${publishSpatialEvidence}:${reason}`,
@@ -57,8 +59,8 @@ export function AdminIncidentObservationsPage({ fireId }: { readonly fireId: str
           <div className="admin-observation-list">
             {state.data.observations.map((item) => {
               const pending = item.verification_state === 'PENDING_REVIEW';
-              const reason = reasons[item.observation_id] ?? '';
-              const canResolve = pending && reason.trim().length >= 10 && FIRE_ID_PATTERN.test(fireId);
+              const note = notes[item.observation_id] ?? '';
+              const canResolve = pending && FIRE_ID_PATTERN.test(fireId);
               return (
                 <article className="admin-observation-record" key={item.observation_id}>
                   <header>
@@ -80,20 +82,6 @@ export function AdminIncidentObservationsPage({ fireId }: { readonly fireId: str
                   </dl>
                   {pending ? (
                     <div className="admin-observation-record__decision">
-                      <label className="admin-field" htmlFor={`observation-reason-${item.observation_id}`}>
-                        <span>Motif de décision audité</span>
-                        <textarea
-                          id={`observation-reason-${item.observation_id}`}
-                          rows={3}
-                          maxLength={500}
-                          value={reason}
-                          onChange={(event) => {
-                            const value = event.currentTarget.value;
-                            setReasons((current) => ({ ...current, [item.observation_id]: value }));
-                          }}
-                          placeholder="Expliquez le rattachement ou le rejet (10 caractères minimum)."
-                        />
-                      </label>
                       <label className="admin-check" htmlFor={`observation-public-position-${item.observation_id}`}>
                         <input
                           id={`observation-public-position-${item.observation_id}`}
@@ -109,6 +97,23 @@ export function AdminIncidentObservationsPage({ fireId }: { readonly fireId: str
                           <small>Option indépendante de la validation. Sans cette autorisation, aucune position exacte issue de cette preuve n’est publiée.</small>
                         </span>
                       </label>
+                      <details className="admin-disclosure">
+                        <summary>Ajouter une note (facultatif)</summary>
+                        <label className="admin-field" htmlFor={`observation-note-${item.observation_id}`}>
+                          <span>Note interne</span>
+                          <textarea
+                            id={`observation-note-${item.observation_id}`}
+                            rows={2}
+                            maxLength={380}
+                            value={note}
+                            onChange={(event) => {
+                              const value = event.currentTarget.value;
+                              setNotes((current) => ({ ...current, [item.observation_id]: value }));
+                            }}
+                            placeholder="Précision utile à l’équipe"
+                          />
+                        </label>
+                      </details>
                       <div className="admin-form-actions">
                         <button className="button button--primary" type="button" disabled={mutation.state.pending || !canResolve} onClick={() => void resolve(item.observation_id, 'attach', item.version)}>Rattacher à cet incident</button>
                         <button className="button button--small" type="button" disabled={mutation.state.pending || !canResolve} onClick={() => void resolve(item.observation_id, 'reject', item.version)}>Rejeter</button>

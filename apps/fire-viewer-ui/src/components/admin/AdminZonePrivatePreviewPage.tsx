@@ -1,4 +1,4 @@
-import { lazy, Suspense, type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { createAdminIdempotencyKey } from '../../lib/adminApi';
 import { getAdminApiOrigin } from '../../lib/adminSession';
 import { useAdminApi, useAdminQuery } from './AdminApiContext';
@@ -36,11 +36,7 @@ export function AdminZonePrivatePreviewPage({ zoneId, revision }: { readonly zon
   const api = useAdminApi();
   const load = useCallback((options: { signal?: AbortSignal }) => api.getZonePrivatePreview(zoneId, revision, options), [api, revision, zoneId]);
   const { state, reload } = useAdminQuery(load, [load]);
-  const [reason, setReason] = useState('');
-  const [incidentId, setIncidentId] = useState('');
-  const [linkReason, setLinkReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [linking, setLinking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [comparisonPackageId, setComparisonPackageId] = useState('');
   const [images, setImages] = useState<readonly PreviewImageState[]>([]);
@@ -104,9 +100,15 @@ export function AdminZonePrivatePreviewPage({ zoneId, revision }: { readonly zon
           ? 'restore'
           : null;
 
-  async function advancePackage(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function advancePackage() {
     if (!preview.package_id || !action) return;
+    const reason = action === 'preview'
+      ? 'Aperçu privé activé manuellement après contrôle du package.'
+      : action === 'publish'
+        ? 'Carte publiée manuellement après contrôle de l’aperçu privé.'
+        : action === 'withdraw'
+          ? 'Carte retirée manuellement du site public depuis son aperçu privé.'
+          : 'Carte restaurée manuellement sur le site public depuis son aperçu privé.';
     setMessage(null);
     setSubmitting(true);
     try {
@@ -114,15 +116,7 @@ export function AdminZonePrivatePreviewPage({ zoneId, revision }: { readonly zon
         const result = await api.enableSpatialPackagePreview(zoneId, revision, { package_id: preview.package_id, reason }, { idempotencyKey: createAdminIdempotencyKey() });
         setMessage(`Package ${result.package_id} prêt à être vérifié.`);
       } else if (action === 'publish') {
-        if (preview.linked_fire_ids.length === 0) {
-          const fireId = incidentId.trim().toUpperCase();
-          const incident = await api.getIncident(fireId);
-          await api.attachSpatialPackageToIncident(fireId, {
-            package_id: preview.package_id,
-            expected_incident_version: incident.version,
-            reason,
-          }, { idempotencyKey: createAdminIdempotencyKey() });
-        }
+        if (preview.linked_fire_ids.length === 0) throw new Error('Choisissez d’abord le projet incendie qui utilisera cette carte.');
         const result = await api.publishSpatialPackage(zoneId, revision, { package_id: preview.package_id, reason }, { idempotencyKey: createAdminIdempotencyKey() });
         setMessage(`Publication ${result.publication_id} activée.`);
       } else {
@@ -130,37 +124,11 @@ export function AdminZonePrivatePreviewPage({ zoneId, revision }: { readonly zon
         await api.changePublication(preview.publication_id, action, { reason }, { idempotencyKey: createAdminIdempotencyKey() });
         setMessage(action === 'withdraw' ? 'La carte a été retirée du site public.' : 'La publication a été restaurée.');
       }
-      setReason('');
-      setIncidentId('');
       reload();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'La transition du package a échoué.');
     } finally {
       setSubmitting(false);
-    }
-  }
-
-  async function linkPackageToIncident(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!preview.package_id) return;
-    const fireId = incidentId.trim().toUpperCase();
-    setMessage(null);
-    setLinking(true);
-    try {
-      const incident = await api.getIncident(fireId);
-      const result = await api.attachSpatialPackageToIncident(fireId, {
-        package_id: preview.package_id,
-        expected_incident_version: incident.version,
-        reason: linkReason,
-      }, { idempotencyKey: createAdminIdempotencyKey() });
-      setMessage(`Carte rattachée à ${result.fire_id}. Le viewer de l’incident peut maintenant la charger.`);
-      setIncidentId('');
-      setLinkReason('');
-      reload();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Le rattachement à l’incident a échoué.');
-    } finally {
-      setLinking(false);
     }
   }
 
@@ -170,7 +138,7 @@ export function AdminZonePrivatePreviewPage({ zoneId, revision }: { readonly zon
     : preview.publication_active
       ? 'Publiée sans incident — non visible'
       : 'Privée';
-  const publishedPackageCanBeLinked = preview.package_state === 'PUBLISHED';
+  const needsIncident = preview.linked_fire_ids.length === 0;
 
   return (
     <section aria-labelledby="admin-zone-preview-title">
@@ -181,7 +149,7 @@ export function AdminZonePrivatePreviewPage({ zoneId, revision }: { readonly zon
         <p><code>{preview.zone_id}</code> · <strong>{publicStatus}</strong></p>
       </AdminPageHeader>
 
-      {publishedPackageCanBeLinked && preview.package_id ? (
+      {preview.package_id ? (
         <section className="admin-section admin-publication-workflow" aria-labelledby="incident-link-title">
           <div className="admin-section__heading">
             <div>
@@ -194,17 +162,7 @@ export function AdminZonePrivatePreviewPage({ zoneId, revision }: { readonly zon
           ) : (
             <p className="admin-feedback admin-feedback--error" role="alert">Aucun incident associé : la carte ne peut pas être visible sur le site.</p>
           )}
-          {preview.linked_fire_ids.length === 0 ? <form className="admin-form-card admin-form-card--embedded" onSubmit={linkPackageToIncident}>
-            <label htmlFor="spatial-incident-id">Identifiant de l’incident</label>
-            <input id="spatial-incident-id" value={incidentId} onChange={(event) => setIncidentId(event.currentTarget.value.toUpperCase())} required pattern="FR-[0-9A-Z]{2,3}-[0-9]{5}" placeholder="FR-26-00001" />
-            <label htmlFor="spatial-incident-link-reason">Motif du rattachement</label>
-            <textarea id="spatial-incident-link-reason" value={linkReason} onChange={(event) => setLinkReason(event.currentTarget.value)} required minLength={10} maxLength={500} rows={3} />
-            <div className="admin-form-actions">
-              <button className="button button--primary" type="submit" disabled={linking || !/^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(incidentId.trim()) || linkReason.trim().length < 10}>
-                {linking ? 'Rattachement…' : 'Associer cette carte'}
-              </button>
-            </div>
-          </form> : null}
+          {needsIncident ? <div className="admin-form-actions"><a className="button button--primary" href="/admin/incidents">Choisir le projet incendie</a></div> : null}
         </section>
       ) : null}
 
@@ -216,34 +174,23 @@ export function AdminZonePrivatePreviewPage({ zoneId, revision }: { readonly zon
           </div>
           {preview.package_state ? <AdminStateLabel value={preview.package_state} /> : null}
         </div>
-        {action ? (
-          <form className="admin-form-card admin-form-card--embedded" onSubmit={advancePackage}>
+        {action && !(action === 'publish' && needsIncident) ? (
+          <div className="admin-form-card admin-form-card--embedded">
             <h4>{ACTION_LABELS[action]}</h4>
             <p>{ACTION_DESCRIPTIONS[action]}</p>
-            {action === 'publish' && preview.linked_fire_ids.length === 0 ? <>
-              <label htmlFor="spatial-publication-incident">Incident qui affichera la carte</label>
-              <input id="spatial-publication-incident" value={incidentId} onChange={(event) => setIncidentId(event.currentTarget.value.toUpperCase())} required pattern="FR-[0-9A-Z]{2,3}-[0-9]{5}" placeholder="FR-26-00001" />
-            </> : null}
-            <label htmlFor="spatial-publication-reason">Motif de l’action</label>
-            <textarea
-              id="spatial-publication-reason"
-              value={reason}
-              onChange={(event) => setReason(event.currentTarget.value)}
-              required
-              minLength={10}
-              maxLength={500}
-              rows={3}
-            />
             <div className="admin-form-actions">
               <button
                 className={`button ${action === 'withdraw' ? 'button--small' : 'button--primary'}`}
-                type="submit"
-                disabled={submitting || reason.trim().length < 10 || (action === 'publish' && preview.linked_fire_ids.length === 0 && !/^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(incidentId.trim()))}
+                type="button"
+                disabled={submitting}
+                onClick={() => void advancePackage()}
               >
                 {submitting ? 'Traitement…' : ACTION_LABELS[action]}
               </button>
             </div>
-          </form>
+          </div>
+        ) : action === 'publish' && needsIncident ? (
+          <p className="admin-publication-workflow__status">Choisissez d’abord le projet incendie ci-dessus. La publication sera ensuite disponible en un clic.</p>
         ) : (
           <p className="admin-publication-workflow__status">Aucune transition n’est requise pour ce package.</p>
         )}

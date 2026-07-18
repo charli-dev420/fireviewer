@@ -10,9 +10,9 @@ import { AdminDashboardPage, AdminOperationalMapPage } from './AdminCommandPages
 const API_ORIGIN = 'http://localhost:8000';
 
 const summary = {
-  total_incidents: 1,
+  total_incidents: 2,
   active_incidents: 1,
-  monitoring_incidents: 0,
+  monitoring_incidents: 1,
   incidents_requiring_review: 1,
   incidents_with_models: 1,
   model_updates_available: 1,
@@ -35,6 +35,15 @@ const incident = {
   pending_observation_count: 1, spatial_zone_id: 'MAURES-01', spatial_zone_revision: 2,
   current_package_id: 'pkg-maures-v2', active_package_id: 'pkg-maures-v1', model_update_available: true,
   models: [{ profile: 'local', source: 'spatial_package', state: 'PUBLISHED', version: 2, asset_id: null, package_id: 'pkg-maures-v2', package_file_id: 3, sha256: 'c'.repeat(64), size_bytes: 2048, is_current: true, access_path: '/api/v2/admin/packages/pkg-maures-v2/files/3' }],
+};
+
+const monitoringIncident = {
+  ...incident,
+  fire_id: 'FR-26-00001', canonical_name: 'Die–Pontaix', territory_code: '26', longitude: 5.37, latitude: 44.75,
+  status: 'MONITORING', verification_state: 'PENDING_REVIEW', visibility: 'ADMIN_ONLY',
+  current_episode_id: 'E02', last_observed_at: '2026-07-15T09:40:00Z', review_required: false,
+  pending_observation_count: 0, spatial_zone_id: 'DIE-PONTAIX-08', spatial_zone_revision: 1,
+  current_package_id: null, active_package_id: null, model_update_available: false, models: [],
 };
 
 const dashboard = {
@@ -70,40 +79,43 @@ describe('surfaces de commandement administrateur', () => {
     vi.unstubAllGlobals();
   });
 
-  it('rend le poste de veille avec les priorités et les états réellement fournis par le backend', async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(dashboard));
+  it('rend la vue nationale avec tous les incidents réellement fournis par le backend', async () => {
+    const mapPayload = { generated_at: '2026-07-15T10:00:00Z', coordinate_system: 'EPSG:4326', summary, incidents: [incident, monitoringIncident] };
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(mapPayload));
     vi.stubGlobal('fetch', fetchMock);
 
     renderWithApi(<AdminDashboardPage />);
 
-    expect(await screen.findByRole('heading', { name: 'Administration' })).toBeVisible();
-    expect(screen.getByText('Publication à valider')).toBeVisible();
-    expect(screen.getByText(/FR-83-00042 · Massif des Maures/)).toBeVisible();
-    expect(screen.getByRole('link', { name: /À valider 2/ })).toHaveAttribute('href', '/admin/validation');
-    expect(fetchMock).toHaveBeenCalledWith(`${API_ORIGIN}/api/v2/admin/dashboard`, expect.objectContaining({ method: 'GET' }));
-    expect(document.body.textContent).not.toContain('/api/v2/admin/packages/pkg-maures-v2/files/3');
+    expect(await screen.findByRole('heading', { name: 'Vue nationale — France métropolitaine' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'FR-83-00042, Massif des Maures' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'FR-26-00001, Die–Pontaix' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Massif des Maures' })).toBeVisible();
+    expect(screen.getByText('1 observation(s) attendent une décision humaine.')).toBeVisible();
+    expect(screen.getByRole('link', { name: /Ouvrir l’incident/ })).toHaveAttribute('href', '/admin/incidents/FR-83-00042');
+    expect(fetchMock).toHaveBeenCalledWith(`${API_ORIGIN}/api/v2/admin/operational-map`, expect.objectContaining({ method: 'GET' }));
+    expect(document.body.textContent).not.toContain('1 240');
+    expect(document.body.textContent).not.toContain('sapeur');
   });
 
-  it('ouvre un incident depuis la carte, expose ses modèles et recharge toutes les couches', async () => {
-    const mapPayload = { generated_at: '2026-07-15T10:00:00Z', coordinate_system: 'EPSG:4326', summary, incidents: [incident] };
+  it('filtre la surveillance, ouvre un incident et revient à la vue nationale', async () => {
+    const mapPayload = { generated_at: '2026-07-15T10:00:00Z', coordinate_system: 'EPSG:4326', summary, incidents: [incident, monitoringIncident] };
     const fetchMock = vi.fn<typeof fetch>().mockImplementation(() => Promise.resolve(jsonResponse(mapPayload)));
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
     renderWithApi(<AdminOperationalMapPage />);
 
-    const marker = await screen.findByRole('button', { name: 'FR-83-00042, Massif des Maures' });
-    await user.click(marker);
-    expect(screen.getByRole('heading', { name: 'FR-83-00042 · Massif des Maures' })).toBeVisible();
-    expect(screen.getByRole('tab', { name: 'Modèles 3D' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('link', { name: 'Ouvrir le modèle' })).toHaveAttribute('href', '/admin/incidents/FR-83-00042/modeles-pipeline');
-    expect(screen.getByTitle('Modèle 3D disponible')).toBeVisible();
+    await screen.findByRole('button', { name: 'FR-83-00042, Massif des Maures' });
+    await user.click(screen.getByRole('button', { name: /Surveillance\s*1/ }));
+    expect(screen.queryByRole('button', { name: 'FR-83-00042, Massif des Maures' })).not.toBeInTheDocument();
+    const monitoringMarker = screen.getByRole('button', { name: 'FR-26-00001, Die–Pontaix' });
+    await user.click(monitoringMarker);
+    expect(screen.getByRole('heading', { name: 'Die–Pontaix' })).toBeVisible();
+    expect(screen.getByText('Aucune décision urgente n’est signalée.')).toBeVisible();
 
-    await user.click(screen.getByRole('checkbox', { name: 'Modèles disponibles' }));
-    expect(screen.getByRole('button', { name: 'FR-83-00042, Massif des Maures' })).toBeVisible();
-    expect(screen.queryByTitle('Modèle 3D disponible')).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: /Actualiser toutes les couches/ }));
+    await user.click(screen.getByRole('button', { name: 'Recentrer sur l’incident' }));
+    await user.click(screen.getAllByRole('button', { name: 'Revenir à la vue nationale' })[1]);
+    await user.click(screen.getByRole('button', { name: /Actualiser les incidents/ }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(fetchMock).toHaveBeenLastCalledWith(`${API_ORIGIN}/api/v2/admin/operational-map`, expect.objectContaining({ method: 'GET' }));
   });

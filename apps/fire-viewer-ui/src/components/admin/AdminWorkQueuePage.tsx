@@ -1,23 +1,32 @@
-import { useCallback, useState } from 'react';
-import { useAdminApi, useAdminMutation, useAdminQuery } from './AdminApiContext';
+import { useCallback } from 'react';
+import { useAdminApi, useAdminQuery } from './AdminApiContext';
 import { AdminEmptyState, AdminErrorState, AdminLoadingState, AdminPageHeader, AdminStateLabel, formatAdminDate } from './AdminPageState';
 
 export function AdminWorkQueuePage() {
-  const api = useAdminApi(); const load = useCallback((options: { signal?: AbortSignal }) => api.getWorkQueue(options), [api]); const { state, reload } = useAdminQuery(load, [load]); const mutation = useAdminMutation();
-  const [reason, setReason] = useState<Record<string, string>>({}); const [target, setTarget] = useState<Record<string, string>>({});
-  const resolve = async (id: string, action: 'attach' | 'create' | 'reject', version: number, proposed?: string | null) => {
-    const note = reason[id]?.trim() ?? ''; const fireId = (target[id] ?? proposed ?? '').trim().toUpperCase();
-    if (note.length < 10 || (action === 'attach' && !/^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(fireId))) return;
-    const result = await mutation.run(`${id}:${action}:${version}:${fireId}:${note}`, (options) => api.resolveObservation(id, { action, expected_version: version, reason: note, ...(action === 'attach' ? { target_fire_id: fireId } : {}) }, options));
-    if (result) reload();
-  };
+  const api = useAdminApi();
+  const load = useCallback((options: { signal?: AbortSignal }) => api.getWorkQueue(options), [api]);
+  const { state, reload } = useAdminQuery(load, [load]);
+
   if (state.kind === 'loading') return <AdminLoadingState label="Chargement de la file de traitement…" />;
   if (state.kind === 'error') return <AdminErrorState error={state.error} onRetry={reload} />;
   const queue = state.data;
-  return <section aria-labelledby="admin-work-queue-title"><AdminPageHeader title="Validation" actions={<div className="admin-form-actions"><a className="button button--small" href="/admin/rapprochement-spatial">Repères</a><a className="button button--small" href="/admin/zones">Cartes 3D</a><a className="button button--small" href="/admin/publications">Publications</a></div>}><p>Tout ce qui attend une décision humaine, regroupé sur un seul écran.</p></AdminPageHeader>
-    <section className="admin-section"><h3 id="admin-work-queue-title">Observations à qualifier</h3>{queue.observations.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Observation</th><th>Candidat spatial</th><th>Motifs</th><th>Décision</th></tr></thead><tbody>{queue.observations.map((item) => <tr key={item.observation_id}><th scope="row"><code>{item.observation_id}</code><small>{item.source_key} · {formatAdminDate(item.observed_at)} · v{item.version}</small></th><td>{item.proposed_fire_id ? <><a href={`/admin/incidents/${item.proposed_fire_id}`}><code>{item.proposed_fire_id}</code></a><small>{item.proposed_episode_id ?? 'épisode non publié'} · score {item.match_score?.toFixed(2) ?? 'non calculé'}</small></> : 'Aucun candidat proposé'}</td><td>{item.review_reasons.length ? item.review_reasons.join(' · ') : 'Aucun motif publié'}</td><td><div className="admin-report-actions"><label className="sr-only" htmlFor={`target-${item.observation_id}`}>Incident cible</label><input id={`target-${item.observation_id}`} value={target[item.observation_id] ?? item.proposed_fire_id ?? ''} onChange={(event) => setTarget((current) => ({ ...current, [item.observation_id]: event.target.value }))} placeholder="FR-83-00042" /><label className="sr-only" htmlFor={`reason-${item.observation_id}`}>Motif de décision</label><textarea id={`reason-${item.observation_id}`} rows={2} maxLength={500} value={reason[item.observation_id] ?? ''} onChange={(event) => setReason((current) => ({ ...current, [item.observation_id]: event.target.value }))} placeholder="Motif audité, 10 caractères minimum" /><div><button type="button" className="button button--small" disabled={mutation.state.pending} onClick={() => void resolve(item.observation_id, 'attach', item.version, item.proposed_fire_id)}>Rattacher</button><button type="button" className="button button--small" disabled={mutation.state.pending} onClick={() => void resolve(item.observation_id, 'create', item.version)}>Créer</button><button type="button" className="button button--small" disabled={mutation.state.pending} onClick={() => void resolve(item.observation_id, 'reject', item.version)}>Rejeter</button></div></div></td></tr>)}</tbody></table></div> : <AdminEmptyState title="Aucune observation à qualifier">Aucune observation non résolue n’est actuellement disponible.</AdminEmptyState>}</section>
-    <section className="admin-section"><h3>Incidents demandant une revue</h3>{queue.incidents.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Incident</th><th>Épisode</th><th>Statut</th><th>Dernière activité</th></tr></thead><tbody>{queue.incidents.map((item) => <tr key={item.fire_id}><th scope="row"><a href={`/admin/incidents/${item.fire_id}`}><code>{item.fire_id}</code></a></th><td>{item.episode_id}</td><td><AdminStateLabel value={item.status} /></td><td>{formatAdminDate(item.last_observed_at)}</td></tr>)}</tbody></table></div> : <AdminEmptyState title="Aucun incident à revoir">Les épisodes courants ne demandent aucune validation.</AdminEmptyState>}</section>
-    <section className="admin-section"><h3>Signalements publics ouverts</h3>{queue.reports.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Incident</th><th>Catégorie</th><th>Reçu</th><th>Accès</th></tr></thead><tbody>{queue.reports.map((item) => <tr key={item.report_id}><th scope="row"><code>{item.fire_id}</code></th><td>{item.category}</td><td>{formatAdminDate(item.submitted_at)}</td><td><a className="button button--small" href="/admin/signalements">Examiner</a></td></tr>)}</tbody></table></div> : <AdminEmptyState title="Aucun signalement ouvert">Aucun signalement public ne demande de revue.</AdminEmptyState>}</section>
-    {mutation.state.error ? <AdminErrorState error={mutation.state.error} /> : null}
+
+  return <section aria-labelledby="admin-work-queue-title">
+    <AdminPageHeader title="Validation"><p>Les éléments à contrôler sont regroupés ici. Chaque décision se prend ensuite dans l’écran adapté, sans formulaire dupliqué.</p></AdminPageHeader>
+
+    <section className="admin-section">
+      <div className="admin-section__heading"><div><h3 id="admin-work-queue-title">Observations à qualifier</h3><p>{queue.observations.length} observation(s) attendent un rattachement ou un rejet.</p></div>{queue.observations.length ? <a className="button button--primary" href="/admin/rapprochement-spatial">Examiner les observations</a> : null}</div>
+      {queue.observations.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Observation</th><th>Source</th><th>Candidat proposé</th><th>Reçue</th></tr></thead><tbody>{queue.observations.map((item) => <tr key={item.observation_id}><th scope="row"><code>{item.observation_id}</code></th><td>{item.source_key}</td><td>{item.proposed_fire_id ? <a href={`/admin/incidents/${item.proposed_fire_id}`}>{item.proposed_fire_id}</a> : 'Aucun candidat'}</td><td>{formatAdminDate(item.observed_at)}</td></tr>)}</tbody></table></div> : <AdminEmptyState title="Aucune observation à qualifier">Aucune observation non résolue n’est actuellement disponible.</AdminEmptyState>}
+    </section>
+
+    <section className="admin-section">
+      <h3>Incidents demandant une revue</h3>
+      {queue.incidents.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Incident</th><th>Statut</th><th>Dernière activité</th><th><span className="sr-only">Ouvrir</span></th></tr></thead><tbody>{queue.incidents.map((item) => <tr key={item.fire_id}><th scope="row"><a href={`/admin/incidents/${item.fire_id}`}>{item.fire_id}</a></th><td><AdminStateLabel value={item.status} /></td><td>{formatAdminDate(item.last_observed_at)}</td><td><a className="button button--small" href={`/admin/incidents/${item.fire_id}`}>Ouvrir</a></td></tr>)}</tbody></table></div> : <AdminEmptyState title="Aucun incident à revoir">Les épisodes courants ne demandent aucune validation.</AdminEmptyState>}
+    </section>
+
+    <section className="admin-section">
+      <div className="admin-section__heading"><div><h3>Signalements publics ouverts</h3><p>{queue.reports.length} signalement(s) attendent une décision.</p></div>{queue.reports.length ? <a className="button button--primary" href="/admin/signalements">Examiner les signalements</a> : null}</div>
+      {!queue.reports.length ? <AdminEmptyState title="Aucun signalement ouvert">Aucun signalement public ne demande de revue.</AdminEmptyState> : null}
+    </section>
   </section>;
 }

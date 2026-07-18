@@ -19,7 +19,7 @@ const PRIMARY_OPERATION_IDS = ['dashboard', 'incidents', 'work-queue', 'system']
 function primaryActivePath(pathname: string, resolvedPath: string | null): string | null {
   if (/^\/admin\/(?:zones|publications|rapprochement-spatial|signalements)(?:\/|$)/.test(pathname)) return '/admin/validation';
   if (/^\/admin\/(?:audit|roles|configuration)(?:\/|$)/.test(pathname)) return '/admin/systeme';
-  if (pathname === '/admin/carte-operationnelle') return '/admin/incidents';
+  if (pathname === '/admin/carte-operationnelle') return '/admin';
   return resolvedPath;
 }
 
@@ -81,7 +81,7 @@ export function AdminShell({ children, onSignOut }: AdminShellProps) {
 
   return (
     <div
-      className={`admin-operation-shell ${activePath === '/admin/carte-operationnelle' ? 'admin-operation-shell--map' : ''}`}
+      className={`admin-operation-shell ${activePath === '/admin' ? 'admin-operation-shell--map' : ''}`}
       onClick={followAdminLink}
     >
       <a className="skip-link" href="#admin-main-content">Aller au contenu administrateur</a>

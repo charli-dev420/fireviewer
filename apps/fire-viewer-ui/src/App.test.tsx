@@ -408,13 +408,13 @@ describe('Routage administrateur privé', () => {
   });
 
   it.each([
-    ['/admin', 'Administration'],
-    ['/admin/carte-operationnelle', 'Carte opérationnelle nationale'],
+    ['/admin', 'Vue nationale — France métropolitaine'],
+    ['/admin/carte-operationnelle', 'Vue nationale — France métropolitaine'],
     ['/admin/zones', 'Cartes 3D'],
-    ['/admin/zones/nouvelle', 'Préparer une carte 3D'],
+    ['/admin/zones/nouvelle', 'Ajouter une carte 3D'],
     ['/admin/zones/ALPES-TEST', 'Zone ALPES-TEST'],
     ['/admin/zones/ALPES-TEST/revisions/nouvelle', 'Zone ALPES-TEST'],
-    ['/admin/zones/ALPES-TEST/revisions/2', 'Révision 2'],
+    ['/admin/zones/ALPES-TEST/revisions/2', 'Carte 3D — version 2'],
     ['/admin/zones/ALPES-TEST/revisions/2/preview', 'Carte 3D — Révision 2'],
     ['/admin/zones/ALPES-TEST/information/nouvelle', 'Ajouter une information — ALPES-TEST'],
     ['/admin/zones/ALPES-TEST/information/info-001', 'Modifier une information — ALPES-TEST'],
@@ -431,7 +431,7 @@ describe('Routage administrateur privé', () => {
     expect(await screen.findByRole('link', { name: 'FireWarning, tableau de bord administrateur' })).toBeVisible();
     expect(screen.getByText('Session vérifiée')).toBeVisible();
     expect(await screen.findByRole('heading', { name: heading })).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Tableau de bord' })).toHaveAttribute('href', '/admin');
+    expect(screen.getByRole('link', { name: 'Centre opérationnel' })).toHaveAttribute('href', '/admin');
     expect(screen.getByRole('link', { name: 'Incidents' })).toHaveAttribute('href', '/admin/incidents');
     expect(screen.getByRole('link', { name: 'Validation' })).toHaveAttribute('href', '/admin/validation');
     expect(screen.getByRole('link', { name: 'Système' })).toHaveAttribute('href', '/admin/systeme');

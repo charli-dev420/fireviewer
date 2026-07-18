@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import {
-  ADMIN_INFORMATION_STATES,
   type AdminInformationState,
   type CreateAdminInformationInput,
   type UpdateAdminInformationInput,
 } from '../../lib/adminApi';
 import { useAdminApi, useAdminMutation, useAdminQuery } from './AdminApiContext';
 import { AdminLocalPlacementPanel } from './AdminLocalPlacementPanel';
-import { AdminErrorState, AdminLoadingState, AdminMutationFeedback, AdminPageHeader, AdminStateLabel } from './AdminPageState';
+import { AdminErrorState, AdminLoadingState, AdminMutationFeedback, AdminPageHeader } from './AdminPageState';
 
 interface AdminInformationEditorPageProps {
   readonly zoneId: string;
@@ -21,21 +20,23 @@ interface InformationFormValue {
   readonly easting: string;
   readonly northing: string;
   readonly state: AdminInformationState;
-  readonly reason: string;
 }
 
 function emptyForm(): InformationFormValue {
-  return { title: '', body: '', category: '', easting: '', northing: '', state: 'DRAFT', reason: '' };
+  return { title: '', body: '', category: 'observation', easting: '', northing: '', state: 'DRAFT' };
 }
 
-function parseForm(value: InformationFormValue, bounds: readonly [number, number, number, number]): CreateAdminInformationInput | null {
+function parseForm(
+  value: InformationFormValue,
+  bounds: readonly [number, number, number, number],
+  reason: string,
+): CreateAdminInformationInput | null {
   const easting = Number(value.easting);
   const northing = Number(value.northing);
   if (
     value.title.trim().length === 0
     || value.body.trim().length === 0
     || value.category.trim().length === 0
-    || value.reason.trim().length === 0
     || value.easting.trim().length === 0
     || value.northing.trim().length === 0
     || !Number.isFinite(easting)
@@ -52,7 +53,7 @@ function parseForm(value: InformationFormValue, bounds: readonly [number, number
     body: value.body.trim(),
     category: value.category.trim(),
     position_l93: [easting, northing],
-    reason: value.reason.trim(),
+    reason,
   };
 }
 
@@ -79,16 +80,18 @@ export function AdminInformationEditorPage({ zoneId, informationId }: AdminInfor
       easting: String(currentInformation.position_l93[0]),
       northing: String(currentInformation.position_l93[1]),
       state: currentInformation.state,
-      reason: '',
     });
   }, [currentInformation]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (query.kind !== 'ready') return;
-    const input = parseForm(form, query.data.zone.bounds_l93_m);
+    const auditReason = editing
+      ? 'Repère mis à jour manuellement depuis la fiche de la carte.'
+      : 'Repère ajouté manuellement depuis la fiche de la carte.';
+    const input = parseForm(form, query.data.zone.bounds_l93_m, auditReason);
     if (!input) {
-      setLocalError('Les coordonnées doivent être finies et situées dans l’emprise locale de la zone.');
+      setLocalError('Renseignez un titre, un type, une description et placez le repère dans la zone.');
       return;
     }
     setLocalError(null);
@@ -120,20 +123,22 @@ export function AdminInformationEditorPage({ zoneId, informationId }: AdminInfor
         title={editing ? `Modifier une information — ${zoneId}` : `Ajouter une information — ${zoneId}`}
         actions={<a className="button button--small" href={`/admin/zones/${encodeURIComponent(zoneId)}`}>Retour à la zone</a>}
       >
-        <p>L’information est placée exclusivement dans le repère Lambert-93 de cette zone locale.</p>
+        <p>Décrivez le repère puis choisissez son emplacement. Les coordonnées techniques sont calculées automatiquement.</p>
       </AdminPageHeader>
       <form className="admin-form-card" onSubmit={(event) => void submit(event)}>
         <div className="admin-form-grid">
           <label className="admin-field" htmlFor="admin-information-title-field"><span>Titre</span><input id="admin-information-title-field" value={form.title} onChange={(event) => set('title', event.currentTarget.value)} maxLength={255} required disabled={mutation.state.pending} /></label>
-          <label className="admin-field" htmlFor="admin-information-category"><span>Catégorie</span><input id="admin-information-category" value={form.category} onChange={(event) => set('category', event.currentTarget.value)} maxLength={64} required disabled={mutation.state.pending} /></label>
-          <label className="admin-field admin-field--wide" htmlFor="admin-information-body"><span>Contenu</span><textarea id="admin-information-body" value={form.body} onChange={(event) => set('body', event.currentTarget.value)} rows={5} maxLength={8_000} required disabled={mutation.state.pending} /></label>
-          <fieldset className="admin-fieldset admin-fieldset--wide">
-            <legend>Position Lambert-93 (mètres)</legend>
-            <div className="admin-coordinate-grid">
-              <label htmlFor="admin-information-easting"><span>Est / X</span><input id="admin-information-easting" type="number" step="any" value={form.easting} onChange={(event) => set('easting', event.currentTarget.value)} required disabled={mutation.state.pending} /></label>
-              <label htmlFor="admin-information-northing"><span>Nord / Y</span><input id="admin-information-northing" type="number" step="any" value={form.northing} onChange={(event) => set('northing', event.currentTarget.value)} required disabled={mutation.state.pending} /></label>
-            </div>
-          </fieldset>
+          <label className="admin-field" htmlFor="admin-information-category">
+            <span>Type de repère</span>
+            <select id="admin-information-category" value={form.category} onChange={(event) => set('category', event.currentTarget.value)} required disabled={mutation.state.pending}>
+              {!['observation', 'access', 'sensitive_point', 'engaged_resource'].includes(form.category) ? <option value={form.category}>{form.category}</option> : null}
+              <option value="observation">Observation</option>
+              <option value="access">Accès</option>
+              <option value="sensitive_point">Point sensible</option>
+              <option value="engaged_resource">Moyen engagé</option>
+            </select>
+          </label>
+          <label className="admin-field admin-field--wide" htmlFor="admin-information-body"><span>Description</span><textarea id="admin-information-body" value={form.body} onChange={(event) => set('body', event.currentTarget.value)} rows={5} maxLength={8_000} required disabled={mutation.state.pending} /></label>
           <div className="admin-field--wide">
             <AdminLocalPlacementPanel
               bounds={bounds}
@@ -145,16 +150,6 @@ export function AdminInformationEditorPage({ zoneId, informationId }: AdminInfor
               }}
             />
           </div>
-          {editing ? (
-            <label className="admin-field" htmlFor="admin-information-state">
-              <span>État de revue</span>
-              <select id="admin-information-state" value={form.state} onChange={(event) => set('state', event.currentTarget.value as AdminInformationState)} disabled={mutation.state.pending}>
-                {ADMIN_INFORMATION_STATES.map((value) => <option key={value} value={value}>{value.replaceAll('_', ' ')}</option>)}
-              </select>
-              <small>État actuel : {currentInformation ? <AdminStateLabel value={currentInformation.state} /> : null}</small>
-            </label>
-          ) : null}
-          <label className="admin-field admin-field--wide" htmlFor="admin-information-reason"><span>Motif administratif</span><textarea id="admin-information-reason" value={form.reason} onChange={(event) => set('reason', event.currentTarget.value)} rows={2} maxLength={500} required disabled={mutation.state.pending} /></label>
         </div>
         {localError ? <div className="admin-feedback admin-feedback--error" role="alert">{localError}</div> : null}
         <AdminMutationFeedback error={mutation.state.error} succeeded={mutation.state.succeeded} success={editing ? 'Information mise à jour.' : 'Information créée.'} />

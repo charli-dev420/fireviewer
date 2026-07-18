@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AdminApiProvider } from './AdminApiContext';
 import { AdminInformationEditorPage } from './AdminInformationEditorPage';
 import { AdminIncidentObservationsPage } from './AdminIncidentObservationsPage';
+import { AdminIncidentSourcesMediaPage } from './AdminIncidentSourcesMediaPage';
 import { AdminNewZonePage } from './AdminNewZonePage';
 import { AdminSpatialMatchingPage } from './AdminSpatialMatchingPage';
 import { AdminZonePrivatePreviewPage } from './AdminZonePrivatePreviewPage';
@@ -65,27 +66,21 @@ describe('pages de workflow administrateur', () => {
     vi.unstubAllEnvs();
   });
 
-  it('crée une zone depuis le formulaire réel avec une clé d’idempotence', async () => {
+  it('commence l’ajout d’une carte depuis un incident sans demander de données techniques', async () => {
     vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response({ zone: zone(), trace_id: 'trace-create-zone' }, 201));
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response({ incidents: [{
+      fire_id: 'FR-26-00001', canonical_name: 'Incendie de Die', territory_code: '26',
+      visibility: 'PRIVATE', current_episode_id: 'E01', status: 'ACTIVE_CONFIRMED',
+      verification_state: 'VERIFIED', corroborating_source_count: 2, estimated_area_ha: 1200,
+      evacuation_established: false, model_generation_eligible: true, review_required: false,
+      last_observed_at: '2026-07-18T10:00:00Z', pending_observation_count: 0, version: 3,
+    }] }));
     vi.stubGlobal('fetch', fetchMock);
-    const user = userEvent.setup();
     renderAdmin(<AdminNewZonePage />);
 
-    await user.type(screen.getByLabelText('Identifiant stable'), 'TEST-ZONE-01');
-    await user.type(screen.getByLabelText('Nom public'), 'Zone de test');
-    await user.type(screen.getByLabelText('Description'), 'Zone de test isolée.');
-    await user.type(screen.getByLabelText('X minimum'), '0');
-    await user.type(screen.getByLabelText('Y minimum'), '0');
-    await user.type(screen.getByLabelText('X maximum'), '100');
-    await user.type(screen.getByLabelText('Y maximum'), '100');
-    await user.type(screen.getByLabelText('Motif administratif'), 'Création de test.');
-    await user.click(screen.getByRole('button', { name: 'Créer la carte' }));
-
-    expect(await screen.findByRole('heading', { name: 'Carte créée' })).toBeVisible();
-    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
-    expect(init.headers).toEqual(expect.objectContaining({ 'Idempotency-Key': expect.stringMatching(/^admin-ui-/) }));
-    expect(JSON.parse(String(init.body))).toMatchObject({ zone_id: 'TEST-ZONE-01' });
+    expect(await screen.findByRole('heading', { name: /Dans quel projet ajouter la carte/ })).toBeVisible();
+    expect(screen.queryByLabelText(/identifiant|longitude|x minimum|motif administratif/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Choisir ce projet' })).toHaveAttribute('href', '/admin/incidents/FR-26-00001/carte/importer');
   });
 
   it('place puis crée une information dans le repère local de sa zone', async () => {
@@ -98,17 +93,17 @@ describe('pages de workflow administrateur', () => {
     renderAdmin(<AdminInformationEditorPage zoneId="TEST-ZONE-01" />);
 
     await screen.findByRole('heading', { name: 'Ajouter une information — TEST-ZONE-01' });
-    const placement = screen.getByRole('img', { name: /Emprise locale de la zone/i });
+    const placement = screen.getByRole('img', { name: /Zone de placement/i });
     vi.spyOn(placement, 'getBoundingClientRect').mockReturnValue({
       x: 0, y: 0, width: 100, height: 100, top: 0, left: 0, bottom: 100, right: 100, toJSON: () => ({}),
     });
     fireEvent.pointerDown(placement, { clientX: 50, clientY: 25 });
-    expect(screen.getByLabelText('Est / X')).toHaveValue(50);
-    expect(screen.getByLabelText('Nord / Y')).toHaveValue(75);
+    expect(screen.getByText('Position choisie')).toBeVisible();
+    expect(screen.queryByLabelText('Est / X')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Nord / Y')).not.toBeInTheDocument();
     await user.type(screen.getByLabelText('Titre'), 'Point local');
-    await user.type(screen.getByLabelText('Catégorie'), 'accès');
-    await user.type(screen.getByLabelText('Contenu'), 'Information synthétique.');
-    await user.type(screen.getByLabelText('Motif administratif'), 'Ajout de test.');
+    await user.selectOptions(screen.getByLabelText('Type de repère'), 'access');
+    await user.type(screen.getByLabelText('Description'), 'Information synthétique.');
     await user.click(screen.getByRole('button', { name: 'Ajouter l’information' }));
 
     expect(await screen.findByRole('heading', { name: 'Information enregistrée' })).toBeVisible();
@@ -126,22 +121,34 @@ describe('pages de workflow administrateur', () => {
         match_score: 0.82, review_reasons: ['distance cohérente', 'source récente'], version: 1,
       }], reports: [], incidents: [],
     };
-    const fetchMock = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(response(queue))
-      .mockResolvedValueOnce(response({ observation_id: 'OBS-REVIEW-01', action: 'attach', verification_state: 'VERIFIED', fire_id: 'FR-83-00042', episode_id: 'E01', version: 2, trace_id: 'trace-spatial-review' }))
-      .mockResolvedValueOnce(response({ observations: [], reports: [], incidents: [] }));
+    const incidentSummary = {
+      fire_id: 'FR-83-00042', canonical_name: 'Feu de test', territory_code: '83', visibility: 'PRIVATE',
+      current_episode_id: 'E01', status: 'UNDER_REVIEW', verification_state: 'PENDING_REVIEW',
+      corroborating_source_count: 1, estimated_area_ha: null, evacuation_established: false,
+      model_generation_eligible: false, review_required: true, last_observed_at: '2026-07-15T10:00:00Z',
+      pending_observation_count: 1, version: 1,
+    };
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
+      const pathname = new URL(String(input)).pathname;
+      if (pathname === '/api/v2/admin/incidents') return response({ incidents: [incidentSummary] });
+      if (pathname === '/api/v2/admin/work-queue') return response(queue);
+      if (init?.method === 'POST') return response({ observation_id: 'OBS-REVIEW-01', action: 'attach', verification_state: 'VERIFIED', fire_id: 'FR-83-00042', episode_id: 'E01', version: 2, trace_id: 'trace-spatial-review' });
+      return response({});
+    });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderAdmin(<AdminSpatialMatchingPage />);
 
     await screen.findByRole('heading', { name: 'Observations à rattacher' });
     expect(screen.getByText('distance cohérente')).toBeVisible();
-    await user.type(screen.getByLabelText('Motif de décision audité'), 'Rattachement confirmé après revue des motifs.');
+    expect(screen.getByLabelText('Incident cible')).toHaveValue('FR-83-00042');
+    expect(screen.queryByLabelText(/motif de décision/i)).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Rattacher au feu' }));
 
     expect(await screen.findByText(/Décision enregistrée pour OBS-REVIEW-01/)).toBeVisible();
-    const [, init] = fetchMock.mock.calls[1] ?? [];
-    expect(JSON.parse(String(init?.body))).toMatchObject({ action: 'attach', expected_version: 1, target_fire_id: 'FR-83-00042' });
+    const postCall = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST');
+    const init = postCall?.[1];
+    expect(JSON.parse(String(init?.body))).toMatchObject({ action: 'attach', expected_version: 1, target_fire_id: 'FR-83-00042', reason: expect.stringContaining('rattachée manuellement') });
     expect(init?.headers).toEqual(expect.objectContaining({ 'Idempotency-Key': expect.stringMatching(/^admin-ui-/) }));
   });
 
@@ -173,7 +180,6 @@ describe('pages de workflow administrateur', () => {
     await screen.findByRole('heading', { name: 'Registre de revue' });
     const exactPosition = screen.getByRole('checkbox', { name: /Autoriser le repère exact/i });
     expect(exactPosition).not.toBeChecked();
-    await user.type(screen.getByLabelText('Motif de décision audité'), 'Validation humaine et diffusion exacte autorisée.');
     await user.click(exactPosition);
     await user.click(screen.getByRole('button', { name: 'Rattacher à cet incident' }));
 
@@ -184,6 +190,44 @@ describe('pages de workflow administrateur', () => {
       expected_version: 1,
       target_fire_id: 'FR-83-00042',
       publish_spatial_evidence: true,
+    });
+  });
+
+  it('limite l’édition d’une source aux choix compréhensibles et conserve les métadonnées techniques', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
+    const workspace = {
+      fire_id: 'FR-26-00001',
+      sources: [{
+        source_key: 'presse-locale', type: 'image', trust: 'partner', enabled: true,
+        display_name: 'Presse locale', public_display_name: null, public_license: 'CC-BY-4.0',
+        public_reference_url: 'https://example.test/source', public_transformations: ['recadrage'],
+        observation_count: 2,
+      }],
+      media_references: [],
+    };
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (_input, init) => {
+      if (init?.method === 'PUT') return response({ id: 'presse-locale' });
+      return response(workspace);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderAdmin(<AdminIncidentSourcesMediaPage fireId="FR-26-00001" />);
+
+    await screen.findByRole('heading', { name: 'Sources liées' });
+    await user.click(screen.getByText('Modifier l’affichage de cette source'));
+    expect(screen.queryByLabelText(/licence|transformations|référence externe|motif audité/i)).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('Nom affiché au public'), 'Journal local');
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    const updateCall = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
+    expect(JSON.parse(String(updateCall?.[1]?.body))).toMatchObject({
+      type: 'image',
+      trust: 'partner',
+      public_display_name: 'Journal local',
+      public_license: 'CC-BY-4.0',
+      public_reference_url: 'https://example.test/source',
+      public_transformations: ['recadrage'],
+      reason: 'Registre source mis à jour manuellement depuis la fiche incident.',
     });
   });
 
@@ -227,7 +271,7 @@ describe('pages de workflow administrateur', () => {
 
     await screen.findByRole('heading', { name: 'Publier sur l’incident' });
     expect(screen.queryByLabelText('Mot de passe administrateur')).not.toBeInTheDocument();
-    await user.type(screen.getByLabelText('Motif de l’action'), 'Publication après validation visuelle privée.');
+    expect(screen.queryByLabelText('Motif de l’action')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Publier sur l’incident' }));
 
     expect(await screen.findByText('Publication publication-001 activée.')).toBeVisible();
@@ -237,11 +281,11 @@ describe('pages de workflow administrateur', () => {
       zone_id: 'TEST-ZONE-01',
       revision: 2,
       package_id: 'pkg-zone-r2',
-      reason: 'Publication après validation visuelle privée.',
+      reason: 'Carte publiée manuellement après contrôle de l’aperçu privé.',
     });
   });
 
-  it('rattache et publie une carte en une seule action utilisateur', async () => {
+  it('renvoie une carte non rattachée vers le choix du projet sans demander de fire_id', async () => {
     vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
     const preview = {
       zone_id: 'DIE-PONTAIX-08', revision: 1, preview_scope: 'private-admin',
@@ -249,39 +293,19 @@ describe('pages de workflow administrateur', () => {
       publication_state: 'PREVIEWABLE', publication_active: false, linked_fire_ids: [],
       verification_report: { status: 'verified' }, preview_package_ids: ['pkg-die-r1'], scene: null, files: [],
     };
-    const incident = {
-      fire_id: 'FR-26-00001', canonical_name: 'Incendie de Die', territory_code: '26', visibility: 'PUBLIC',
-      current_episode_id: 'E01', status: 'ACTIVE_CONFIRMED', verification_state: 'VERIFIED',
-      corroborating_source_count: 3, estimated_area_ha: 1200, evacuation_established: false,
-      model_generation_eligible: true, review_required: false, last_observed_at: '2026-07-18T00:00:00Z',
-      pending_observation_count: 0, version: 7, episodes: [], observations: [], sources: [], models: [], audit: [],
-    };
     const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
       const url = String(input);
-      if (url.endsWith('/incidents/FR-26-00001') && init?.method === 'GET') return response(incident);
-      if (url.endsWith('/incidents/FR-26-00001/representations') && init?.method === 'POST') {
-        return response({ fire_id: 'FR-26-00001', episode_id: 'E01', package_id: 'pkg-die-r1', manifest_revision: 2, primary_asset_id: null, model_asset_ids: [], incident_version: 8, trace_id: 'trace-attach' });
-      }
-      if (url.endsWith('/publications') && init?.method === 'POST') {
-        return response({ publication: { zone_id: 'DIE-PONTAIX-08', revision: 1, package_id: 'pkg-die-r1', package_state: 'PUBLISHED', publication_id: 'publication-die-r1', publication_state: 'PUBLISHED', is_active: true }, trace_id: 'trace-publish' });
-      }
+      expect(init?.method).not.toBe('POST');
       if (url.endsWith('/png')) return new Response(new Blob(['png']), { status: 200, headers: { 'Content-Type': 'image/png' } });
       return response(preview);
     });
     vi.stubGlobal('fetch', fetchMock);
-    const user = userEvent.setup();
     renderAdmin(<AdminZonePrivatePreviewPage zoneId="DIE-PONTAIX-08" revision={1} />);
 
-    await user.type(await screen.findByLabelText('Incident qui affichera la carte'), 'FR-26-00001');
-    await user.type(screen.getByLabelText('Motif de l’action'), 'Publication de la carte validée sur l’incident de Die.');
-    await user.click(screen.getByRole('button', { name: 'Publier sur l’incident' }));
-
-    expect(await screen.findByText('Publication publication-die-r1 activée.')).toBeVisible();
-    const mutations = fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST').map(([url]) => String(url));
-    expect(mutations).toEqual([
-      `${API_ORIGIN}/api/v2/admin/incidents/FR-26-00001/representations`,
-      `${API_ORIGIN}/api/v1/admin/publications`,
-    ]);
+    expect(await screen.findByRole('link', { name: 'Choisir le projet incendie' })).toHaveAttribute('href', '/admin/incidents');
+    expect(screen.queryByLabelText(/identifiant de l’incident|incident qui affichera/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Publier sur l’incident' })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
   });
 
   it('retire une carte publiée sans supprimer son historique', async () => {
@@ -305,13 +329,12 @@ describe('pages de workflow administrateur', () => {
     renderAdmin(<AdminZonePrivatePreviewPage zoneId="TEST-ZONE-01" revision={2} />);
 
     await screen.findByRole('heading', { name: 'Retirer du public' });
-    await user.type(screen.getByLabelText('Motif de l’action'), 'Retrait demandé après contrôle administratif.');
     await user.click(screen.getByRole('button', { name: 'Retirer du public' }));
 
     expect(await screen.findByText('La carte a été retirée du site public.')).toBeVisible();
     const withdrawCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/publications/publication-001/withdraw'));
     expect(JSON.parse(String(withdrawCall?.[1]?.body))).toEqual({
-      reason: 'Retrait demandé après contrôle administratif.',
+      reason: 'Carte retirée manuellement du site public depuis son aperçu privé.',
       confirm_publication_id: 'publication-001',
     });
   });
@@ -335,9 +358,9 @@ describe('pages de workflow administrateur', () => {
     renderAdmin(<AdminZonePrivatePreviewPage zoneId="TEST-ZONE-01" revision={2} />);
 
     expect(await screen.findByText('Scène Unity orbit · accès include')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Publier sur l’incident' })).toBeDisabled();
-    expect(screen.getByLabelText('Incident qui affichera la carte')).toHaveAttribute('placeholder', 'FR-26-00001');
-    expect(screen.queryByRole('button', { name: 'Associer cette carte' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Publier sur l’incident' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Choisir le projet incendie' })).toHaveAttribute('href', '/admin/incidents');
+    expect(screen.queryByLabelText('Incident qui affichera la carte')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Vue FPS' }));
     expect(await screen.findByText('Scène Unity fps · accès include')).toBeVisible();
   });

@@ -39,16 +39,16 @@ export function AdminLocalPlacementPanel({ bounds, position, onChange, disabled 
     <section className="admin-placement" aria-labelledby="admin-placement-title">
       <div className="admin-placement__heading">
         <div>
-          <h3 id="admin-placement-title">Repère local de la zone</h3>
-          <p>Cliquez dans l’emprise pour placer l’information. Ce schéma ne charge ni carte ni géométrie 3D.</p>
+          <h3 id="admin-placement-title">Emplacement du repère</h3>
+          <p>Cliquez à l’endroit voulu dans la zone.</p>
         </div>
-        <span>{visiblePosition ? `${visiblePosition[0].toLocaleString('fr-FR')} / ${visiblePosition[1].toLocaleString('fr-FR')}` : 'Aucun point'}</span>
+        <span>{visiblePosition ? 'Position choisie' : 'Cliquez pour placer le repère'}</span>
       </div>
       <svg
         className={`admin-placement__canvas ${disabled ? 'is-disabled' : ''}`}
         viewBox="0 0 100 100"
         role="img"
-        aria-label="Emprise locale de la zone ; cliquez pour choisir une position Lambert-93"
+        aria-label="Zone de placement ; cliquez pour choisir la position du repère"
         onPointerDown={place}
       >
         <defs>
@@ -66,12 +66,6 @@ export function AdminLocalPlacementPanel({ bounds, position, onChange, disabled 
           </g>
         ) : null}
       </svg>
-      <div className="admin-placement__bounds" aria-hidden="true">
-        <span>Y max {maxY.toLocaleString('fr-FR')}</span>
-        <span>X min {minX.toLocaleString('fr-FR')}</span>
-        <span>X max {maxX.toLocaleString('fr-FR')}</span>
-        <span>Y min {minY.toLocaleString('fr-FR')}</span>
-      </div>
     </section>
   );
 }

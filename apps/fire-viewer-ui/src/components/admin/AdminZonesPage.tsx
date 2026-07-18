@@ -19,7 +19,7 @@ export function AdminZonesPage() {
         title="Cartes 3D"
         actions={<a className="button button--primary" href="/admin/zones/nouvelle">Ajouter une carte</a>}
       >
-        <p>Importez, vérifiez et publiez chaque carte depuis un parcours unique.</p>
+        <p>Retrouvez les fonds 3D déjà importés. Une nouvelle carte s’ajoute toujours depuis son incident.</p>
       </AdminPageHeader>
 
       {state.kind === 'loading' ? <AdminLoadingState label="Chargement des zones administrées…" /> : null}
@@ -29,7 +29,7 @@ export function AdminZonesPage() {
           title="Aucune carte 3D"
           action={<a className="button button--primary" href="/admin/zones/nouvelle">Ajouter la première carte</a>}
         >
-          Créez une zone logique, puis une révision et importez le dossier du package produit localement.
+          Choisissez d’abord l’incident concerné, puis importez le dossier exporté.
         </AdminEmptyState>
       ) : null}
       {state.kind === 'ready' && state.data.length > 0 ? (

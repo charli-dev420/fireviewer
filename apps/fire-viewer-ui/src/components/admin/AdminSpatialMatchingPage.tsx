@@ -31,18 +31,27 @@ function candidateLabel(observation: PendingObservation): string {
  */
 export function AdminSpatialMatchingPage() {
   const api = useAdminApi();
-  const load = useCallback((options: { signal?: AbortSignal }) => api.getWorkQueue(options), [api]);
+  const load = useCallback(async (options: { signal?: AbortSignal }) => {
+    const [queue, incidents] = await Promise.all([
+      api.getWorkQueue(options),
+      api.listIncidents(options),
+    ]);
+    return { queue, incidents };
+  }, [api]);
   const { state, reload } = useAdminQuery(load, [load]);
   const mutation = useAdminMutation();
   const [filter, setFilter] = useState<'all' | 'candidate' | 'unmatched'>('all');
   const [targets, setTargets] = useState<Record<string, string>>({});
-  const [reasons, setReasons] = useState<Record<string, string>>({});
   const [resolved, setResolved] = useState<{ observationId: string; fireId: string | null; episodeId: string | null } | null>(null);
 
   const resolve = async (observation: PendingObservation, action: ResolutionAction) => {
-    const reason = reasons[observation.observation_id]?.trim() ?? '';
     const targetFireId = (targets[observation.observation_id] ?? observation.proposed_fire_id ?? '').trim().toUpperCase();
-    if (reason.length < 10 || (action === 'attach' && !FIRE_ID_PATTERN.test(targetFireId))) return;
+    if (action === 'attach' && !FIRE_ID_PATTERN.test(targetFireId)) return;
+    const reason = action === 'attach'
+      ? `Observation rattachée manuellement à ${targetFireId} depuis la file de rapprochement.`
+      : action === 'create'
+        ? 'Nouvel incident créé manuellement depuis une observation sans rattachement confirmé.'
+        : 'Observation rejetée manuellement depuis la file de rapprochement.';
 
     const result = await mutation.run(
       `${observation.observation_id}:${action}:${observation.version}:${targetFireId}:${reason}`,
@@ -66,7 +75,7 @@ export function AdminSpatialMatchingPage() {
   if (state.kind === 'loading') return <AdminLoadingState label="Chargement des rapprochements spatiaux…" />;
   if (state.kind === 'error') return <AdminErrorState error={state.error} onRetry={reload} />;
 
-  const observations = state.data.observations.filter((observation) => {
+  const observations = state.data.queue.observations.filter((observation) => {
     if (filter === 'candidate') return observation.proposed_fire_id !== null;
     if (filter === 'unmatched') return observation.proposed_fire_id === null;
     return true;
@@ -103,9 +112,7 @@ export function AdminSpatialMatchingPage() {
           <div className="admin-spatial-review-list">
             {observations.map((observation) => {
               const target = targets[observation.observation_id] ?? observation.proposed_fire_id ?? '';
-              const reason = reasons[observation.observation_id] ?? '';
-              const canAttach = FIRE_ID_PATTERN.test(target.trim().toUpperCase()) && reason.trim().length >= 10;
-              const canResolveWithoutTarget = reason.trim().length >= 10;
+              const canAttach = FIRE_ID_PATTERN.test(target.trim().toUpperCase());
               return (
                 <article className="admin-spatial-review" key={observation.observation_id}>
                   <header>
@@ -127,23 +134,23 @@ export function AdminSpatialMatchingPage() {
 
                   <div className="admin-spatial-review__decision">
                     <label className="admin-field" htmlFor={`spatial-target-${observation.observation_id}`}>
-                      <span><code>fire_id</code> cible pour le rattachement</span>
-                      <input id={`spatial-target-${observation.observation_id}`} value={target} onChange={(event) => {
+                      <span>Incident cible</span>
+                      <select id={`spatial-target-${observation.observation_id}`} value={target} onChange={(event) => {
                         const value = event.currentTarget.value;
                         setTargets((current) => ({ ...current, [observation.observation_id]: value }));
-                      }} placeholder="FR-83-00042" autoCapitalize="characters" />
-                    </label>
-                    <label className="admin-field" htmlFor={`spatial-reason-${observation.observation_id}`}>
-                      <span>Motif de décision audité</span>
-                      <textarea id={`spatial-reason-${observation.observation_id}`} rows={3} maxLength={500} value={reason} onChange={(event) => {
-                        const value = event.currentTarget.value;
-                        setReasons((current) => ({ ...current, [observation.observation_id]: value }));
-                      }} placeholder="Expliquez les éléments qui justifient la décision (10 caractères minimum)." />
+                      }}>
+                        <option value="">Choisir un incident</option>
+                        {state.data.incidents.map((incident) => (
+                          <option key={incident.fire_id} value={incident.fire_id}>
+                            {incident.canonical_name ?? `Incident ${incident.territory_code}`} — {incident.territory_code}
+                          </option>
+                        ))}
+                      </select>
                     </label>
                     <div className="admin-form-actions">
                       <button className="button button--primary" type="button" disabled={mutation.state.pending || !canAttach} onClick={() => void resolve(observation, 'attach')}>Rattacher au feu</button>
-                      <button className="button button--small" type="button" disabled={mutation.state.pending || !canResolveWithoutTarget} onClick={() => void resolve(observation, 'create')}>Créer un incident</button>
-                      <button className="button button--small" type="button" disabled={mutation.state.pending || !canResolveWithoutTarget} onClick={() => void resolve(observation, 'reject')}>Rejeter l’observation</button>
+                      <button className="button button--small" type="button" disabled={mutation.state.pending} onClick={() => void resolve(observation, 'create')}>Créer un incident</button>
+                      <button className="button button--small" type="button" disabled={mutation.state.pending} onClick={() => void resolve(observation, 'reject')}>Rejeter l’observation</button>
                     </div>
                   </div>
                 </article>

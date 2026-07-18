@@ -17,7 +17,7 @@ describe('AdminShell', () => {
     render(<AdminShell><p>Contenu de test</p></AdminShell>);
 
     expect(ADMIN_OPERATIONS).toHaveLength(11);
-    expect(screen.getByRole('link', { name: 'Tableau de bord' })).toHaveAttribute('href', '/admin');
+    expect(screen.getByRole('link', { name: 'Centre opérationnel' })).toHaveAttribute('href', '/admin');
     expect(screen.getByRole('link', { name: 'Validation' })).toHaveAttribute('href', '/admin/validation');
     expect(screen.getByRole('link', { name: 'Incidents' })).toHaveAttribute('href', '/admin/incidents');
     expect(screen.getByRole('link', { name: 'Système' })).toHaveAttribute('href', '/admin/systeme');

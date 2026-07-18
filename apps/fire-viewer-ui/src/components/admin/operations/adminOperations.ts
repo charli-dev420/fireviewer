@@ -12,7 +12,7 @@ export interface AdminOperationDefinition {
 
 /** Seules les opérations dotées d'un contrat réel sont exposées dans la navigation. */
 export const ADMIN_OPERATIONS: readonly AdminOperationDefinition[] = [
-  { id: 'dashboard', label: 'Tableau de bord', href: '/admin', group: 'pilotage', icon: 'chart', availability: 'available', description: 'Décisions, alertes et état des services.' },
+  { id: 'dashboard', label: 'Centre opérationnel', href: '/admin', group: 'pilotage', icon: 'map', availability: 'available', description: 'Vue nationale des incidents et décisions prioritaires.' },
   { id: 'operational-map', label: 'Carte opérationnelle', href: '/admin/carte-operationnelle', group: 'pilotage', icon: 'map', availability: 'available', description: 'Carte nationale interne des incidents et représentations 3D.' },
   { id: 'work-queue', label: 'Validation', href: '/admin/validation', group: 'pilotage', icon: 'data', availability: 'available', description: 'Tout ce qui attend une décision humaine.' },
   { id: 'incidents', label: 'Incidents', href: '/admin/incidents', group: 'operations', icon: 'flame', availability: 'available', description: 'Dossiers fire_id, épisodes, observations, modèles et audit.' },
@@ -27,8 +27,8 @@ export const ADMIN_OPERATIONS: readonly AdminOperationDefinition[] = [
 
 /** Références spatiales techniques, distinctes de l’identité incidente. */
 export const ADMIN_ZONE_TOOLS: readonly AdminOperationDefinition[] = [
-  { id: 'zones', label: 'Cartes 3D', href: '/admin/zones', group: 'production', icon: 'database', availability: 'available', description: 'Importer, vérifier et publier les cartes 3D.' },
-  { id: 'new-zone', label: 'Nouvelle zone', href: '/admin/zones/nouvelle', group: 'production', icon: 'plus-circle', availability: 'available', description: 'Déclarer une nouvelle zone logique locale.' },
+  { id: 'zones', label: 'Cartes 3D', href: '/admin/zones', group: 'production', icon: 'database', availability: 'available', description: 'Consulter les fonds 3D déjà importés.' },
+  { id: 'new-zone', label: 'Ajouter une carte', href: '/admin/zones/nouvelle', group: 'production', icon: 'plus-circle', availability: 'available', description: 'Choisir l’incident puis importer son fond 3D.' },
 ] as const;
 
 export function findAdminOperationByPath(pathname: string): AdminOperationDefinition | null {

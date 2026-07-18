@@ -182,6 +182,107 @@
   box-shadow: 0 2px 7px rgb(4 24 38 / 5%);
 }
 
+.admin-incident-cockpit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.admin-incident-card {
+  display: flex;
+  min-width: 0;
+  min-height: 250px;
+  flex-direction: column;
+  padding: 20px;
+  border: 1px solid var(--admin-line);
+  border-radius: 7px;
+  background: rgb(255 255 255 / 84%);
+  box-shadow: 0 2px 7px rgb(4 24 38 / 5%);
+}
+
+.admin-incident-card__heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.admin-incident-card__icon {
+  display: grid;
+  width: 39px;
+  height: 39px;
+  flex: 0 0 39px;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--admin-orange-dark);
+  background: #fff1e9;
+}
+
+.admin-incident-card__heading h3 { margin: 1px 0 4px; color: var(--admin-navy); font-size: 1rem; }
+.admin-incident-card__heading p { margin: 0; color: var(--admin-muted); font-size: 0.75rem; line-height: 1.45; }
+.admin-incident-card__states { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 18px; }
+
+.admin-incident-card__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 17px 0 0;
+  overflow: hidden;
+  border: 1px solid #deded9;
+  border-radius: 5px;
+  background: #deded9;
+}
+
+.admin-incident-card__facts > div { min-width: 0; padding: 10px 11px; background: #fff; }
+.admin-incident-card__facts dt { color: #687583; font-size: 0.61rem; font-weight: 780; text-transform: uppercase; }
+.admin-incident-card__facts dd { margin: 4px 0 0; color: #192b3d; font-size: 0.75rem; font-weight: 710; overflow-wrap: anywhere; }
+
+.admin-incident-card__availability {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 19px;
+  padding: 11px 12px;
+  border: 1px solid #d7dad8;
+  border-radius: 6px;
+  color: #33475a;
+  background: #f7f8f7;
+  font-size: 0.74rem;
+}
+
+.admin-incident-card__availability.is-ready { border-color: #bcdcc9; color: #226d43; background: #f0faf4; }
+.admin-incident-card__availability.is-missing { border-color: #edc9b9; color: #96330d; background: #fff4ed; }
+.admin-incident-card__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 18px; }
+
+.admin-incident-card__source-list {
+  display: grid;
+  gap: 8px;
+  margin: 17px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-incident-card__source-list li {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #e0e0dc;
+  border-radius: 5px;
+  color: #26394b;
+  background: #fff;
+  font-size: 0.74rem;
+}
+
+.admin-incident-card__source-list svg { flex: 0 0 auto; color: #2b9259; }
+.admin-incident-card__source-list span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-incident-card__empty { margin: 17px 0 0; color: var(--admin-muted); font-size: 0.76rem; }
+.admin-incident-card--decision.is-urgent { border-color: #edbca8; background: linear-gradient(150deg, rgb(255 255 255 / 92%), #fff7f1); }
+.admin-incident-card--decision.is-urgent .admin-incident-card__icon { color: #9c350d; background: #ffe7da; }
+.admin-incident-card--decision.is-steady .admin-incident-card__icon { color: #226d43; background: #e9f7ef; }
+.admin-incident-secondary { margin-top: 16px; }
+.admin-incident-secondary > .admin-detail-grid { padding: 18px; }
+
 .admin-operation-shell__backdrop { display: none; }
 
 @media (max-width: 1180px) {
@@ -217,11 +318,16 @@
   .admin-operation-shell__backdrop { position: fixed; z-index: 70; inset: 68px 0 0; display: block; border: 0; background: rgb(3 15 25 / 55%); }
   .admin-operation-shell__content :is(section, form, .admin-section, .admin-table-wrap) { min-width: 0; max-width: 100%; }
   .admin-operation-shell__content .admin-table-wrap { overscroll-behavior-inline: contain; }
+  .admin-incident-cockpit { grid-template-columns: 1fr; }
+  .admin-incident-card { min-height: 0; }
 }
 
 @media (max-width: 520px) {
   .admin-operation-shell__topbar { gap: 7px; padding-inline: 8px; }
   .admin-operation-shell__notification { display: none; }
+  .admin-incident-card { padding: 16px; }
+  .admin-incident-card__facts { grid-template-columns: 1fr; }
+  .admin-incident-card__actions .button { width: 100%; justify-content: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {

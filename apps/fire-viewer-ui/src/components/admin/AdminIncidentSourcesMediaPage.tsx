@@ -19,31 +19,31 @@ function SourceEditor({ source, onSave, pending }: {
   readonly onSave: (sourceKey: string, input: { type: string; trust: string; display_name: string | null; public_display_name: string | null; public_license: string | null; public_reference_url: string | null; public_transformations: readonly string[]; enabled: boolean; reason: string }) => void;
   readonly pending: boolean;
 }) {
-  const [displayName, setDisplayName] = useState(source.display_name ?? '');
   const [publicName, setPublicName] = useState(source.public_display_name ?? '');
-  const [license, setLicense] = useState(source.public_license ?? '');
-  const [reference, setReference] = useState(source.public_reference_url ?? '');
-  const [transformations, setTransformations] = useState(source.public_transformations.join(', '));
-  const [reason, setReason] = useState('');
-  const [type, setType] = useState(source.type);
   const [trust, setTrust] = useState(source.trust);
   const [enabled, setEnabled] = useState(source.enabled);
-  const canSave = reason.trim().length >= 10;
+  const hasChanges = publicName.trim() !== (source.public_display_name ?? '')
+    || trust !== source.trust
+    || enabled !== source.enabled;
   return (
     <details className="admin-source-editor">
-      <summary>Modifier la diffusion et le registre</summary>
+      <summary>Modifier l’affichage de cette source</summary>
       <div className="admin-source-editor__grid">
-        <label className="admin-field"><span>Type</span><select value={type} onChange={(event) => setType(event.currentTarget.value)}><option value="text">Texte</option><option value="image">Image</option><option value="video">Vidéo</option><option value="sensor">Capteur</option><option value="operator">Opérateur</option><option value="institutional">Institutionnel</option></select></label>
-        <label className="admin-field"><span>Confiance</span><select value={trust} onChange={(event) => setTrust(event.currentTarget.value)}><option value="unverified">Non vérifiée</option><option value="partner">Partenaire</option><option value="institutional">Institutionnelle</option><option value="operator">Opérateur</option></select></label>
-        <label className="admin-field"><span>Nom interne</span><input value={displayName} maxLength={255} onChange={(event) => setDisplayName(event.currentTarget.value)} /></label>
-        <label className="admin-field"><span>Nom publiable</span><input value={publicName} maxLength={255} onChange={(event) => setPublicName(event.currentTarget.value)} /></label>
-        <label className="admin-field"><span>Licence publiable</span><input value={license} maxLength={255} onChange={(event) => setLicense(event.currentTarget.value)} /></label>
-        <label className="admin-field"><span>Référence externe publiable</span><input value={reference} maxLength={2048} inputMode="url" onChange={(event) => setReference(event.currentTarget.value)} /></label>
-        <label className="admin-field admin-field--wide"><span>Transformations déclarées, séparées par des virgules</span><input value={transformations} maxLength={1024} onChange={(event) => setTransformations(event.currentTarget.value)} /></label>
-        <label className="admin-source-editor__enabled"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.currentTarget.checked)} /> Source activée</label>
-        <label className="admin-field admin-field--wide"><span>Motif audité</span><textarea rows={3} maxLength={500} value={reason} onChange={(event) => setReason(event.currentTarget.value)} placeholder="Expliquez cette modification (10 caractères minimum)." /></label>
+        <label className="admin-field"><span>Niveau de confiance</span><select value={trust} onChange={(event) => setTrust(event.currentTarget.value)}><option value="unverified">Non vérifiée</option><option value="partner">Partenaire</option><option value="institutional">Institutionnelle</option><option value="operator">Opérateur terrain</option></select></label>
+        <label className="admin-field"><span>Nom affiché au public</span><input value={publicName} maxLength={255} onChange={(event) => setPublicName(event.currentTarget.value)} placeholder={source.display_name ?? source.source_key} /></label>
+        <label className="admin-source-editor__enabled"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.currentTarget.checked)} /> Utiliser cette source</label>
       </div>
-      <button type="button" className="button button--primary" disabled={pending || !canSave} onClick={() => onSave(source.source_key, { type, trust, display_name: displayName.trim() || null, public_display_name: publicName.trim() || null, public_license: license.trim() || null, public_reference_url: reference.trim() || null, public_transformations: transformations.split(',').map((item) => item.trim()).filter(Boolean), enabled, reason: reason.trim() })}>Enregistrer la source</button>
+      <button type="button" className="button button--primary" disabled={pending || !hasChanges} onClick={() => onSave(source.source_key, {
+        type: source.type,
+        trust,
+        display_name: source.display_name,
+        public_display_name: publicName.trim() || null,
+        public_license: source.public_license,
+        public_reference_url: source.public_reference_url,
+        public_transformations: source.public_transformations,
+        enabled,
+        reason: 'Registre source mis à jour manuellement depuis la fiche incident.',
+      })}>Enregistrer</button>
     </details>
   );
 }

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useAdminApi, useAdminMutation, useAdminQuery } from './AdminApiContext';
 import { AdminEmptyState, AdminErrorState, AdminLoadingState, AdminPageHeader, formatAdminDate } from './AdminPageState';
 
@@ -16,17 +16,16 @@ export function AdminPublicationsPage() {
     [api],
   );
   const mutation = useAdminMutation();
-  const [reason, setReason] = useState<Record<string, string>>({});
 
   const change = async (publicationId: string, action: 'withdraw' | 'restore') => {
-    const value = reason[publicationId]?.trim() ?? '';
-    if (value.length < 10) return;
+    const reason = action === 'withdraw'
+      ? 'Carte retirée manuellement du site public depuis le registre des publications.'
+      : 'Carte restaurée manuellement sur le site public depuis le registre des publications.';
     const result = await mutation.run(
-      `${publicationId}:${action}:${value}`,
-      (options) => api.changePublication(publicationId, action, { reason: value }, options),
+      `${publicationId}:${action}`,
+      (options) => api.changePublication(publicationId, action, { reason }, options),
     );
     if (result !== null) {
-      setReason((current) => ({ ...current, [publicationId]: '' }));
       reload();
     }
   };
@@ -71,19 +70,11 @@ export function AdminPublicationsPage() {
                 {item.state === 'PUBLISHED' || item.state === 'WITHDRAWN' ? (
                   <details className="admin-publication-card__control">
                     <summary>{item.state === 'PUBLISHED' ? 'Retirer cette carte du public' : 'Restaurer cette carte'}</summary>
-                    <label>
-                      Motif de l’action
-                      <textarea
-                        rows={2}
-                        maxLength={500}
-                        value={reason[item.publication_id] ?? ''}
-                        onChange={(event) => setReason((current) => ({ ...current, [item.publication_id]: event.target.value }))}
-                      />
-                    </label>
+                    <p>{item.state === 'PUBLISHED' ? 'La carte ne sera plus visible sur le site public.' : 'La carte redeviendra visible si elle est toujours liée à un incident.'}</p>
                     <button
                       className="button button--small"
                       type="button"
-                      disabled={mutation.state.pending || (reason[item.publication_id]?.trim().length ?? 0) < 10}
+                      disabled={mutation.state.pending}
                       onClick={() => void change(item.publication_id, action)}
                     >
                       {item.state === 'PUBLISHED' ? 'Confirmer le retrait' : 'Confirmer la restauration'}

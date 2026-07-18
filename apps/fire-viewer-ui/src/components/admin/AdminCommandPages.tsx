@@ -1,152 +1,60 @@
-import { useCallback, useState, type CSSProperties, type ReactNode } from 'react';
-import heroDashboard from '../../assets/public/fire-hero-home.jpg';
-import heroMap from '../../assets/public/fire-hero-incidents.jpg';
-import type { AdminOperationalMapIncident } from '../../lib/adminApi';
-import { PublicIcon, type PublicIconName } from '../public/PublicIcon';
+import { useCallback, useState, type CSSProperties } from 'react';
+import type { AdminOperationalMapIncident, AdminOperationalMapResponse } from '../../lib/adminApi';
+import { PublicIcon } from '../public/PublicIcon';
 import { useAdminApi, useAdminQuery } from './AdminApiContext';
 import { AdminErrorState, AdminLoadingState, formatAdminDate } from './AdminPageState';
 import './AdminCommandPages.css';
-
-function AdminCommandHero({
-  title,
-  subtitle,
-  generatedAt,
-  status,
-  image,
-}: {
-  readonly title: string;
-  readonly subtitle: string;
-  readonly generatedAt?: string;
-  readonly status?: string;
-  readonly image: string;
-}) {
-  return (
-    <header className="admin-command-hero" style={{ '--admin-command-hero': `url(${image})` } as CSSProperties}>
-      <div className="admin-command-hero__copy">
-        <h1>{title}</h1>
-        <p>{subtitle}</p>
-        {generatedAt ? <span><PublicIcon name="clock" size={17} />{formatAdminDate(generatedAt)}</span> : null}
-      </div>
-      {status ? <div className="admin-command-hero__status"><PublicIcon name="check-circle" size={17} />{status}</div> : null}
-    </header>
-  );
-}
-
-function elapsedLabel(value: string): string {
-  const elapsedMinutes = Math.max(0, Math.round((Date.now() - Date.parse(value)) / 60_000));
-  if (elapsedMinutes < 1) return "à l'instant";
-  if (elapsedMinutes < 60) return `il y a ${elapsedMinutes} min`;
-  const hours = Math.floor(elapsedMinutes / 60);
-  return `il y a ${hours} h ${elapsedMinutes % 60 ? String(elapsedMinutes % 60).padStart(2, '0') : ''}`.trim();
-}
-
-function priorityIcon(priority: 'critical' | 'high' | 'medium'): PublicIconName {
-  return priority === 'critical' ? 'shield' : priority === 'high' ? 'warning' : 'info';
-}
-
-function priorityHref(kind: string, fireId: string | null): string {
-  if (kind === 'report') return '/admin/signalements';
-  if (kind === 'observation') return '/admin/rapprochement-spatial';
-  if (kind === 'model_package' || kind === 'job') return fireId ? `/admin/incidents/${fireId}/modeles-pipeline` : '/admin/zones';
-  return fireId ? `/admin/incidents/${fireId}` : '/admin/validation';
-}
-
-function Panel({ title, icon, action, children, className = '' }: {
-  readonly title: string;
-  readonly icon?: PublicIconName;
-  readonly action?: ReactNode;
-  readonly children: ReactNode;
-  readonly className?: string;
-}) {
-  return (
-    <section className={`admin-command-panel ${className}`}>
-      <header><h2>{icon ? <PublicIcon name={icon} size={20} /> : null}{title}</h2>{action}</header>
-      {children}
-    </section>
-  );
-}
-
-export function AdminDashboardPage() {
-  const api = useAdminApi();
-  const load = useCallback((options: { signal?: AbortSignal }) => api.getDashboard(options), [api]);
-  const { state, reload } = useAdminQuery(load, [load]);
-  const dashboard = state.kind === 'ready' ? state.data : null;
-
-  return (
-    <div className="admin-dashboard-page">
-      <AdminCommandHero
-        title="Administration"
-        subtitle="Valider les preuves, suivre les incidents et gérer les cartes 3D"
-        generatedAt={dashboard?.generated_at}
-        status={dashboard ? 'Données à jour' : undefined}
-        image={heroDashboard}
-      />
-      <div className="admin-dashboard-page__content">
-        {state.kind === 'loading' ? <AdminLoadingState label="Chargement du poste de veille…" /> : null}
-        {state.kind === 'error' ? <AdminErrorState error={state.error} onRetry={reload} /> : null}
-        {dashboard ? (
-          <>
-            <div className="admin-dashboard-page__summary">
-              <a className="admin-command-button admin-command-button--primary" href="/admin/validation">
-                <PublicIcon name="data" size={18} />À valider <span>{dashboard.queue.total}</span>
-              </a>
-              <dl>
-                <div><dt>Incidents actifs</dt><dd>{dashboard.map_summary.active_incidents}</dd></div>
-                <div><dt>Avec carte 3D</dt><dd>{dashboard.map_summary.incidents_with_models}</dd></div>
-                <div><dt>À revoir</dt><dd>{dashboard.map_summary.incidents_requiring_review}</dd></div>
-              </dl>
-            </div>
-
-            <div className="admin-dashboard-page__grid">
-              <div className="admin-dashboard-page__main">
-                <Panel title="À valider" action={<a href="/admin/validation">Tout voir</a>}>
-                  {dashboard.priorities.length ? (
-                    <ul className="admin-priority-list">
-                      {dashboard.priorities.slice(0, 6).map((item) => (
-                        <li key={`${item.kind}-${item.target_id}`}>
-                          <span className={`admin-priority-list__icon is-${item.priority}`}><PublicIcon name={priorityIcon(item.priority)} size={23} /></span>
-                          <span className="admin-priority-list__copy"><strong>{item.priority === 'critical' ? 'Critique' : item.priority === 'high' ? 'Haute' : 'Moyenne'}</strong><small>{item.title}</small></span>
-                          <span className="admin-priority-list__target"><strong>{item.fire_id ?? item.target_id}</strong><small>{item.detail}</small></span>
-                          <time dateTime={item.created_at}>{elapsedLabel(item.created_at)}</time>
-                          <a href={priorityHref(item.kind, item.fire_id)}>Examiner <PublicIcon name="chevron-right" size={16} /></a>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : <p className="admin-command-panel__empty">Aucune décision urgente dans la file persistée.</p>}
-                </Panel>
-
-              </div>
-
-              <aside className="admin-dashboard-page__aside">
-                <Panel title="Incidents actifs" icon="shield" action={<a href="/admin/incidents">Tout voir</a>}>
-                  {dashboard.watchlist.length ? (
-                    <ul className="admin-watch-list">
-                      {dashboard.watchlist.slice(0, 5).map((incident) => (
-                        <li key={incident.fire_id}>
-                          <span className={`admin-watch-list__dot is-${incident.status === 'ACTIVE_CONFIRMED' ? 'active' : 'monitoring'}`} />
-                          <span><strong>{incident.fire_id} · {incident.canonical_name ?? 'Incident sans nom'}</strong><small>{incident.model_update_available ? 'Mise à jour du modèle disponible' : incident.review_required ? 'Revue humaine requise' : `${incident.pending_observation_count} observation(s) à traiter`}</small></span>
-                          <a href={`/admin/incidents/${incident.fire_id}`}>Ouvrir</a>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : <p className="admin-command-panel__empty">Aucun incident actif à surveiller.</p>}
-                </Panel>
-
-              </aside>
-            </div>
-            <p className="admin-dashboard-page__safety"><PublicIcon name="info" size={18} />Aucune sortie automatisée n’est publiée sans validation humaine.</p>
-          </>
-        ) : null}
-      </div>
-    </div>
-  );
-}
 
 const MAP_ZOOM = 6;
 const MAP_X_MIN = 30;
 const MAP_X_MAX = 34;
 const MAP_Y_MIN = 21;
 const MAP_Y_MAX = 24;
+
+type MapFilter = 'active' | 'review' | 'monitoring';
+
+interface MapView {
+  readonly scale: number;
+  readonly translateX: number;
+  readonly translateY: number;
+}
+
+interface PositionedIncident {
+  readonly incident: AdminOperationalMapIncident;
+  readonly left: number;
+  readonly top: number;
+}
+
+interface IncidentCluster {
+  readonly key: string;
+  readonly incidents: readonly AdminOperationalMapIncident[];
+  readonly left: number;
+  readonly top: number;
+}
+
+const NATIONAL_VIEW: MapView = { scale: 1, translateX: 0, translateY: 0 };
+
+function elapsedLabel(value: string): string {
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return 'heure inconnue';
+  const elapsedMinutes = Math.max(0, Math.round((Date.now() - parsed) / 60_000));
+  if (elapsedMinutes < 1) return "à l'instant";
+  if (elapsedMinutes < 60) return `il y a ${elapsedMinutes} min`;
+  const hours = Math.floor(elapsedMinutes / 60);
+  if (hours < 24) return `il y a ${hours} h${elapsedMinutes % 60 ? ` ${elapsedMinutes % 60} min` : ''}`;
+  return `il y a ${Math.floor(hours / 24)} j`;
+}
+
+function readableState(value: string): string {
+  return value
+    .toLocaleLowerCase('fr-FR')
+    .replaceAll('_', ' ')
+    .replace(/^./, (letter) => letter.toLocaleUpperCase('fr-FR'));
+}
+
+function incidentName(incident: AdminOperationalMapIncident): string {
+  return incident.canonical_name ?? `Incident ${incident.territory_code}`;
+}
 
 function mercatorPosition(longitude: number, latitude: number): { left: number; top: number } {
   const worldSize = 2 ** MAP_ZOOM;
@@ -159,140 +67,277 @@ function mercatorPosition(longitude: number, latitude: number): { left: number; 
   };
 }
 
-function mapMarkerVisible(incident: AdminOperationalMapIncident, layers: MapLayers): boolean {
-  if (incident.status === 'ACTIVE_CONFIRMED' && !layers.active) return false;
-  if (incident.status === 'MONITORING' && !layers.monitoring) return false;
-  return true;
+function visibleForFilter(incident: AdminOperationalMapIncident, filter: MapFilter): boolean {
+  if (filter === 'review') return incident.review_required;
+  if (filter === 'monitoring') return incident.status === 'MONITORING';
+  return incident.status === 'ACTIVE_CONFIRMED' || incident.status === 'MONITORING';
 }
 
-interface MapLayers { readonly active: boolean; readonly monitoring: boolean; readonly models: boolean; readonly updates: boolean; readonly review: boolean; }
-type IncidentTab = 'situation' | 'models' | 'zones' | 'actions';
+function clusterIncidents(incidents: readonly AdminOperationalMapIncident[], scale: number): readonly IncidentCluster[] {
+  const positioned: PositionedIncident[] = incidents.map((incident) => ({ incident, ...mercatorPosition(incident.longitude, incident.latitude) }));
+  const clusters: { incidents: AdminOperationalMapIncident[]; left: number; top: number }[] = [];
+  const threshold = 4.2 / scale;
 
-function IncidentMapPanel({ incident, tab, setTab, onClose }: { readonly incident: AdminOperationalMapIncident; readonly tab: IncidentTab; readonly setTab: (tab: IncidentTab) => void; readonly onClose: () => void }) {
+  for (const item of positioned) {
+    const existing = clusters.find((cluster) => Math.hypot(cluster.left - item.left, cluster.top - item.top) <= threshold);
+    if (!existing) {
+      clusters.push({ incidents: [item.incident], left: item.left, top: item.top });
+      continue;
+    }
+    existing.incidents.push(item.incident);
+    const positions = existing.incidents.map((incident) => mercatorPosition(incident.longitude, incident.latitude));
+    existing.left = positions.reduce((sum, position) => sum + position.left, 0) / positions.length;
+    existing.top = positions.reduce((sum, position) => sum + position.top, 0) / positions.length;
+  }
+
+  return clusters.map((cluster) => ({
+    ...cluster,
+    key: cluster.incidents.map((incident) => incident.fire_id).sort().join('|'),
+  }));
+}
+
+function filterCount(data: AdminOperationalMapResponse, filter: MapFilter): number {
+  if (filter === 'review') return data.summary.incidents_requiring_review;
+  if (filter === 'monitoring') return data.summary.monitoring_incidents;
+  return data.summary.active_incidents + data.summary.monitoring_incidents;
+}
+
+function NationalStatusLegend({ data, selected }: { readonly data: AdminOperationalMapResponse; readonly selected: AdminOperationalMapIncident | null }) {
   return (
-    <section className="admin-incident-map-panel" aria-label={`Incident ${incident.fire_id}`}>
-      <header><PublicIcon name="flame" size={21} /><h2>{incident.fire_id} · {incident.canonical_name ?? incident.territory_code}</h2><button type="button" onClick={onClose} aria-label="Fermer la fiche"><PublicIcon name="close" size={20} /></button></header>
-      <div className="admin-incident-map-panel__tabs" role="tablist" aria-label="Données de l’incident">
-        {([['situation', 'Situation'], ['models', 'Modèles 3D'], ['zones', 'Zones et marqueurs'], ['actions', 'Actions']] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => setTab(value)}>{label}</button>)}
-      </div>
-      <div className="admin-incident-map-panel__body">
-        {tab === 'situation' ? (
-          <dl className="admin-incident-map-panel__facts">
-            <div><dt>État</dt><dd>{incident.status.replaceAll('_', ' ')}</dd></div>
-            <div><dt>Vérification</dt><dd>{incident.verification_state.replaceAll('_', ' ')}</dd></div>
-            <div><dt>Observations à traiter</dt><dd>{incident.pending_observation_count}</dd></div>
-            <div><dt>Incertitude</dt><dd>± {Math.round(incident.horizontal_uncertainty_m)} m</dd></div>
-          </dl>
-        ) : null}
-        {tab === 'models' ? (
-          incident.models.length ? <ul className="admin-map-model-list">{incident.models.map((model, index) => (
-            <li key={`${model.source}-${model.asset_id ?? model.package_file_id ?? index}`}>
-              <PublicIcon name="database" size={18} />
-              <span><strong>{model.profile === 'close' ? 'Rapproché' : model.profile === 'local' ? 'Local' : model.profile === 'extended' ? 'Étendu' : model.profile}</strong><small>{model.version ? `v${model.version}` : 'Package'} · {model.state.replaceAll('_', ' ')}</small></span>
-              <span className={model.is_current ? 'is-current' : ''}>{model.is_current ? 'À jour' : 'Disponible'}</span>
-              <a href={`/admin/incidents/${incident.fire_id}/modeles-pipeline`}>Ouvrir le modèle</a>
-            </li>
-          ))}</ul> : <p className="admin-command-panel__empty">Aucune représentation 3D liée à cet incident.</p>
-        ) : null}
-        {tab === 'zones' ? (
-          <dl className="admin-incident-map-panel__facts">
-            <div><dt>Zone technique</dt><dd>{incident.spatial_zone_id ?? 'Non liée'}</dd></div>
-            <div><dt>Révision</dt><dd>{incident.spatial_zone_revision ?? '—'}</dd></div>
-            <div><dt>Package courant</dt><dd>{incident.current_package_id ?? '—'}</dd></div>
-            <div><dt>Package publié</dt><dd>{incident.active_package_id ?? '—'}</dd></div>
-          </dl>
-        ) : null}
-        {tab === 'actions' ? <div className="admin-incident-map-panel__actions"><a href={`/admin/incidents/${incident.fire_id}`}>Ouvrir l’incident</a><a href={`/admin/incidents/${incident.fire_id}/observations`}>Vérifier les observations</a><a href={`/admin/incidents/${incident.fire_id}/modeles-pipeline`}>Gérer les modèles</a></div> : null}
-      </div>
-      <footer><PublicIcon name="clock" size={15} />Dernière synchronisation : {elapsedLabel(incident.last_observed_at)}<span>Origine EPSG:4326</span></footer>
+    <section className="admin-national-map__freshness" aria-label="État des données">
+      <strong>État des données</strong>
+      <span><i className="is-live" />Carte nationale <small>{elapsedLabel(data.generated_at)}</small></span>
+      <span><i className={selected?.pending_observation_count ? 'is-attention' : 'is-live'} />Observations <small>{selected ? `${selected.pending_observation_count} à traiter` : 'sélectionnez un incident'}</small></span>
+      <span><i className={selected?.models.length ? 'is-live' : 'is-muted'} />Carte 3D <small>{selected?.models.length ? `${selected.models.length} disponible(s)` : 'non disponible'}</small></span>
+      <span><i className={data.summary.incidents_requiring_review ? 'is-attention' : 'is-live'} />Décisions <small>{data.summary.incidents_requiring_review} en attente</small></span>
     </section>
   );
 }
 
-export function AdminOperationalMapPage() {
+function IncidentDecisionDrawer({
+  incident,
+  onClose,
+  onFocus,
+  onNationalView,
+}: {
+  readonly incident: AdminOperationalMapIncident;
+  readonly onClose: () => void;
+  readonly onFocus: () => void;
+  readonly onNationalView: () => void;
+}) {
+  const [activityOpen, setActivityOpen] = useState(false);
+  const reviewCopy = incident.pending_observation_count > 0
+    ? `${incident.pending_observation_count} observation(s) attendent une décision humaine.`
+    : 'La situation doit être confirmée avant toute publication.';
+
+  return (
+    <aside className="admin-incident-drawer" aria-label={`Incident ${incident.fire_id}`}>
+      <header>
+        <div>
+          <span className={`admin-incident-drawer__status is-${incident.status === 'MONITORING' ? 'monitoring' : 'active'}`}>
+            {incident.status === 'MONITORING' ? 'Surveillance' : 'Actif'}
+          </span>
+          <h1>{incidentName(incident)}</h1>
+          <p>{incident.fire_id} · Territoire {incident.territory_code}</p>
+        </div>
+        <button type="button" onClick={onClose} aria-label="Fermer la fiche incident"><PublicIcon name="close" size={20} /></button>
+      </header>
+
+      {incident.review_required ? (
+        <section className="admin-incident-drawer__alert">
+          <PublicIcon name="warning" size={21} />
+          <div><strong>Action requise</strong><p>{reviewCopy}</p></div>
+        </section>
+      ) : (
+        <section className="admin-incident-drawer__steady">
+          <PublicIcon name="check-circle" size={21} />
+          <div><strong>Situation suivie</strong><p>Aucune décision urgente n’est signalée.</p></div>
+        </section>
+      )}
+
+      <section className="admin-incident-drawer__section">
+        <div className="admin-incident-drawer__section-title"><h2>Situation</h2><time dateTime={incident.last_observed_at}>{elapsedLabel(incident.last_observed_at)}</time></div>
+        <dl className="admin-incident-drawer__facts">
+          <div><dt>État</dt><dd>{readableState(incident.status)}</dd></div>
+          <div><dt>Vérification</dt><dd>{readableState(incident.verification_state)}</dd></div>
+          <div><dt>Observations à traiter</dt><dd>{incident.pending_observation_count}</dd></div>
+          <div><dt>Précision de localisation</dt><dd>± {Math.round(incident.horizontal_uncertainty_m)} m</dd></div>
+        </dl>
+      </section>
+
+      <section className="admin-incident-drawer__section">
+        <div className="admin-incident-drawer__section-title"><h2>Données disponibles</h2></div>
+        <div className="admin-incident-drawer__data-grid">
+          <div><PublicIcon name="image" size={21} /><span><strong>Observations</strong><small>{incident.pending_observation_count} à examiner</small></span></div>
+          <div><PublicIcon name="database" size={21} /><span><strong>Carte 3D</strong><small>{incident.models.length ? `${incident.models.length} disponible(s)` : 'Non disponible'}</small></span></div>
+          <div><PublicIcon name="globe" size={21} /><span><strong>Visibilité</strong><small>{readableState(incident.visibility)}</small></span></div>
+        </div>
+      </section>
+
+      <section className={`admin-incident-drawer__decision ${incident.review_required ? 'is-required' : ''}`}>
+        <div><PublicIcon name={incident.review_required ? 'shield' : 'check-circle'} size={22} /><span><strong>{incident.review_required ? 'Décision humaine requise' : 'Aucune action urgente'}</strong><small>{incident.review_required ? 'Vérifiez les sources avant de mettre à jour la fiche publique.' : 'Le suivi continue automatiquement.'}</small></span></div>
+        <a className="admin-incident-drawer__primary" href={`/admin/incidents/${incident.fire_id}`}>Ouvrir l’incident <PublicIcon name="arrow" size={17} /></a>
+        <a className="admin-incident-drawer__secondary" href={`/admin/incidents/${incident.fire_id}/sources-medias`}>Voir les sources</a>
+      </section>
+
+      <div className="admin-incident-drawer__map-actions">
+        <button type="button" onClick={onFocus}><PublicIcon name="crosshair" size={17} />Recentrer sur l’incident</button>
+        <button type="button" onClick={onNationalView}><PublicIcon name="globe" size={17} />Revenir à la vue nationale</button>
+      </div>
+
+      <section className="admin-incident-drawer__activity">
+        <button type="button" aria-expanded={activityOpen} onClick={() => setActivityOpen((open) => !open)}>
+          <span><PublicIcon name="clock" size={18} />Activité récente</span><PublicIcon name={activityOpen ? 'chevron-down' : 'chevron-right'} size={17} />
+        </button>
+        {activityOpen ? (
+          <ul>
+            <li>Dernière observation {elapsedLabel(incident.last_observed_at)}.</li>
+            <li>{incident.review_required ? 'Validation humaine demandée.' : 'Aucune validation en attente.'}</li>
+            {incident.model_update_available ? <li>Une mise à jour de la carte 3D est disponible.</li> : null}
+          </ul>
+        ) : null}
+      </section>
+    </aside>
+  );
+}
+
+function AdminNationalOperationsPage() {
   const api = useAdminApi();
   const load = useCallback((options: { signal?: AbortSignal }) => api.getOperationalMap(options), [api]);
   const { state, reload } = useAdminQuery(load, [load]);
   const data = state.kind === 'ready' ? state.data : null;
+  const [filter, setFilter] = useState<MapFilter>('active');
   const [selectedFireId, setSelectedFireId] = useState<string | null>(null);
-  const [tab, setTab] = useState<IncidentTab>('models');
-  const [scale, setScale] = useState(1);
-  const [layers, setLayers] = useState<MapLayers>({ active: true, monitoring: true, models: true, updates: true, review: true });
-  const selected = data?.incidents.find((incident) => incident.fire_id === selectedFireId) ?? null;
-  const visibleIncidents = data?.incidents.filter((incident) => mapMarkerVisible(incident, layers)) ?? [];
-  const tiles = Array.from({ length: MAP_Y_MAX - MAP_Y_MIN + 1 }, (_, row) => Array.from({ length: MAP_X_MAX - MAP_X_MIN + 1 }, (_, column) => ({ x: MAP_X_MIN + column, y: MAP_Y_MIN + row }))).flat();
+  const [drawerOpen, setDrawerOpen] = useState(true);
+  const [view, setView] = useState<MapView>(NATIONAL_VIEW);
 
-  const toggleLayer = (layer: keyof MapLayers) => setLayers((current) => ({ ...current, [layer]: !current[layer] }));
-  const selectIncident = (fireId: string) => { setSelectedFireId(fireId); setTab('models'); };
+  const defaultIncident = data?.incidents.find((incident) => incident.review_required) ?? data?.incidents[0] ?? null;
+  const selected = drawerOpen
+    ? data?.incidents.find((incident) => incident.fire_id === selectedFireId) ?? defaultIncident
+    : null;
+  const visibleIncidents = data?.incidents.filter((incident) => visibleForFilter(incident, filter)) ?? [];
+  const clusters = clusterIncidents(visibleIncidents, view.scale);
+  const tiles = Array.from(
+    { length: MAP_Y_MAX - MAP_Y_MIN + 1 },
+    (_, row) => Array.from({ length: MAP_X_MAX - MAP_X_MIN + 1 }, (_, column) => ({ x: MAP_X_MIN + column, y: MAP_Y_MIN + row })),
+  ).flat();
+
+  const selectIncident = (incident: AdminOperationalMapIncident) => {
+    setSelectedFireId(incident.fire_id);
+    setDrawerOpen(true);
+  };
+
+  const focusPosition = (left: number, top: number, scale = 1.65) => {
+    setView({ scale, translateX: 50 - left, translateY: 50 - top });
+  };
+
+  const focusIncident = (incident: AdminOperationalMapIncident) => {
+    const position = mercatorPosition(incident.longitude, incident.latitude);
+    focusPosition(position.left, position.top, 1.75);
+  };
+
+  const activateFilter = (nextFilter: MapFilter) => {
+    setFilter(nextFilter);
+    setView(NATIONAL_VIEW);
+  };
 
   return (
-    <div className="admin-map-page">
-      <AdminCommandHero title="Carte opérationnelle nationale" subtitle="Incidents, modèles et couches administratives" generatedAt={data?.generated_at} image={heroMap} />
-      <div className="admin-map-page__workspace">
-        {state.kind === 'loading' ? <div className="admin-map-page__state"><AdminLoadingState label="Chargement de la carte nationale…" /></div> : null}
-        {state.kind === 'error' ? <div className="admin-map-page__state"><AdminErrorState error={state.error} onRetry={reload} /></div> : null}
-        {data ? (
-          <>
-            <div className="admin-map-page__canvas" aria-label="Carte interne des incidents en France">
-              <div className="admin-map-page__geography" style={{ transform: `scale(${scale})` }}>
-                <div className="admin-map-page__tiles" aria-hidden="true">
-                  {tiles.map((tile) => <img key={`${tile.x}-${tile.y}`} src={`https://tile.opentopomap.org/${MAP_ZOOM}/${tile.x}/${tile.y}.png`} alt="" loading="eager" />)}
-                </div>
-                {visibleIncidents.map((incident) => {
-                  const position = mercatorPosition(incident.longitude, incident.latitude);
+    <div className="admin-national-map">
+      {state.kind === 'loading' ? <div className="admin-national-map__state"><AdminLoadingState label="Chargement du centre opérationnel…" /></div> : null}
+      {state.kind === 'error' ? <div className="admin-national-map__state"><AdminErrorState error={state.error} onRetry={reload} /></div> : null}
+      {data ? (
+        <div className={`admin-national-map__workspace ${selected ? 'has-drawer' : ''}`}>
+          <main className="admin-national-map__canvas" aria-label="Carte nationale des incidents en France">
+            <div
+              className="admin-national-map__geography"
+              style={{ '--map-scale': view.scale, '--map-x': `${view.translateX}%`, '--map-y': `${view.translateY}%` } as CSSProperties}
+            >
+              <div className="admin-national-map__tiles" aria-hidden="true">
+                {tiles.map((tile) => <img key={`${tile.x}-${tile.y}`} src={`https://tile.opentopomap.org/${MAP_ZOOM}/${tile.x}/${tile.y}.png`} alt="" loading="eager" />)}
+              </div>
+              {clusters.map((cluster) => {
+                if (cluster.incidents.length > 1) {
                   return (
                     <button
-                      className={`admin-map-marker ${incident.status === 'ACTIVE_CONFIRMED' ? 'is-active' : 'is-monitoring'} ${selectedFireId === incident.fire_id ? 'is-selected' : ''}`}
-                      style={{ left: `${position.left}%`, top: `${position.top}%` }}
+                      className="admin-national-map__cluster"
                       type="button"
-                      key={incident.fire_id}
-                      onClick={() => selectIncident(incident.fire_id)}
-                      aria-label={`${incident.fire_id}, ${incident.canonical_name ?? incident.territory_code}`}
+                      key={cluster.key}
+                      style={{ left: `${cluster.left}%`, top: `${cluster.top}%` }}
+                      onClick={() => {
+                        selectIncident(cluster.incidents[0]);
+                        focusPosition(cluster.left, cluster.top, Math.max(1.45, view.scale + 0.35));
+                      }}
+                      aria-label={`${cluster.incidents.length} incidents proches`}
                     >
-                      <span><PublicIcon name={incident.status === 'ACTIVE_CONFIRMED' ? 'flame' : 'target'} size={19} /></span>
-                      {layers.models && incident.models.length ? <i className="admin-map-marker__badge is-model" title="Modèle 3D disponible"><PublicIcon name="database" size={12} /></i> : null}
-                      {layers.updates && incident.model_update_available ? <i className="admin-map-marker__badge is-update" title="Mise à jour de modèle disponible"><PublicIcon name="warning" size={12} /></i> : null}
-                      {layers.review && incident.review_required ? <i className="admin-map-marker__badge is-review" title="Revue humaine requise"><PublicIcon name="shield" size={12} /></i> : null}
-                      <strong>{incident.fire_id}<small>{incident.canonical_name ?? incident.territory_code}</small></strong>
+                      <span>{cluster.incidents.length}</span><small>incidents</small>
                     </button>
                   );
-                })}
-              </div>
-              <p className="admin-map-page__attribution">Fond cartographique © OpenStreetMap · SRTM · OpenTopoMap (CC-BY-SA)</p>
+                }
+                const incident = cluster.incidents[0];
+                const isSelected = selected?.fire_id === incident.fire_id;
+                return (
+                  <button
+                    className={`admin-national-map__marker is-${incident.status === 'MONITORING' ? 'monitoring' : 'active'} ${incident.review_required ? 'needs-review' : ''} ${isSelected ? 'is-selected' : ''}`}
+                    style={{ left: `${cluster.left}%`, top: `${cluster.top}%` }}
+                    type="button"
+                    key={incident.fire_id}
+                    onClick={() => selectIncident(incident)}
+                    aria-label={`${incident.fire_id}, ${incidentName(incident)}`}
+                  >
+                    <span><PublicIcon name={incident.status === 'MONITORING' ? 'target' : 'flame'} size={18} /></span>
+                    <strong>{incidentName(incident)}<small>{incident.review_required ? 'Décision requise' : readableState(incident.status)}</small></strong>
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="admin-map-controls" aria-label="Contrôles de la carte">
-              <button type="button" onClick={() => setScale((value) => Math.min(1.35, value + 0.1))} aria-label="Zoom avant"><PublicIcon name="plus" size={22} /></button>
-              <button type="button" onClick={() => setScale((value) => Math.max(1, value - 0.1))} aria-label="Zoom arrière">−</button>
-              <button type="button" onClick={() => setScale(1)} aria-label="Recentrer la carte"><PublicIcon name="crosshair" size={20} /></button>
-              <button type="button" onClick={reload} aria-label="Actualiser la carte"><PublicIcon name="arrow" size={20} /></button>
-            </div>
+            <header className="admin-national-map__heading">
+              <div><span>Centre opérationnel</span><h1>Vue nationale — France métropolitaine</h1><p>{data.summary.total_incidents} incident(s) suivi(s) · mise à jour {elapsedLabel(data.generated_at)}</p></div>
+              <button type="button" onClick={reload} aria-label="Actualiser les incidents"><PublicIcon name="arrow" size={18} />Actualiser</button>
+            </header>
 
-            <section className="admin-map-layers" aria-labelledby="admin-map-layers-title">
-              <header><PublicIcon name="data" size={20} /><h2 id="admin-map-layers-title">Couches</h2></header>
-              {([['active', 'Incidents actifs', 'flame'], ['monitoring', 'Sous surveillance', 'target'], ['models', 'Modèles disponibles', 'database'], ['updates', 'Mises à jour modèles', 'warning'], ['review', 'Revue requise', 'shield']] as const).map(([key, label, icon]) => (
-                <label key={key}><input type="checkbox" checked={layers[key]} onChange={() => toggleLayer(key)} /><PublicIcon name={icon} size={18} />{label}</label>
+            <nav className="admin-national-map__filters" aria-label="Filtrer les incidents">
+              {([['active', 'Actifs'], ['review', 'À valider'], ['monitoring', 'Surveillance']] as const).map(([value, label]) => (
+                <button type="button" key={value} aria-pressed={filter === value} onClick={() => activateFilter(value)}>
+                  <span className={`is-${value}`} />{label}<strong>{filterCount(data, value)}</strong>
+                </button>
               ))}
-              <button type="button" onClick={reload}>Actualiser toutes les couches <PublicIcon name="arrow" size={17} /></button>
-            </section>
+            </nav>
 
-            {selected ? <IncidentMapPanel incident={selected} tab={tab} setTab={setTab} onClose={() => setSelectedFireId(null)} /> : null}
-
-            <div className="admin-map-page__queue">
-              <PublicIcon name="data" size={23} />
-              <strong>{data.summary.incidents_requiring_review} incident(s) à revoir</strong>
-              <span>{data.summary.model_updates_available} mise(s) à jour de modèle</span>
-              <span>{data.summary.incidents_with_models} incident(s) avec 3D</span>
-              <a href="/admin/validation">Ouvrir la validation <PublicIcon name="arrow" size={18} /></a>
+            <div className="admin-national-map__controls" aria-label="Contrôles de la carte">
+              <button type="button" onClick={() => setView((current) => ({ ...current, scale: Math.min(2.4, current.scale + 0.2) }))} aria-label="Zoom avant"><PublicIcon name="plus" size={20} /></button>
+              <button type="button" onClick={() => setView((current) => ({ ...current, scale: Math.max(1, current.scale - 0.2) }))} aria-label="Zoom arrière">−</button>
+              <button type="button" onClick={() => setView(NATIONAL_VIEW)} aria-label="Revenir à la vue nationale"><PublicIcon name="globe" size={18} /></button>
             </div>
 
-            <section className="admin-map-page__mobile-list" aria-label="Incidents visibles">
-              <h2>Incidents sur la carte</h2>
-              {visibleIncidents.map((incident) => <button type="button" key={incident.fire_id} onClick={() => selectIncident(incident.fire_id)}><PublicIcon name={incident.status === 'ACTIVE_CONFIRMED' ? 'flame' : 'target'} size={19} /><span><strong>{incident.fire_id}</strong><small>{incident.canonical_name ?? incident.territory_code}</small></span><PublicIcon name="chevron-right" size={17} /></button>)}
-            </section>
-          </>
-        ) : null}
-      </div>
+            <NationalStatusLegend data={data} selected={selected} />
+            <p className="admin-national-map__attribution">Fond cartographique © OpenStreetMap · SRTM · OpenTopoMap (CC-BY-SA)</p>
+          </main>
+
+          {selected ? (
+            <IncidentDecisionDrawer
+              incident={selected}
+              onClose={() => setDrawerOpen(false)}
+              onFocus={() => focusIncident(selected)}
+              onNationalView={() => setView(NATIONAL_VIEW)}
+            />
+          ) : null}
+
+          <footer className="admin-national-map__statusbar">
+            <span><i className="is-live" />{visibleIncidents.length} incident(s) affiché(s)</span>
+            <span><PublicIcon name="shield" size={15} />{data.summary.incidents_requiring_review} décision(s) en attente</span>
+            <span><PublicIcon name="clock" size={15} />Synchronisé le {formatAdminDate(data.generated_at)}</span>
+          </footer>
+        </div>
+      ) : null}
     </div>
   );
+}
+
+export function AdminDashboardPage() {
+  return <AdminNationalOperationsPage />;
+}
+
+export function AdminOperationalMapPage() {
+  return <AdminNationalOperationsPage />;
 }
