@@ -16,3 +16,4 @@ build/
 .env
 data/*
 !data/.gitkeep
+.vercel
