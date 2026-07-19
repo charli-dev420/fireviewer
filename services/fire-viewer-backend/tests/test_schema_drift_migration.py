@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, inspect, text
 
+from fire_viewer.core.config import Settings
 from fire_viewer.db.sqlite_invariants import SQLITE_CRITICAL_TRIGGERS
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -13,6 +15,15 @@ PRE_NORMALIZATION_REVISION = "f3b8c1d7a920"
 NORMALIZATION_REVISION = "a4e9c2f7d610"
 PRE_SOURCE_INGESTION_REVISION = "e1c7a9b4d620"
 SOURCE_INGESTION_REVISION = "f9c8b7a6d510"
+
+
+def test_runtime_and_vercel_expect_the_current_schema_revision() -> None:
+    vercel_config = json.loads((PROJECT_ROOT / "vercel.json").read_text(encoding="utf-8"))
+
+    assert Settings().database_schema_revision == SOURCE_INGESTION_REVISION
+    assert (
+        vercel_config["env"]["FV_DATABASE_SCHEMA_REVISION"] == SOURCE_INGESTION_REVISION
+    )
 
 
 def _config(database_path: Path) -> Config:
