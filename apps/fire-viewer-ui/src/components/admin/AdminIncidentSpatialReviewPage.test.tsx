@@ -41,11 +41,11 @@ vi.mock('./AdminApiContext', () => ({
           publication_id: 'ZP-DIE-01',
           publication_state: 'PREVIEWABLE',
           publication_active: false,
-          catalog_url: '/api/v1/incident/FR-26-00001/spatial-scene/catalog',
+          catalog_url: '/api/v1/admin/zones/DIE-PONTAIX-08/revisions/1/preview/packages/fireviewer-die-pontaix-r1-v4/catalog',
           files: {
-            'terrain/T00/elevation.cog.tif': '/api/elevation',
-            'terrain/T00/colour.png': '/api/colour',
-            'vectors/T00/features.glb': '/api/features',
+            'terrain/T00/elevation.cog.tif': '/api/v2/admin/packages/fireviewer-die-pontaix-r1-v4/files/1',
+            'terrain/T00/colour.png': '/api/v2/admin/packages/fireviewer-die-pontaix-r1-v4/files/2',
+            'vectors/T00/features.glb': '/api/v2/admin/packages/fireviewer-die-pontaix-r1-v4/files/3',
           },
           origin_wgs84: [5.37, 44.75, 350],
         },
@@ -65,7 +65,7 @@ vi.mock('./AdminApiContext', () => ({
 }));
 
 vi.mock('../public/TiledSpatialScene3D', () => ({
-  TiledSpatialScene3D: ({ onPick, cameraMode }: { onPick: (point: readonly [number, number, number]) => void; cameraMode: string }) => <div><span>Moteur {cameraMode}</span><button type="button" onClick={() => onPick([25, 2, -40])}>Cliquer le relief</button></div>,
+  TiledSpatialScene3D: ({ onPick, cameraMode, source }: { onPick: (point: readonly [number, number, number]) => void; cameraMode: string; source: { readonly credentials?: RequestCredentials; readonly catalogUrl: string } }) => <div><span>Moteur {cameraMode} {source.credentials}</span><span>{source.catalogUrl}</span><button type="button" onClick={() => onPick([25, 2, -40])}>Cliquer le relief</button></div>,
 }));
 
 describe('outils de revue spatiale 3D', () => {
@@ -78,7 +78,8 @@ describe('outils de revue spatiale 3D', () => {
     const user = userEvent.setup();
     render(<AdminIncidentSpatialReviewPage fireId="FR-26-00001" />);
 
-    expect(await screen.findByText('Moteur orbit')).toBeVisible();
+    expect(await screen.findByText('Moteur orbit include')).toBeVisible();
+    expect(screen.getByText(/\/api\/v1\/admin\/zones\/DIE-PONTAIX-08\/revisions\/1\/preview\/packages\/fireviewer-die-pontaix-r1-v4\/catalog$/)).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Vue FPS' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Tracer un nouveau contour' }));
     await user.click(screen.getByRole('button', { name: 'Cliquer le relief' }));

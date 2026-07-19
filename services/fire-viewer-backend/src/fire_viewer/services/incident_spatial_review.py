@@ -132,14 +132,15 @@ def _scene(
             publication_state=publication.state.value if publication is not None else None,
             publication_active=publication.is_active if publication is not None else False,
             catalog_url=(
-                f"/api/v1/incident/{incident.fire_id}/spatial-scene/catalog"
+                f"/api/v1/admin/zones/{zone_id}/revisions/{spatial_revision.revision}/preview/"
+                f"packages/{manifest.package.package_id}/catalog"
                 if manifest.package is not None
                 else None
             ),
             files=(
                 {
                     str(item.provenance.get("catalog_path")): (
-                        f"/api/v1/incident/{incident.fire_id}/spatial-scene/files/{item.id}"
+                        f"/api/v2/admin/packages/{manifest.package.package_id}/files/{item.id}"
                     )
                     for item in manifest.package.files
                     if item.provenance.get("catalog_path")

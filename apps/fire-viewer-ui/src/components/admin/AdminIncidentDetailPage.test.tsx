@@ -125,4 +125,59 @@ describe('fiche incident principale', () => {
     expect(screen.getByLabelText('Nouveau statut')).toBeVisible();
     expect(screen.queryByText(/seuil de surface|machine d’état|éligible/i)).not.toBeInTheDocument();
   });
+
+  it('enregistre un statut autorisé puis affiche la valeur relue depuis l’API', async () => {
+    const user = userEvent.setup();
+    const monitored = incident({
+      status: 'MONITORING',
+      version: 4,
+      episodes: [{
+        episode_id: 'E01', ordinal: 1, status: 'MONITORING', verification_state: 'VERIFIED',
+        corroborating_source_count: 3, evidence_basis_at: '2026-07-18T10:00:00Z', estimated_area_ha: 1_240,
+        evacuation_established: false, model_generation_eligible: true, review_required: false,
+        started_at: '2026-07-08T08:00:00Z', last_observed_at: '2026-07-18T10:00:00Z', is_current: true, version: 4,
+      }],
+    });
+    const confirmed = incident({
+      status: 'ACTIVE_CONFIRMED',
+      version: 5,
+      episodes: [{
+        episode_id: 'E01', ordinal: 1, status: 'ACTIVE_CONFIRMED', verification_state: 'VERIFIED',
+        corroborating_source_count: 3, evidence_basis_at: '2026-07-18T10:00:00Z', estimated_area_ha: 1_240,
+        evacuation_established: false, model_generation_eligible: true, review_required: false,
+        started_at: '2026-07-08T08:00:00Z', last_observed_at: '2026-07-18T10:00:00Z', is_current: true, version: 5,
+      }],
+    });
+    let incidentReads = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/api/v1/operator/incidents/FR-26-00001/transitions')) {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        expect(body).toMatchObject({
+          target_status: 'ACTIVE_CONFIRMED',
+          expected_version: 4,
+          validation_basis: expect.stringContaining('Confirmation explicite par l’opérateur'),
+        });
+        return response({ episode_id: 'E01', status: 'ACTIVE_CONFIRMED', version: 5 });
+      }
+      incidentReads += 1;
+      return response(incidentReads === 1 ? monitored : confirmed);
+    });
+    vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <AdminApiProvider session={SESSION} onUnauthorized={vi.fn()}>
+        <AdminIncidentDetailPage fireId="FR-26-00001" />
+      </AdminApiProvider>,
+    );
+
+    await screen.findByText('Sous surveillance');
+    await user.click(screen.getByText('Mettre à jour la situation'));
+    expect(screen.queryByRole('option', { name: 'Clos' })).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Nouveau statut'), 'ACTIVE_CONFIRMED');
+    await user.click(screen.getByRole('button', { name: 'Changer le statut' }));
+
+    expect(await screen.findByText('Actif confirmé', { selector: '.admin-state' })).toBeVisible();
+    expect(incidentReads).toBe(2);
+  });
 });

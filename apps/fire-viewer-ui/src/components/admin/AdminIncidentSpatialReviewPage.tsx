@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import type { AdminActiveFireZoneRevision, AdminGltfPoint } from '../../lib/adminApi';
-import { getViewerManifestApiOrigin } from '../../lib/manifestClient';
+import { getAdminApiOrigin } from '../../lib/adminSession';
 import { useAdminApi, useAdminQuery } from './AdminApiContext';
 import { AdminEmptyState, AdminErrorState, AdminLoadingState, AdminPageHeader, AdminStateLabel, formatAdminDate } from './AdminPageState';
 import { AdminIncidentSpatialEditor3D } from './AdminIncidentSpatialEditor3D';
@@ -66,10 +66,11 @@ export function AdminIncidentSpatialReviewPage({ fireId }: { readonly fireId: st
   const validatedMarkerIds = useMemo(() => state.kind === 'ready' ? state.data.markers.filter((item) => item.review_state === 'VALIDATED').map((item) => item.marker_id) : [], [state]);
   const tiledSource = useMemo(() => {
     if (state.kind !== 'ready' || !state.data.scene?.catalog_url) return null;
-    const apiOrigin = getViewerManifestApiOrigin() ?? window.location.origin;
+    const apiOrigin = getAdminApiOrigin() ?? window.location.origin;
     return {
       catalogUrl: new URL(state.data.scene.catalog_url, apiOrigin).toString(),
       files: Object.fromEntries(Object.entries(state.data.scene.files).map(([path, url]) => [path, new URL(url, apiOrigin).toString()])),
+      credentials: 'include' as const,
     };
   }, [state]);
 

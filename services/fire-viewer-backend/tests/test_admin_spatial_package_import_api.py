@@ -571,6 +571,19 @@ def test_admin_imports_map_inside_incident_project_atomically(
     assert scene["publication_id"] == publication.publication_id
     assert scene["publication_state"] == "PREVIEWABLE"
     assert scene["publication_active"] is False
+    assert scene["catalog_url"] == (
+        "/api/v1/admin/zones/IMPORT-TEST-01/revisions/1/preview/"
+        "packages/pkg-project-map-r1/catalog"
+    )
+    assert scene["files"]
+    assert all(
+        url.startswith("/api/v2/admin/packages/pkg-project-map-r1/files/")
+        for url in scene["files"].values()
+    )
+    private_catalog = client.get(scene["catalog_url"])
+    assert private_catalog.status_code == 200, private_catalog.text
+    private_file = client.get(next(iter(scene["files"].values())))
+    assert private_file.status_code == 200, private_file.text
 
     replay = client.post(
         f"/api/v2/admin/incidents/{incident.fire_id}/spatial-package/from-blob",

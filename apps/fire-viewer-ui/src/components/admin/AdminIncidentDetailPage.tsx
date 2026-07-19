@@ -19,6 +19,17 @@ const incidentStatuses = [
   ['REJECTED', 'Écarté'],
 ] as const;
 
+const incidentStatusTransitions: Readonly<Record<string, readonly string[]>> = {
+  CANDIDATE: ['UNDER_REVIEW', 'ACTIVE_CONFIRMED', 'REJECTED'],
+  UNDER_REVIEW: ['ACTIVE_CONFIRMED', 'REJECTED'],
+  ACTIVE_CONFIRMED: ['MONITORING', 'EXTINGUISHED'],
+  MONITORING: ['ACTIVE_CONFIRMED', 'EXTINGUISHED'],
+  EXTINGUISHED: ['CLOSED'],
+  CLOSED: [],
+  SUSPENDED: [],
+  REJECTED: [],
+};
+
 const verificationLabels: Readonly<Record<string, string>> = {
   VERIFIED: 'Vérifié',
   CORROBORATED: 'Recoupé',
@@ -84,11 +95,17 @@ export function AdminIncidentDetailPage({ fireId }: { readonly fireId: string })
   const sourcePreview = activeSources.slice(0, 3);
   const hasPendingObservations = incident.pending_observation_count > 0;
   const hasUrgentAction = incident.review_required || hasPendingObservations;
+  const availableStatuses = incidentStatuses.filter(([value]) => (
+    incidentStatusTransitions[current?.status ?? ''] ?? []
+  ).includes(value));
 
   const transition = async () => {
     if (!current || !status) return;
     const selectedStatusLabel = statusLabel(status);
     const reason = `Statut défini manuellement sur « ${selectedStatusLabel} » depuis la fiche incident.`;
+    const validationBasis = status === 'ACTIVE_CONFIRMED'
+      ? `Confirmation explicite par l’opérateur depuis la fiche incident ; ${incident.sources.length} source(s) enregistrée(s) dans le dossier.`
+      : undefined;
     const result = await mutation.run(
       `transition:${status}:${current.version}:${publicNote}`,
       (options) => api.transitionIncident(
@@ -98,11 +115,13 @@ export function AdminIncidentDetailPage({ fireId }: { readonly fireId: string })
           expected_version: current.version,
           reason,
           ...(publicNote.trim() ? { public_note: publicNote.trim() } : {}),
+          ...(validationBasis ? { validation_basis: validationBasis } : {}),
         },
         options,
       ),
     );
     if (result) {
+      setStatus('');
       setPublicNote('');
       reload();
     }
@@ -316,7 +335,7 @@ export function AdminIncidentDetailPage({ fireId }: { readonly fireId: string })
               Nouveau statut
               <select value={status} onChange={(event) => setStatus(event.target.value)}>
                 <option value="">Choisir</option>
-                {incidentStatuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                {availableStatuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </label>
             <label>
@@ -331,6 +350,7 @@ export function AdminIncidentDetailPage({ fireId }: { readonly fireId: string })
             >
               Changer le statut
             </button>
+            {!availableStatuses.length ? <p>Aucun changement de statut opérationnel n’est disponible.</p> : null}
           </section>
         </div>
       </details>
