@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { AdminAgentOperationType } from '../../lib/adminApi';
-import { uploadIncidentSourcePackage } from '../../lib/sourcePackageUpload';
 import { useAdminApi, useAdminMutation, useAdminQuery } from './AdminApiContext';
 import {
   AdminEmptyState,
@@ -49,16 +48,11 @@ function blockedLabel(reason: string | null): string {
   return 'Rien à traiter';
 }
 
-/** Espace quotidien unique : réception, recherche, analyse et provenance privée. */
+/** Espace quotidien de supervision : analyse et provenance des sources déjà reçues. */
 export function AdminIncidentSourcesMediaPage({ fireId }: { readonly fireId: string }) {
   const api = useAdminApi();
-  const fileInputId = useId();
   const [localDate, setLocalDate] = useState(todayLocal);
   const [locationHint, setLocationHint] = useState('');
-  const [files, setFiles] = useState<readonly File[]>([]);
-  const [analysisAuthorized, setAnalysisAuthorized] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
-  const [uploadResult, setUploadResult] = useState<string | null>(null);
   const [launched, setLaunched] = useState<{ type: AdminAgentOperationType; files: number } | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const load = useCallback(
@@ -72,7 +66,6 @@ export function AdminIncidentSourcesMediaPage({ fireId }: { readonly fireId: str
   const { state, reload } = useAdminQuery(load, [load]);
   const { state: operations, reload: reloadOperations } = useAdminQuery(loadOperations, [loadOperations]);
   const analysisMutation = useAdminMutation();
-  const uploadMutation = useAdminMutation();
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1_000);
@@ -95,31 +88,6 @@ export function AdminIncidentSourcesMediaPage({ fireId }: { readonly fireId: str
     }
   };
 
-  const sendFiles = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!analysisAuthorized || !files.length) return;
-    setUploadProgress('Préparation de l’envoi…');
-    setUploadResult(null);
-    const result = await uploadMutation.run(
-      `source-package:${fireId}:${localDate}:${files.map((file) => `${file.name}:${file.size}`).join('|')}`,
-      (options) => uploadIncidentSourcePackage(api, {
-        fireId,
-        files,
-        localDate,
-        locationHint: locationHint.trim() || null,
-        idempotencyKey: options.idempotencyKey!,
-        onProgress: (completed, total) => setUploadProgress(`${completed}/${total} fichier${total > 1 ? 's' : ''} envoyé${completed > 1 ? 's' : ''}`),
-      }),
-    );
-    if (result !== null) {
-      setUploadResult(`${result.item_count} fichier${result.item_count > 1 ? 's' : ''} prêt${result.item_count > 1 ? 's' : ''} pour l’analyse.`);
-      setUploadProgress(null);
-      setFiles([]);
-      setAnalysisAuthorized(false);
-      reloadOperations();
-    }
-  };
-
   if (state.kind === 'loading') return <AdminLoadingState label="Chargement des sources et médias…" />;
   if (state.kind === 'error') return <AdminErrorState error={state.error} onRetry={reload} />;
   return (
@@ -131,23 +99,12 @@ export function AdminIncidentSourcesMediaPage({ fireId }: { readonly fireId: str
 
       <section className="admin-section" aria-labelledby="admin-analysis-day-title">
         <div className="admin-section__heading">
-          <div><h3 id="admin-analysis-day-title">Journée traitée</h3><p>Cette date s’applique aux fichiers, à la recherche publique et au satellite.</p></div>
+          <div><h3 id="admin-analysis-day-title">Journée traitée</h3><p>Cette date regroupe les fichiers transmis par les utilisateurs, la recherche publique et le satellite.</p></div>
         </div>
         <div className="admin-form-grid admin-form-grid--compact">
           <label className="admin-field"><span>Date</span><input type="date" value={localDate} onChange={(event) => setLocalDate(event.currentTarget.value)} /></label>
           <label className="admin-field"><span>Lieu ou repère <small>(facultatif)</small></span><input value={locationHint} maxLength={500} onChange={(event) => setLocationHint(event.currentTarget.value)} placeholder="Ex. Die, massif de Justin" /></label>
         </div>
-      </section>
-
-      <section className="admin-section" aria-labelledby="admin-source-upload-title">
-        <div className="admin-section__heading"><div><h3 id="admin-source-upload-title">Ajouter les fichiers reçus</h3><p>Les empreintes, tailles, types et métadonnées sont calculés automatiquement.</p></div></div>
-        <form onSubmit={(event) => void sendFiles(event)}>
-          <label className="admin-field" htmlFor={fileInputId}><span>Photos, vidéos, audios ou textes</span><input id={fileInputId} type="file" multiple accept=".jpg,.jpeg,.png,.webp,.tif,.tiff,.mp4,.mov,.webm,.mp3,.m4a,.wav,.ogg,.txt,.md,.html,.htm" onChange={(event) => setFiles(Array.from(event.currentTarget.files ?? []))} /></label>
-          <p>{files.length ? `${files.length} fichier${files.length > 1 ? 's' : ''} sélectionné${files.length > 1 ? 's' : ''}.` : 'Aucun fichier sélectionné.'}</p>
-          <label className="admin-source-editor__enabled"><input type="checkbox" checked={analysisAuthorized} onChange={(event) => setAnalysisAuthorized(event.currentTarget.checked)} /> J’autorise l’analyse privée de ces fichiers.</label>
-          <div className="admin-actions"><button type="submit" className="button button--primary" disabled={uploadMutation.state.pending || !files.length || !analysisAuthorized}>{uploadMutation.state.pending ? uploadProgress ?? 'Envoi…' : 'Envoyer les fichiers'}</button></div>
-        </form>
-        <AdminMutationFeedback error={uploadMutation.state.error} succeeded={uploadMutation.state.succeeded} success={uploadResult ?? 'Fichiers reçus et prêts pour analyse.'} />
       </section>
 
       <section className="admin-section" aria-labelledby="admin-agent-operations-title">

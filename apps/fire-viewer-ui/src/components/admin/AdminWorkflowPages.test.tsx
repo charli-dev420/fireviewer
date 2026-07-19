@@ -247,8 +247,8 @@ describe('pages de workflow administrateur', () => {
 
     await screen.findByRole('heading', { name: 'Sources liées' });
     expect(screen.getByLabelText('Date')).toBeInTheDocument();
-    expect(screen.getByLabelText(/Photos, vidéos, audios ou textes/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/autorise l’analyse privée/)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Ajouter les fichiers reçus' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Envoyer les fichiers' })).not.toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Analyser les fichiers reçus' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Rechercher et analyser les sources publiques' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Rien à traiter' })).toBeDisabled();
