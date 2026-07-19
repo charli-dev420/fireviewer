@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ACESFilmicToneMapping,
   AmbientLight,
@@ -56,6 +56,11 @@ export interface TiledSceneSource {
 
 export interface TiledScenePoint { readonly position: readonly [number, number, number]; readonly color: string; }
 export interface TiledSceneLine { readonly points: readonly (readonly [number, number, number])[]; readonly color: string; }
+export interface TiledSceneWgs84Geometry {
+  readonly geometry: Readonly<Record<string, unknown>>;
+  readonly color: string;
+}
+export type TiledSceneCapture = () => Promise<Blob>;
 export type TiledSceneViewPreset = 'near' | 'local' | 'extended';
 
 interface Runtime {
@@ -64,6 +69,7 @@ interface Runtime {
   readonly overlays: Group;
   readonly origin: UnityOrigin;
   readonly catalog: UnitySpatialCatalog;
+  readonly terrains: readonly Mesh[];
   readonly refreshDetails: () => void;
 }
 
@@ -306,21 +312,105 @@ function overlayWorld(origin: UnityOrigin, point: readonly [number, number, numb
   return new Vector3(point[0], point[2], point[1] + lift);
 }
 
-function redrawOverlays(runtime: Runtime, points: readonly TiledScenePoint[], lines: readonly TiledSceneLine[]): void {
+function overlayTerrainWorld(runtime: Runtime, point: readonly [number, number, number], lift: number): Vector3 {
+  const projected = overlayWorld(runtime.origin, point, 0);
+  const terrain = terrainPointAt(projected, runtime.terrains);
+  return (terrain ?? projected).clone().addScaledVector(WORLD_UP, lift);
+}
+
+function wgs84GeometryLines(
+  runtime: Runtime,
+  overlays: readonly TiledSceneWgs84Geometry[],
+): readonly TiledSceneLine[] {
+  coordinateSystem();
+  const result: TiledSceneLine[] = [];
+  for (const overlay of overlays) {
+    const rawCoordinates = overlay.geometry.coordinates;
+    const polygons = overlay.geometry.type === 'Polygon'
+      ? [rawCoordinates]
+      : overlay.geometry.type === 'MultiPolygon' ? rawCoordinates : null;
+    if (!Array.isArray(polygons)) continue;
+    for (const polygon of polygons) {
+      if (!Array.isArray(polygon)) continue;
+      for (const ring of polygon) {
+        if (!Array.isArray(ring)) continue;
+        const points = ring.flatMap((coordinate): readonly (readonly [number, number, number])[] => {
+          if (
+            !Array.isArray(coordinate)
+            || typeof coordinate[0] !== 'number'
+            || typeof coordinate[1] !== 'number'
+            || !Number.isFinite(coordinate[0])
+            || !Number.isFinite(coordinate[1])
+          ) return [];
+          const [east, north] = proj4(
+            'EPSG:4326',
+            'EPSG:2154',
+            [coordinate[0], coordinate[1]],
+          ) as [number, number];
+          return [[east - runtime.origin[0], 0, north - runtime.origin[1]]];
+        });
+        if (points.length >= 2) result.push({ points, color: overlay.color });
+      }
+    }
+  }
+  return result;
+}
+
+function redrawOverlays(
+  runtime: Runtime,
+  points: readonly TiledScenePoint[],
+  lines: readonly TiledSceneLine[],
+  wgs84Geometries: readonly TiledSceneWgs84Geometry[],
+): void {
   disposeObject(runtime.overlays); runtime.overlays.clear();
   for (const item of points) {
     const marker = new Mesh(new SphereGeometry(10, 14, 10), new MeshBasicMaterial({ color: item.color, depthTest: false }));
-    marker.position.copy(overlayWorld(runtime.origin, item.position, 8)); marker.renderOrder = 20; runtime.overlays.add(marker);
+    marker.position.copy(overlayTerrainWorld(runtime, item.position, 8)); marker.renderOrder = 20; runtime.overlays.add(marker);
   }
-  for (const item of lines) {
+  for (const item of [...lines, ...wgs84GeometryLines(runtime, wgs84Geometries)]) {
     if (item.points.length < 2) continue;
     const line = new ThreeLine(
-      new BufferGeometry().setFromPoints(item.points.map((point) => overlayWorld(runtime.origin, point, 5))),
+      new BufferGeometry().setFromPoints(item.points.map((point) => overlayTerrainWorld(runtime, point, 5))),
       new LineBasicMaterial({ color: item.color, depthTest: false, transparent: true, opacity: 0.96 }),
     );
     line.renderOrder = 19; runtime.overlays.add(line);
   }
   runtime.instance.notifyChange(runtime.overlays);
+}
+
+function wgs84OverlayBounds(
+  runtime: Runtime,
+  overlays: readonly TiledSceneWgs84Geometry[],
+): Box3 | null {
+  const bounds = new Box3();
+  let pointCount = 0;
+  for (const line of wgs84GeometryLines(runtime, overlays)) {
+    for (const point of line.points) {
+      bounds.expandByPoint(overlayTerrainWorld(runtime, point, 5));
+      pointCount += 1;
+    }
+  }
+  return pointCount ? bounds.expandByScalar(12) : null;
+}
+
+function canvasBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  const width = canvas.width;
+  const height = canvas.height;
+  if (!width || !height) return Promise.reject(new Error('Le viewer 3D ne possède aucune image exploitable.'));
+  const scale = Math.max(1, 640 / width, 360 / height);
+  const output = document.createElement('canvas');
+  output.width = Math.ceil(width * scale);
+  output.height = Math.ceil(height * scale);
+  const context = output.getContext('2d');
+  if (!context) return Promise.reject(new Error('La capture du viewer 3D est indisponible.'));
+  context.drawImage(canvas, 0, 0, output.width, output.height);
+  return new Promise((resolve, reject) => {
+    output.toBlob(
+      (blob) => blob ? resolve(blob) : reject(new Error('La capture du viewer 3D a échoué.')),
+      'image/jpeg',
+      0.9,
+    );
+  });
 }
 
 function frameCamera(runtime: Runtime, preset: TiledSceneViewPreset, focus?: readonly [number, number]): void {
@@ -346,6 +436,9 @@ export function TiledSpatialScene3D({
   viewPreset = 'near',
   overlayPoints = [],
   overlayLines = [],
+  overlayGeometriesWgs84 = [],
+  captureGeometriesWgs84,
+  onCaptureReady,
 }: {
   readonly source: TiledSceneSource;
   readonly overlayOriginWgs84?: readonly [number, number, number];
@@ -355,18 +448,46 @@ export function TiledSpatialScene3D({
   readonly viewPreset?: TiledSceneViewPreset;
   readonly overlayPoints?: readonly TiledScenePoint[];
   readonly overlayLines?: readonly TiledSceneLine[];
+  readonly overlayGeometriesWgs84?: readonly TiledSceneWgs84Geometry[];
+  readonly captureGeometriesWgs84?: readonly TiledSceneWgs84Geometry[];
+  readonly onCaptureReady?: (capture: TiledSceneCapture | null) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const runtimeRef = useRef<Runtime | null>(null);
   const [detailLodEnabled, setDetailLodEnabled] = useState(true);
-  const propsRef = useRef({ overlayPoints, overlayLines, onPick, drawMode, cameraMode, detailLodEnabled, viewPreset });
+  const propsRef = useRef({ overlayPoints, overlayLines, overlayGeometriesWgs84, captureGeometriesWgs84, onPick, drawMode, cameraMode, detailLodEnabled, viewPreset, onCaptureReady });
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [detailState, setDetailState] = useState({ active: 0, expected: 0, failures: 0 });
-  propsRef.current = { overlayPoints, overlayLines, onPick, drawMode, cameraMode, detailLodEnabled, viewPreset };
+  propsRef.current = { overlayPoints, overlayLines, overlayGeometriesWgs84, captureGeometriesWgs84, onPick, drawMode, cameraMode, detailLodEnabled, viewPreset, onCaptureReady };
 
-  useEffect(() => { const runtime = runtimeRef.current; if (runtime) redrawOverlays(runtime, overlayPoints, overlayLines); }, [overlayPoints, overlayLines]);
+  useEffect(() => { const runtime = runtimeRef.current; if (runtime) redrawOverlays(runtime, overlayPoints, overlayLines, overlayGeometriesWgs84); }, [overlayPoints, overlayLines, overlayGeometriesWgs84]);
   useEffect(() => { const runtime = runtimeRef.current; if (runtime) frameCamera(runtime, viewPreset); }, [viewPreset]);
   useEffect(() => { runtimeRef.current?.refreshDetails(); }, [detailLodEnabled]);
+
+  const captureCurrentScene = useCallback(async () => {
+    const runtime = runtimeRef.current;
+    if (!runtime) throw new Error('La scène 3D n’est pas encore prête.');
+    const captureOverlays = propsRef.current.captureGeometriesWgs84 ?? propsRef.current.overlayGeometriesWgs84;
+    const overlayBounds = wgs84OverlayBounds(runtime, captureOverlays);
+    if (!overlayBounds) throw new Error('Aucun calque géographique ne peut être capturé.');
+    if (!cameraFrustum(runtime.instance.view.camera).intersectsBox(overlayBounds)) {
+      throw new Error('Cadrez le périmètre incendie dans la vue avant de l’ajouter à la galerie.');
+    }
+    const current = propsRef.current;
+    try {
+      redrawOverlays(runtime, [], [], captureOverlays);
+      runtime.instance.render();
+      return await canvasBlob(runtime.instance.domElement);
+    } finally {
+      redrawOverlays(runtime, current.overlayPoints, current.overlayLines, current.overlayGeometriesWgs84);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!onCaptureReady) return undefined;
+    onCaptureReady(status === 'ready' ? captureCurrentScene : null);
+    return () => onCaptureReady(null);
+  }, [captureCurrentScene, onCaptureReady, status]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -580,7 +701,12 @@ export function TiledSpatialScene3D({
         const response = await fetch(source.catalogUrl, { cache: 'no-store', credentials: source.credentials ?? 'omit', signal: abortController.signal });
         if (!response.ok) throw new Error(`Catalogue Unity inaccessible (${response.status}).`);
         catalog = parseUnitySpatialCatalog(await response.json());
-        instance = new Instance({ target: host, crs: coordinateSystem(), backgroundColor: '#102429' });
+        instance = new Instance({
+          target: host,
+          crs: coordinateSystem(),
+          backgroundColor: '#102429',
+          renderer: { preserveDrawingBuffer: Boolean(propsRef.current.onCaptureReady) },
+        });
         instance.renderer.toneMapping = ACESFilmicToneMapping;
         instance.renderer.toneMappingExposure = 0.82;
         instance.view.camera.up.copy(WORLD_UP);
@@ -597,8 +723,8 @@ export function TiledSpatialScene3D({
         if (farBounds) terrainElevationRange = [farBounds.min.z, farBounds.max.z];
         farRoot = far.root; farRoot.position.z = -3; farTerrain = far.terrain; terrainMeshes.push(far.terrain); await instance.add(farRoot);
         const overlays = new Group(); overlays.name = 'admin-spatial-overlays'; await instance.add(overlays);
-        const runtime: Runtime = { instance, controls, overlays, origin: catalog.origin_l93_m, catalog, refreshDetails: scheduleRefresh };
-        runtimeRef.current = runtime; redrawOverlays(runtime, propsRef.current.overlayPoints, propsRef.current.overlayLines);
+        const runtime: Runtime = { instance, controls, overlays, origin: catalog.origin_l93_m, catalog, terrains: terrainMeshes, refreshDetails: scheduleRefresh };
+        runtimeRef.current = runtime; redrawOverlays(runtime, propsRef.current.overlayPoints, propsRef.current.overlayLines, propsRef.current.overlayGeometriesWgs84);
         let focus: readonly [number, number] | undefined;
         if (overlayOriginWgs84) focus = proj4('EPSG:4326', 'EPSG:2154', [overlayOriginWgs84[0], overlayOriginWgs84[1]]) as [number, number];
         frameCamera(runtime, propsRef.current.viewPreset, focus); scheduleRefresh(); setStatus('ready');

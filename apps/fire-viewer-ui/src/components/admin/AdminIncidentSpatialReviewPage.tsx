@@ -1,6 +1,8 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import type { AdminActiveFireZoneRevision, AdminGltfPoint } from '../../lib/adminApi';
 import { getAdminApiOrigin } from '../../lib/adminSession';
+import { uploadIncidentMapCapture } from '../../lib/mapCaptureUpload';
+import type { TiledSceneCapture } from '../public/TiledSpatialScene3D';
 import { useAdminApi, useAdminQuery } from './AdminApiContext';
 import { AdminEmptyState, AdminErrorState, AdminLoadingState, AdminPageHeader, AdminStateLabel, formatAdminDate } from './AdminPageState';
 import { AdminIncidentSpatialEditor3D } from './AdminIncidentSpatialEditor3D';
@@ -34,6 +36,11 @@ export function AdminIncidentSpatialReviewPage({ fireId }: { readonly fireId: st
   const [message, setMessage] = useState<string | null>(null);
   const [sceneReset, setSceneReset] = useState(0);
   const [movingDraftIndex, setMovingDraftIndex] = useState<number | null>(null);
+  const [editingRevision, setEditingRevision] = useState<AdminActiveFireZoneRevision | null>(null);
+  const [captureScene, setCaptureScene] = useState<TiledSceneCapture | null>(null);
+  const handleCaptureReady = useCallback((capture: TiledSceneCapture | null) => {
+    setCaptureScene(() => capture);
+  }, []);
 
   const changeMapPublication = async () => {
     if (state.kind !== 'ready' || !state.data.scene) return;
@@ -73,6 +80,18 @@ export function AdminIncidentSpatialReviewPage({ fireId }: { readonly fireId: st
       credentials: 'include' as const,
     };
   }, [state]);
+  const currentLayer = useMemo(() => state.kind === 'ready' ? [...state.data.zone_revisions]
+    .filter((item) => item.review_state !== 'REJECTED')
+    .sort((left, right) => right.revision - left.revision)[0] ?? null : null, [state]);
+  const overlayGeometriesWgs84 = useMemo(() => state.kind === 'ready' ? state.data.zone_revisions
+    .filter((item) => item.review_state !== 'REJECTED')
+    .map((item) => ({
+      geometry: item.geometry_geojson,
+      color: item.review_state === 'READY_FOR_PUBLICATION' ? '#ff5b43' : '#60a5fa',
+    })) : [], [state]);
+  const captureGeometriesWgs84 = useMemo(() => currentLayer?.review_state === 'READY_FOR_PUBLICATION'
+    ? [{ geometry: currentLayer.geometry_geojson, color: '#ff5b43' }]
+    : [], [currentLayer]);
 
   const mutate = async (operation: () => Promise<unknown>, success: string) => {
     setBusy(true); setMessage(null);
@@ -84,14 +103,8 @@ export function AdminIncidentSpatialReviewPage({ fireId }: { readonly fireId: st
   if (state.kind === 'loading') return <AdminLoadingState label="Chargement de la revue spatiale 3D…" />;
   if (state.kind === 'error') return <AdminErrorState error={state.error} onRetry={reload} />;
   const workspace = state.data;
-  const currentLayer = [...workspace.zone_revisions]
-    .filter((item) => item.review_state !== 'REJECTED')
-    .sort((left, right) => right.revision - left.revision)[0] ?? null;
   const overlayPoints = workspace.markers.filter((item) => item.gltf_position && item.review_state !== 'REJECTED').map((item) => ({ position: item.gltf_position!, color: item.review_state === 'VALIDATED' ? '#4ee19a' : '#ffc857' }));
-  const overlayLines = [
-    ...workspace.zone_revisions.filter((item) => item.review_state !== 'REJECTED').flatMap((item) => item.gltf_polygons.flatMap((polygon) => polygon.map((points) => ({ points, color: item.review_state === 'READY_FOR_PUBLICATION' ? '#ff5b43' : '#60a5fa' })))),
-    ...(draft.length > 1 ? [{ points: [...draft.map((item) => item.gltf), ...(draft.length > 2 ? [draft[0]!.gltf] : [])], color: '#f8e16c' }] : []),
-  ];
+  const overlayLines = draft.length > 1 ? [{ points: [...draft.map((item) => item.gltf), ...(draft.length > 2 ? [draft[0]!.gltf] : [])], color: '#f8e16c' }] : [];
   const mapPublicationAction = workspace.scene?.package_state === 'PREVIEWABLE'
     ? 'Publier la carte'
     : workspace.scene?.publication_active
@@ -125,14 +138,33 @@ export function AdminIncidentSpatialReviewPage({ fireId }: { readonly fireId: st
       if (!Array.isArray(coordinate) || coordinate.length < 2 || typeof coordinate[0] !== 'number' || typeof coordinate[1] !== 'number') continue;
       points.push({ gltf: gltf[index], wgs84: [coordinate[0], coordinate[1], typeof coordinate[2] === 'number' ? coordinate[2] : workspace.scene?.origin_wgs84[2] ?? 0] });
     }
-    setDraft(points); setMovingDraftIndex(null); setSupportingMarkers(revision.supporting_marker_ids); setDrawMode(true); setMessage('Calque chargé dans l’éditeur. Modifiez ses sommets directement sur le terrain.');
+    setDraft(points); setMovingDraftIndex(null); setEditingRevision(revision); setSupportingMarkers(revision.supporting_marker_ids); setDrawMode(true); setMessage('Calque chargé dans l’éditeur. Modifiez ses sommets directement sur le terrain.');
   };
 
   const saveDraft = () => {
     if (draft.length < 3 || reason.trim().length < 10) { setMessage('Au moins trois sommets et un motif explicite sont requis.'); return; }
     const ring = draft.map((point) => [point.wgs84[0], point.wgs84[1]]);
     ring.push([...ring[0]]);
-    void mutate(() => api.createActiveFireZoneRevision(fireId, { expected_latest_revision: latestRevision, valid_at: new Date().toISOString(), geometry_geojson: { type: 'Polygon', coordinates: [ring] }, supporting_marker_ids: supportingMarkers, reason }, { idempotencyKey: key('active-zone') }), 'Calque enregistré. Il reste privé jusqu’à sa validation.').then((saved) => { if (saved) { setDraft([]); setMovingDraftIndex(null); setDrawMode(false); } });
+    void mutate(() => api.createActiveFireZoneRevision(fireId, { expected_latest_revision: latestRevision, valid_at: editingRevision?.valid_at ?? new Date().toISOString(), analysis_id: editingRevision?.analysis_id, geometry_geojson: { type: 'Polygon', coordinates: [ring] }, supporting_marker_ids: supportingMarkers, reason }, { idempotencyKey: key('active-zone') }), 'Calque enregistré. Il reste privé jusqu’à sa validation.').then((saved) => { if (saved) { setDraft([]); setMovingDraftIndex(null); setEditingRevision(null); setDrawMode(false); } });
+  };
+
+  const addCurrentViewToGallery = async () => {
+    if (!captureScene || !currentLayer || currentLayer.review_state !== 'READY_FOR_PUBLICATION') return;
+    setBusy(true); setMessage(null);
+    try {
+      const image = await captureScene();
+      await uploadIncidentMapCapture(api, {
+        fireId,
+        zoneRevisionId: currentLayer.zone_revision_id,
+        image,
+      });
+      setMessage('Vue 3D du périmètre ajoutée à la galerie de l’incident.');
+      reload();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Capture de la carte impossible.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return <section aria-labelledby="admin-spatial-review-title">
@@ -146,19 +178,22 @@ export function AdminIncidentSpatialReviewPage({ fireId }: { readonly fireId: st
         <div className="admin-spatial-camera-controls" role="group" aria-label="Contrôles de caméra 3D">
           <button type="button" onClick={() => setSceneReset((value) => value + 1)}>Recentrer</button>
           <span>Souris : rotation, déplacement et zoom</span>
+          {currentLayer?.review_state === 'READY_FOR_PUBLICATION' ? <button type="button" className="button button--small" disabled={busy || !captureScene} onClick={() => void addCurrentViewToGallery()}>Ajouter cette vue à la galerie</button> : null}
         </div>
-        {tiledSource ? <Suspense fallback={<AdminLoadingState label="Initialisation du moteur cartographique 3D…" />}><TiledSpatialScene3D key={sceneReset} source={tiledSource} overlayOriginWgs84={workspace.scene.origin_wgs84} cameraMode="orbit" drawMode={drawMode} overlayPoints={overlayPoints} overlayLines={overlayLines} onPick={(point) => void addTerrainPoint(point)} /></Suspense> : workspace.scene.asset_url ? <AdminIncidentSpatialEditor3D assetUrl={workspace.scene.asset_url} cameraMode="orbit" markers={workspace.markers} revisions={workspace.zone_revisions} draftPoints={draft.map((point) => point.gltf)} drawMode={drawMode} onTerrainPick={(point) => void addTerrainPoint(point)} /> : <AdminEmptyState title="Scène 3D incomplète">Aucun fichier de scène exploitable n’est associé à cette carte.</AdminEmptyState>}
+        {tiledSource ? <Suspense fallback={<AdminLoadingState label="Initialisation du moteur cartographique 3D…" />}><TiledSpatialScene3D key={sceneReset} source={tiledSource} overlayOriginWgs84={workspace.scene.origin_wgs84} cameraMode="orbit" drawMode={drawMode} overlayPoints={overlayPoints} overlayLines={overlayLines} overlayGeometriesWgs84={overlayGeometriesWgs84} captureGeometriesWgs84={captureGeometriesWgs84} onPick={(point) => void addTerrainPoint(point)} onCaptureReady={handleCaptureReady} /></Suspense> : workspace.scene.asset_url ? <AdminIncidentSpatialEditor3D assetUrl={workspace.scene.asset_url} cameraMode="orbit" markers={workspace.markers} revisions={workspace.zone_revisions} draftPoints={draft.map((point) => point.gltf)} drawMode={drawMode} onTerrainPick={(point) => void addTerrainPoint(point)} /> : <AdminEmptyState title="Scène 3D incomplète">Aucun fichier de scène exploitable n’est associé à cette carte.</AdminEmptyState>}
       </div>
       <aside id="active-zone" className="admin-spatial-tools" aria-label="Outils d’édition du périmètre incendie">
         <h3>Périmètre de l’incendie</h3>
         <p>{draft.length ? `${draft.length} sommet${draft.length > 1 ? 's' : ''} en cours d’édition.` : currentLayer ? 'Un périmètre est enregistré. Vous pouvez le modifier ou tracer un nouveau contour.' : 'Aucun périmètre enregistré. Dessinez-le directement sur le terrain.'}{movingDraftIndex !== null ? ` Cliquez sur le relief pour déplacer le sommet ${movingDraftIndex + 1}.` : ''}</p>
         {currentLayer && draft.length === 0 ? <button type="button" className="button button--primary" onClick={() => resumeRevision(currentLayer)} disabled={busy}>Modifier le périmètre actuel</button> : null}
-        <div className="admin-spatial-actions"><button type="button" className="button" onClick={() => { setDrawMode((value) => !value); setMovingDraftIndex(null); }} disabled={busy}>{drawMode ? 'Arrêter le dessin' : currentLayer ? 'Tracer un nouveau contour' : 'Dessiner le périmètre'}</button><button type="button" className="button button--small" onClick={() => { setDraft((current) => current.slice(0, -1)); setMovingDraftIndex(null); }} disabled={!draft.length || busy}>Annuler le dernier point</button><button type="button" className="button button--small" onClick={() => { setDraft([]); setMovingDraftIndex(null); }} disabled={!draft.length || busy}>Vider</button></div>
+        <div className="admin-spatial-actions"><button type="button" className="button" onClick={() => { if (!drawMode) { setDraft([]); setEditingRevision(null); } setDrawMode((value) => !value); setMovingDraftIndex(null); }} disabled={busy}>{drawMode ? 'Arrêter le dessin' : currentLayer ? 'Tracer un nouveau contour' : 'Dessiner le périmètre'}</button><button type="button" className="button button--small" onClick={() => { setDraft((current) => current.slice(0, -1)); setMovingDraftIndex(null); }} disabled={!draft.length || busy}>Annuler le dernier point</button><button type="button" className="button button--small" onClick={() => { setDraft([]); setMovingDraftIndex(null); setEditingRevision(null); }} disabled={!draft.length || busy}>Vider</button></div>
         {draft.length ? <ol className="admin-spatial-vertices" aria-label="Sommets du contour en cours">{draft.map((point, index) => <li key={`${point.gltf.join(':')}-${index}`} className={movingDraftIndex === index ? 'is-moving' : ''}><span>Sommet {index + 1}<small>{point.wgs84[1].toFixed(5)}, {point.wgs84[0].toFixed(5)}</small></span><div><button type="button" className="button button--small" disabled={busy} aria-pressed={movingDraftIndex === index} onClick={() => { setDrawMode(true); setMovingDraftIndex((current) => current === index ? null : index); }}>{movingDraftIndex === index ? 'Annuler déplacement' : 'Déplacer'}</button><button type="button" className="button button--small" disabled={busy} onClick={() => { setDraft((current) => current.filter((_, pointIndex) => pointIndex !== index)); setMovingDraftIndex(null); }}>Retirer</button></div></li>)}</ol> : null}
         <details className="admin-disclosure"><summary>Justificatifs et note interne</summary><label>Note de modification<textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={3} /></label><fieldset><legend>Repères justificatifs validés</legend>{validatedMarkerIds.length ? validatedMarkerIds.map((markerId) => <label key={markerId}><input type="checkbox" checked={supportingMarkers.includes(markerId)} onChange={() => setSupportingMarkers((current) => current.includes(markerId) ? current.filter((id) => id !== markerId) : [...current, markerId])} />{markerId}</label>) : <p>Aucun repère validé.</p>}</fieldset></details>
         <button type="button" className="button button--primary" onClick={saveDraft} disabled={draft.length < 3 || busy}>Enregistrer le calque</button>
       </aside>
     </div>}
+
+    {workspace.map_gallery.length ? <section className="admin-section"><div className="admin-section__heading"><div><h3>Galerie cartographique</h3><p>Captures réelles du fond 3D avec le périmètre géographique validé.</p></div></div><div className="admin-spatial-gallery">{workspace.map_gallery.map((capture) => <figure key={capture.capture_id}><img src={new URL(capture.image_url, getAdminApiOrigin() ?? window.location.origin).toString()} crossOrigin="use-credentials" alt={`Vue 3D du périmètre incendie du ${capture.local_date}`} width={capture.width_px} height={capture.height_px} loading="lazy" /><figcaption>{capture.local_date} · {formatAdminDate(capture.captured_at)}</figcaption></figure>)}</div></section> : null}
 
     <details className="admin-section admin-disclosure admin-spatial-secondary"><summary>Détails, calques enregistrés et historique</summary><div className="admin-spatial-secondary__content">
     <section id="markers" className="admin-section"><div className="admin-section__heading"><div><h3>Points et marqueurs importés</h3><p>Ils servent de références dans la scène. Leur permission d’affichage public reste distincte.</p></div></div><div className="admin-spatial-records">{workspace.markers.map((marker) => <article key={marker.marker_id}><header><code>{marker.marker_id}</code><AdminStateLabel value={marker.review_state} /></header><p>{marker.marker_type} · {marker.geometry_origin} · ±{Math.round(marker.horizontal_accuracy_m ?? 0)} m</p>{marker.source_kind === 'agent_media' && marker.review_state === 'PENDING' ? <div className="admin-spatial-actions"><button type="button" className="button button--small" disabled={busy} onClick={() => void mutate(() => api.reviewIncidentSpatialMarker(fireId, marker.marker_id, { action: 'validate', expected_version: marker.version, reason: 'Coordonnées et origine contrôlées dans la scène 3D et la preuve source.' }, { idempotencyKey: key('marker-valid') }), 'Marqueur validé.')}>Valider</button><button type="button" className="button button--small" disabled={busy} onClick={() => void mutate(() => api.reviewIncidentSpatialMarker(fireId, marker.marker_id, { action: 'reject', expected_version: marker.version, reason: 'Coordonnées incompatibles avec la preuve ou le référentiel de scène.' }, { idempotencyKey: key('marker-reject') }), 'Marqueur rejeté.')}>Rejeter</button></div> : null}</article>)}</div></section>

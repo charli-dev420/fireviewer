@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import hmac
 from io import StringIO
 from typing import Annotated, Any
 
@@ -19,7 +20,7 @@ from fire_viewer.api.dependencies import (
     SourceTokenDep,
     TraceIdDep,
 )
-from fire_viewer.db.models import SpatialPackage
+from fire_viewer.db.models import IncidentMapCapture, SpatialPackage
 from fire_viewer.domain.errors import NotFoundError
 from fire_viewer.domain.hashing import sha256_hex
 from fire_viewer.domain.schemas import (
@@ -199,6 +200,39 @@ def get_public_view(
     if if_none_match == etag:
         return Response(status_code=304, headers=headers)
     return JSONResponse(content=jsonable_encoder(payload), headers=headers)
+
+
+@router.get("/{fire_id}/map-gallery/{capture_id}")
+def get_public_incident_map_capture(
+    fire_id: FireIdDep,
+    capture_id: str,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> Response:
+    view = get_public_incident_view(session, fire_id=fire_id, settings=settings)
+    if capture_id not in {item.capture_id for item in view.map_gallery}:
+        raise NotFoundError("incident_map_capture", capture_id)
+    capture = session.execute(
+        select(IncidentMapCapture).where(IncidentMapCapture.capture_id == capture_id)
+    ).scalar_one_or_none()
+    if capture is None:
+        raise NotFoundError("incident_map_capture", capture_id)
+    try:
+        content = build_object_store(settings).read_bytes(capture.object_uri)
+    except ObjectStorageError as exc:
+        raise NotFoundError("incident_map_capture", capture_id) from exc
+    if len(content) != capture.size_bytes or not hmac.compare_digest(
+        hashlib.sha256(content).hexdigest(), capture.sha256
+    ):
+        raise NotFoundError("incident_map_capture", capture_id)
+    return Response(
+        content=content,
+        media_type=capture.media_type,
+        headers={
+            "Cache-Control": "public, max-age=86400, immutable",
+            "ETag": f'"sha256-{capture.sha256}"',
+        },
+    )
 
 
 @router.get("/{fire_id}/public-view/export.json")

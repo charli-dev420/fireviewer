@@ -15,6 +15,14 @@ const mocks = vi.hoisted(() => ({
   review: vi.fn(async () => ({})),
   publish: vi.fn(async () => ({})),
   changePublication: vi.fn(async () => ({})),
+  createZone: vi.fn(async () => ({})),
+  uploadCapture: vi.fn(async () => ({ capture_id: 'mapcap-1' })),
+  zoneState: 'DRAFT' as 'DRAFT' | 'READY_FOR_PUBLICATION',
+  analysisId: null as string | null,
+}));
+
+vi.mock('../../lib/mapCaptureUpload', () => ({
+  uploadIncidentMapCapture: mocks.uploadCapture,
 }));
 
 vi.mock('./AdminApiContext', () => ({
@@ -23,6 +31,7 @@ vi.mock('./AdminApiContext', () => ({
     reviewActiveFireZoneRevision: mocks.review,
     publishSpatialPackage: mocks.publish,
     changePublication: mocks.changePublication,
+    createActiveFireZoneRevision: mocks.createZone,
   }),
   useAdminQuery: () => ({
     state: {
@@ -51,12 +60,14 @@ vi.mock('./AdminApiContext', () => ({
         },
         markers: [],
         zone_revisions: [{
-          zone_revision_id: 'AZR-01', revision: 1, review_state: 'DRAFT',
+          zone_revision_id: 'AZR-01', revision: 1, review_state: mocks.zoneState,
+          analysis_id: mocks.analysisId,
           geometry_origin: 'HUMAN_CONFIRMED', valid_at: '2026-07-17T10:00:00Z',
           reason: 'Premier contour contrôlé.', supporting_marker_ids: [],
           geometry_geojson: { type: 'MultiPolygon', coordinates: [[[[5.37, 44.75], [5.38, 44.75], [5.38, 44.76], [5.37, 44.75]]]] },
           gltf_polygons: [[[[0, 0, 0], [100, 0, 0], [100, 0, -100], [0, 0, 0]]]],
         }],
+        map_gallery: [],
         agent_reviews: [],
       },
     },
@@ -65,13 +76,15 @@ vi.mock('./AdminApiContext', () => ({
 }));
 
 vi.mock('../public/TiledSpatialScene3D', () => ({
-  TiledSpatialScene3D: ({ onPick, cameraMode, source }: { onPick: (point: readonly [number, number, number]) => void; cameraMode: string; source: { readonly credentials?: RequestCredentials; readonly catalogUrl: string } }) => <div><span>Moteur {cameraMode} {source.credentials}</span><span>{source.catalogUrl}</span><button type="button" onClick={() => onPick([25, 2, -40])}>Cliquer le relief</button></div>,
+  TiledSpatialScene3D: ({ onPick, onCaptureReady, cameraMode, source, captureGeometriesWgs84 = [] }: { onPick: (point: readonly [number, number, number]) => void; onCaptureReady?: (capture: (() => Promise<Blob>) | null) => void; cameraMode: string; source: { readonly credentials?: RequestCredentials; readonly catalogUrl: string }; captureGeometriesWgs84?: readonly unknown[] }) => <div><span>Moteur {cameraMode} {source.credentials}</span><span>{source.catalogUrl}</span><span>Calques capturables {captureGeometriesWgs84.length}</span><button type="button" onClick={() => onPick([25, 2, -40])}>Cliquer le relief</button><button type="button" onClick={() => onCaptureReady?.(async () => new Blob(['capture'], { type: 'image/jpeg' }))}>Préparer la capture</button></div>,
 }));
 
 describe('outils de revue spatiale 3D', () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    mocks.zoneState = 'DRAFT';
+    mocks.analysisId = null;
   });
 
   it('reste en vue orbitale et permet de déplacer ou retirer un sommet du brouillon', async () => {
@@ -115,5 +128,43 @@ describe('outils de revue spatiale 3D', () => {
       expect.objectContaining({ idempotencyKey: expect.stringMatching(/^project-map-publish-/) }),
     );
     expect(await screen.findByText('Carte publiée sur le site public.')).toBeVisible();
+  });
+
+  it('ajoute la vue réelle au seul calque validé sans ressaisir sa géométrie', async () => {
+    mocks.zoneState = 'READY_FOR_PUBLICATION';
+    const user = userEvent.setup();
+    render(<AdminIncidentSpatialReviewPage fireId="FR-26-00001" />);
+
+    const addButton = screen.getByRole('button', { name: 'Ajouter cette vue à la galerie' });
+    expect(screen.getByText('Calques capturables 1')).toBeVisible();
+    expect(addButton).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Préparer la capture' }));
+    expect(addButton).toBeEnabled();
+    await user.click(addButton);
+
+    expect(mocks.uploadCapture).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ fireId: 'FR-26-00001', zoneRevisionId: 'AZR-01' }),
+    );
+    expect(await screen.findByText('Vue 3D du périmètre ajoutée à la galerie de l’incident.')).toBeVisible();
+  });
+
+  it('conserve la journée d’analyse quand un calque IA est corrigé manuellement', async () => {
+    mocks.analysisId = 'analysis-die-2026-07-17';
+    const user = userEvent.setup();
+    render(<AdminIncidentSpatialReviewPage fireId="FR-26-00001" />);
+
+    await user.click(screen.getByText('Détails, calques enregistrés et historique'));
+    await user.click(screen.getByRole('button', { name: 'Modifier' }));
+    await user.click(screen.getByRole('button', { name: 'Enregistrer le calque' }));
+
+    expect(mocks.createZone).toHaveBeenCalledWith(
+      'FR-26-00001',
+      expect.objectContaining({
+        analysis_id: 'analysis-die-2026-07-17',
+        valid_at: '2026-07-17T10:00:00Z',
+      }),
+      expect.objectContaining({ idempotencyKey: expect.stringMatching(/^active-zone-/) }),
+    );
   });
 });

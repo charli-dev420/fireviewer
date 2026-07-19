@@ -8,11 +8,11 @@ import type { PublicIncidentView } from '../../lib/publicIncidentView';
 import type { ViewerManifestSummary } from '../../lib/viewerManifest';
 
 vi.mock('./TiledSpatialScene3D', () => ({
-  TiledSpatialScene3D: ({ viewPreset }: { readonly viewPreset: string }) => <div data-testid="tiled-scene-preset">Preset {viewPreset}</div>,
+  TiledSpatialScene3D: ({ viewPreset, overlayGeometriesWgs84 = [] }: { readonly viewPreset: string; readonly overlayGeometriesWgs84?: readonly unknown[] }) => <div data-testid="tiled-scene-preset" data-overlay-count={overlayGeometriesWgs84.length}>Preset {viewPreset}</div>,
 }));
 
 const summary: ViewerManifestSummary = { schemaVersion: '2.0', fireId: 'FR-83-00042', episodeId: 'E01', statusCode: 'MONITORING', validatedAt: null, reviewRequired: false, location: null, asset: null, scene: null, frame: null, freshness: { incident_at: '2026-07-15T10:00:00Z', terrain_source_year: null, generated_at: null }, modelState: 'not_available', publicNotice: 'Notice publique.', sources: [], history: [], journal: [] };
-const view: PublicIncidentView = { schema_version: '1.0', fire_id: 'FR-83-00042', canonical_name: 'Massif test', public_note: null, status: 'MONITORING', verification: 'verified', freshness_at: '2026-07-15T10:00:00Z', last_human_validation_at: null, location: null, facts: ['Observation validée.'], limitations: ['Donnée datée.'], episodes: [{ episode_id: 'E01', ordinal: 1, status: 'MONITORING', verification_state: 'VERIFIED', corroborating_source_count: 1, evidence_basis_at: '2026-07-15T10:00:00Z', estimated_area_ha: 12, evacuation_established: false, model_generation_eligible: true, review_required: false, started_at: '2026-07-15T09:00:00Z', last_observed_at: '2026-07-15T10:00:00Z', validated_at: '2026-07-15T10:02:00Z', ended_at: null, is_current: true, version: 1 }], observations: [{ observation_id: 'O-1', episode_id: 'E01', type: 'institutional', observed_at: '2026-07-15T10:00:00Z', received_at: '2026-07-15T10:01:00Z', uncertainty_m: 250, area_label: 'Massif test', verification_state: 'VERIFIED', spatial_mode: 'WITHHELD' }], evidence_projections: [{ projection_id: 'P-1', episode_id: 'E01', kind: 'validated_marker', verification_state: 'VERIFIED', center: { coordinates: [6.1, 43.2], horizontal_uncertainty_m: 25 }, radius_m: 25, label: 'Image utilisateur validée', observed_at: '2026-07-15T10:00:00Z' }], sources: [], timeline: [], model: { state: 'not_available', version: null, sha256: null, size_bytes: null, lod: null, terrain_source_year: null, generated_at: null, public_download_available: false, limitations: [] }, downloads: [] };
+const view: PublicIncidentView = { schema_version: '1.0', fire_id: 'FR-83-00042', canonical_name: 'Massif test', public_note: null, status: 'MONITORING', verification: 'verified', freshness_at: '2026-07-15T10:00:00Z', last_human_validation_at: null, location: null, facts: ['Observation validée.'], limitations: ['Donnée datée.'], episodes: [{ episode_id: 'E01', ordinal: 1, status: 'MONITORING', verification_state: 'VERIFIED', corroborating_source_count: 1, evidence_basis_at: '2026-07-15T10:00:00Z', estimated_area_ha: 12, evacuation_established: false, model_generation_eligible: true, review_required: false, started_at: '2026-07-15T09:00:00Z', last_observed_at: '2026-07-15T10:00:00Z', validated_at: '2026-07-15T10:02:00Z', ended_at: null, is_current: true, version: 1 }], observations: [{ observation_id: 'O-1', episode_id: 'E01', type: 'institutional', observed_at: '2026-07-15T10:00:00Z', received_at: '2026-07-15T10:01:00Z', uncertainty_m: 250, area_label: 'Massif test', verification_state: 'VERIFIED', spatial_mode: 'WITHHELD' }], evidence_projections: [{ projection_id: 'P-1', episode_id: 'E01', kind: 'validated_marker', verification_state: 'VERIFIED', center: { coordinates: [6.1, 43.2], horizontal_uncertainty_m: 25 }, radius_m: 25, label: 'Image utilisateur validée', observed_at: '2026-07-15T10:00:00Z' }], active_fire_zone: { zone_revision_id: 'azr-public-1', revision: 1, valid_at: '2026-07-15T10:00:00Z', geometry_geojson: { type: 'MultiPolygon', coordinates: [[[[5.36, 44.74], [5.38, 44.74], [5.38, 44.76], [5.36, 44.74]]]] } }, map_gallery: [{ capture_id: 'mapcap-1', zone_revision_id: 'azr-public-1', local_date: '2026-07-15', captured_at: '2026-07-15T10:05:00Z', image_url: '/api/v1/incident/FR-83-00042/map-gallery/mapcap-1', width_px: 1280, height_px: 720 }], sources: [], timeline: [], model: { state: 'not_available', version: null, sha256: null, size_bytes: null, lod: null, terrain_source_year: null, generated_at: null, public_download_available: false, limitations: [] }, downloads: [] };
 
 afterEach(() => {
   cleanup();
@@ -49,6 +49,7 @@ it('pilote réellement les trois cadrages de la scène tuilée', async () => {
   renderPage(tiledSummary);
 
   expect(await screen.findByTestId('tiled-scene-preset')).toHaveTextContent('Preset near');
+  expect(screen.getByTestId('tiled-scene-preset')).toHaveAttribute('data-overlay-count', '1');
   await user.click(screen.getByRole('button', { name: 'Vue étendue' }));
   expect(screen.getByTestId('tiled-scene-preset')).toHaveTextContent('Preset extended');
   expect(screen.getByRole('button', { name: 'Vue étendue' })).toHaveAttribute('aria-pressed', 'true');
@@ -76,13 +77,15 @@ it('affiche une page unique avec les quatre vues publiques validées', async () 
   expect(screen.getByText('Nombre d’épisodes')).toBeVisible();
 });
 
-it('ouvre les images depuis leur contexte sans créer de galerie publique', async () => {
+it('ouvre la galerie des captures 3D validées sans republier les médias utilisateur', async () => {
+  vi.stubEnv('VITE_API_BASE_URL', 'https://api.fireviewer.test');
   const user = userEvent.setup();
   renderPage();
   await screen.findByRole('heading', { name: 'Massif test', level: 1 });
 
-  await user.click(screen.getByRole('button', { name: 'Images géolocalisées' }));
-  expect(screen.getByRole('complementary', { name: 'Images géolocalisées' })).toHaveTextContent('Il ne s’agit pas d’une galerie');
+  await user.click(screen.getByRole('button', { name: 'Galerie cartographique' }));
+  expect(screen.getByRole('complementary', { name: 'Galerie cartographique' })).toHaveTextContent('Zone d’activité validée');
+  expect(screen.getByRole('img', { name: 'Vue 3D du calque incendie du 2026-07-15' })).toBeVisible();
   expect(screen.getByText('Image utilisateur validée')).toBeVisible();
   await user.click(screen.getByRole('button', { name: 'Fermer le panneau' }));
   await user.click(screen.getByRole('button', { name: 'Épisodes' }));

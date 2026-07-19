@@ -95,6 +95,44 @@ describe('client API d’administration', () => {
     expect(client.getBlobUploadTokenUrl()).toBe(`${API_ORIGIN}/api/v1/admin/blob-upload-token`);
   });
 
+  it('ouvre puis finalise le transfert privé d’une capture cartographique', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
+    const uploadId = 'b'.repeat(32);
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(response({
+        upload_id: uploadId,
+        pathname_prefix: `gallery-captures/${uploadId}`,
+        upload_grant: 'grant-capture',
+        expires_at: '2026-07-19T18:10:00Z',
+        maximum_file_size_bytes: 8 * 1_024 * 1_024,
+        allowed_content_types: ['image/jpeg'],
+      }, 201))
+      .mockResolvedValueOnce(response({
+        capture_id: 'mapcap-1', zone_revision_id: 'azr-1', local_date: '2026-07-09',
+        captured_at: '2026-07-19T18:00:00Z',
+        image_url: '/api/v1/admin/incidents/FR-26-00001/map-gallery/mapcap-1',
+        width_px: 960, height_px: 540,
+      }, 201));
+    const client = new AdminApiClient({ session: SESSION, fetchImpl: fetchMock });
+
+    await client.createIncidentMapCaptureUploadGrant('FR-26-00001', {
+      zone_revision_id: 'azr-1', size_bytes: 1_024, media_type: 'image/jpeg',
+    });
+    await expect(client.finalizeIncidentMapCaptureFromBlob('FR-26-00001', {
+      upload_id: uploadId,
+      zone_revision_id: 'azr-1',
+      object: {
+        path: 'capture.jpg', pathname: `gallery-captures/${uploadId}/capture.jpg`,
+        size_bytes: 1_024, content_type: 'image/jpeg',
+      },
+    })).resolves.toMatchObject({ capture_id: 'mapcap-1', local_date: '2026-07-09' });
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      `${API_ORIGIN}/api/v1/admin/incidents/FR-26-00001/map-gallery/upload-grant`,
+      `${API_ORIGIN}/api/v1/admin/incidents/FR-26-00001/map-gallery/from-blob`,
+    ]);
+  });
+
   it('rafraîchit explicitement la session pendant un envoi Blob long', async () => {
     vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response({
@@ -383,7 +421,8 @@ describe('client API d’administration', () => {
       fire_id: 'FR-83-00042', episode_id: 'E01',
       scene: { asset_url: 'https://private.invalid/model.glb', asset_version: 2, sha256: 'a'.repeat(64), origin_wgs84: [6.02, 43.29, 420], local_frame: 'ENU', gltf_profile: 'gltf-eun-negz-metric-v1' },
       markers: [{ marker_id: 'IM-1', source_kind: 'agent_media', marker_type: 'media_capture', longitude: 6.021, latitude: 43.291, altitude_m: null, horizontal_accuracy_m: 12, geometry_origin: 'METADATA', review_state: 'PENDING', observed_at: null, spatial_display_allowed: false, gltf_position: [12, 0, -8], version: 1 }],
-      zone_revisions: [{ zone_revision_id: 'azr-1', revision: 1, valid_at: '2026-07-16T10:00:00Z', geometry_geojson: { type: 'MultiPolygon', coordinates: [] }, gltf_polygons: [[[[0, 0, 0], [10, 0, 0], [0, 0, -10], [0, 0, 0]]]], geometry_origin: 'HUMAN_AUTHORED', supporting_marker_ids: ['IM-1'], source_revision_ids: [], review_state: 'DRAFT', supersedes_zone_revision_id: null, reason: 'Contour de test suffisamment explicite.', created_by: 'admin', reviewed_by: null, reviewed_at: null, review_reason: null, created_at: '2026-07-16T10:00:00Z' }],
+      zone_revisions: [{ zone_revision_id: 'azr-1', revision: 1, valid_at: '2026-07-16T10:00:00Z', analysis_id: null, geometry_geojson: { type: 'MultiPolygon', coordinates: [] }, gltf_polygons: [[[[0, 0, 0], [10, 0, 0], [0, 0, -10], [0, 0, 0]]]], geometry_origin: 'HUMAN_AUTHORED', supporting_marker_ids: ['IM-1'], source_revision_ids: [], review_state: 'DRAFT', supersedes_zone_revision_id: null, reason: 'Contour de test suffisamment explicite.', created_by: 'admin', reviewed_by: null, reviewed_at: null, review_reason: null, created_at: '2026-07-16T10:00:00Z' }],
+      map_gallery: [],
       agent_reviews: [],
     }));
     const client = new AdminApiClient({ session: SESSION, fetchImpl: fetchMock });

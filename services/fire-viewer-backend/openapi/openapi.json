@@ -179,6 +179,55 @@
         }
       }
     },
+    "/api/v1/incident/{fire_id}/map-gallery/{capture_id}": {
+      "get": {
+        "tags": [
+          "incidents"
+        ],
+        "summary": "Get Public Incident Map Capture",
+        "operationId": "get_public_incident_map_capture_api_v1_incident__fire_id__map_gallery__capture_id__get",
+        "parameters": [
+          {
+            "name": "capture_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Capture Id"
+            }
+          },
+          {
+            "name": "fire_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Fire Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/incident/{fire_id}/public-view/export.json": {
       "get": {
         "tags": [
@@ -1751,6 +1800,174 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AdminIncidentSpatialReviewWorkspace"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/incidents/{fire_id}/map-gallery/{capture_id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Incident Map Capture",
+        "operationId": "get_incident_map_capture_api_v1_admin_incidents__fire_id__map_gallery__capture_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fire_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Fire Id"
+            }
+          },
+          {
+            "name": "capture_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Capture Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/incidents/{fire_id}/map-gallery/upload-grant": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Grant Incident Map Capture Upload",
+        "operationId": "grant_incident_map_capture_upload_api_v1_admin_incidents__fire_id__map_gallery_upload_grant_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fire_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Fire Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentMapCaptureUploadGrantRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminBlobUploadGrantResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/incidents/{fire_id}/map-gallery/from-blob": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Finalize Incident Map Capture",
+        "operationId": "finalize_incident_map_capture_api_v1_admin_incidents__fire_id__map_gallery_from_blob_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fire_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Fire Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentMapCaptureFinalizeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminIncidentMapCapture"
                 }
               }
             }
@@ -4909,6 +5126,19 @@
             "format": "date-time",
             "title": "Valid At"
           },
+          "analysis_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Id"
+          },
           "geometry_geojson": {
             "additionalProperties": true,
             "type": "object",
@@ -4998,6 +5228,17 @@
           "geometry_origin": {
             "type": "string",
             "title": "Geometry Origin"
+          },
+          "analysis_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Id"
           },
           "supporting_marker_ids": {
             "items": {
@@ -6054,6 +6295,54 @@
         "additionalProperties": false,
         "type": "object",
         "title": "AdminIncidentListResponse"
+      },
+      "AdminIncidentMapCapture": {
+        "properties": {
+          "capture_id": {
+            "type": "string",
+            "title": "Capture Id"
+          },
+          "zone_revision_id": {
+            "type": "string",
+            "title": "Zone Revision Id"
+          },
+          "local_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Local Date"
+          },
+          "captured_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Captured At"
+          },
+          "image_url": {
+            "type": "string",
+            "title": "Image Url"
+          },
+          "width_px": {
+            "type": "integer",
+            "minimum": 640.0,
+            "title": "Width Px"
+          },
+          "height_px": {
+            "type": "integer",
+            "minimum": 360.0,
+            "title": "Height Px"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "capture_id",
+          "zone_revision_id",
+          "local_date",
+          "captured_at",
+          "image_url",
+          "width_px",
+          "height_px"
+        ],
+        "title": "AdminIncidentMapCapture"
       },
       "AdminIncidentMediaReference": {
         "properties": {
@@ -7560,6 +7849,14 @@
             "type": "array",
             "maxItems": 500,
             "title": "Zone Revisions"
+          },
+          "map_gallery": {
+            "items": {
+              "$ref": "#/components/schemas/AdminIncidentMapCapture"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Map Gallery"
           },
           "agent_reviews": {
             "items": {
@@ -12520,6 +12817,105 @@
         ],
         "title": "IncidentGltfPickResponse"
       },
+      "IncidentMapCaptureFinalizeRequest": {
+        "properties": {
+          "upload_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$",
+            "title": "Upload Id"
+          },
+          "zone_revision_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Zone Revision Id"
+          },
+          "object": {
+            "$ref": "#/components/schemas/IncidentMapCaptureObject"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "upload_id",
+          "zone_revision_id",
+          "object"
+        ],
+        "title": "IncidentMapCaptureFinalizeRequest"
+      },
+      "IncidentMapCaptureObject": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "enum": [
+              "capture.jpg",
+              "capture.png"
+            ],
+            "title": "Path"
+          },
+          "pathname": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Pathname"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "maximum": 8388608.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Size Bytes"
+          },
+          "content_type": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png"
+            ],
+            "title": "Content Type"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "path",
+          "pathname",
+          "size_bytes",
+          "content_type"
+        ],
+        "title": "IncidentMapCaptureObject"
+      },
+      "IncidentMapCaptureUploadGrantRequest": {
+        "properties": {
+          "zone_revision_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Zone Revision Id"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "maximum": 8388608.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Size Bytes"
+          },
+          "media_type": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png"
+            ],
+            "title": "Media Type"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "zone_revision_id",
+          "size_bytes",
+          "media_type"
+        ],
+        "title": "IncidentMapCaptureUploadGrantRequest"
+      },
       "IncidentMarkerReviewRequest": {
         "properties": {
           "action": {
@@ -13082,6 +13478,40 @@
         ],
         "title": "PointGeometryInput"
       },
+      "PublicActiveFireZone": {
+        "properties": {
+          "zone_revision_id": {
+            "type": "string",
+            "maxLength": 96,
+            "minLength": 1,
+            "title": "Zone Revision Id"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          },
+          "valid_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Valid At"
+          },
+          "geometry_geojson": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Geometry Geojson"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "zone_revision_id",
+          "revision",
+          "valid_at",
+          "geometry_geojson"
+        ],
+        "title": "PublicActiveFireZone"
+      },
       "PublicDownload": {
         "properties": {
           "id": {
@@ -13191,6 +13621,60 @@
           "label"
         ],
         "title": "PublicEvidenceProjection"
+      },
+      "PublicIncidentMapCapture": {
+        "properties": {
+          "capture_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Capture Id"
+          },
+          "zone_revision_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Zone Revision Id"
+          },
+          "local_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Local Date"
+          },
+          "captured_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Captured At"
+          },
+          "image_url": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Image Url"
+          },
+          "width_px": {
+            "type": "integer",
+            "minimum": 640.0,
+            "title": "Width Px"
+          },
+          "height_px": {
+            "type": "integer",
+            "minimum": 360.0,
+            "title": "Height Px"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "capture_id",
+          "zone_revision_id",
+          "local_date",
+          "captured_at",
+          "image_url",
+          "width_px",
+          "height_px"
+        ],
+        "title": "PublicIncidentMapCapture"
       },
       "PublicIncidentReport": {
         "properties": {
@@ -13421,6 +13905,24 @@
             },
             "type": "array",
             "title": "Evidence Projections"
+          },
+          "active_fire_zone": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicActiveFireZone"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "map_gallery": {
+            "items": {
+              "$ref": "#/components/schemas/PublicIncidentMapCapture"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Map Gallery"
           },
           "sources": {
             "items": {

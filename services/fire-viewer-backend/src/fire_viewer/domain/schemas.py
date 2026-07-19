@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Literal
 
 from pydantic import (
@@ -354,6 +354,23 @@ class PublicDownload(StrictModel):
     url: str = Field(min_length=1, max_length=255)
 
 
+class PublicActiveFireZone(StrictModel):
+    zone_revision_id: str = Field(min_length=1, max_length=96)
+    revision: int = Field(ge=1)
+    valid_at: datetime
+    geometry_geojson: dict[str, object]
+
+
+class PublicIncidentMapCapture(StrictModel):
+    capture_id: str = Field(min_length=1, max_length=128)
+    zone_revision_id: str = Field(min_length=1, max_length=128)
+    local_date: date
+    captured_at: datetime
+    image_url: str = Field(min_length=1, max_length=255)
+    width_px: int = Field(ge=640)
+    height_px: int = Field(ge=360)
+
+
 class PublicIncidentView(StrictModel):
     schema_version: Literal["1.0"] = "1.0"
     fire_id: str
@@ -369,6 +386,8 @@ class PublicIncidentView(StrictModel):
     episodes: list[EpisodeSummary] = Field(default_factory=list)
     observations: list[PublicObservationSummary] = Field(default_factory=list)
     evidence_projections: list[PublicEvidenceProjection] = Field(default_factory=list)
+    active_fire_zone: PublicActiveFireZone | None = None
+    map_gallery: list[PublicIncidentMapCapture] = Field(default_factory=list, max_length=1_000)
     sources: list[PublicSourceSummary] = Field(default_factory=list)
     timeline: list[PublicTimelineEvent] = Field(default_factory=list)
     model: PublicModelMetadata

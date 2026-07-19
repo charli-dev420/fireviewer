@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     database_pool_recycle_seconds: int = Field(default=300, ge=30, le=3_600)
     database_statement_timeout_ms: int = Field(default=15_000, ge=1_000, le=120_000)
     database_schema_revision: str = Field(
-        default="f9c8b7a6d510",
+        default="a3d7e9f1b520",
         pattern=r"^[0-9a-f]{12}$",
     )
     log_level: str = "INFO"

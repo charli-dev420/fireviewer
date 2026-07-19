@@ -7,15 +7,17 @@ from collections import defaultdict
 from datetime import UTC
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from fire_viewer.core.config import Settings
 from fire_viewer.core.ids import new_prefixed_id
 from fire_viewer.core.security import Actor
 from fire_viewer.core.time import as_utc, utcnow
 from fire_viewer.db.models import (
+    ActiveFireZoneRevision,
     AuditEvent,
     Episode,
+    IncidentMapCapture,
     IncidentPublicReport,
     IncidentSeries,
     Observation,
@@ -23,6 +25,7 @@ from fire_viewer.db.models import (
 )
 from fire_viewer.db.transactions import begin_write_transaction
 from fire_viewer.domain.enums import (
+    ActiveFireZoneReviewState,
     ActorType,
     EvidenceSpatialMode,
     PublicReportState,
@@ -35,8 +38,10 @@ from fire_viewer.domain.schemas import (
     AdminPublicReportEnvelope,
     AdminPublicReportListResponse,
     AdminPublicReportReviewRequest,
+    PublicActiveFireZone,
     PublicDownload,
     PublicEvidenceProjection,
+    PublicIncidentMapCapture,
     PublicIncidentReport,
     PublicIncidentReportReceipt,
     PublicIncidentReportRequest,
@@ -187,6 +192,8 @@ def get_public_incident_view(
             episodes=[],
             observations=[],
             evidence_projections=[],
+            active_fire_zone=None,
+            map_gallery=[],
             sources=[],
             timeline=[],
             model=PublicModelMetadata(
@@ -282,6 +289,37 @@ def get_public_incident_view(
         for event in audit_events
     ]
     model = _public_model(session, incident, settings)
+    active_zone = session.execute(
+        select(ActiveFireZoneRevision)
+        .where(
+            ActiveFireZoneRevision.incident_id == incident.id,
+            ActiveFireZoneRevision.episode_id == current.id,
+            ActiveFireZoneRevision.review_state
+            == ActiveFireZoneReviewState.READY_FOR_PUBLICATION,
+        )
+        .order_by(ActiveFireZoneRevision.revision.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    map_captures = list(
+        session.scalars(
+            select(IncidentMapCapture)
+            .join(
+                ActiveFireZoneRevision,
+                ActiveFireZoneRevision.id == IncidentMapCapture.active_zone_revision_id,
+            )
+            .where(
+                IncidentMapCapture.incident_id == incident.id,
+                IncidentMapCapture.episode_id == current.id,
+                ActiveFireZoneRevision.review_state
+                == ActiveFireZoneReviewState.READY_FOR_PUBLICATION,
+            )
+            .options(selectinload(IncidentMapCapture.active_zone_revision))
+            .order_by(
+                IncidentMapCapture.local_date.asc(),
+                IncidentMapCapture.captured_at.asc(),
+            )
+        )
+    )
     if current.verification_state == VerificationState.VERIFIED:
         facts = ["Une validation humaine de cet épisode a été enregistrée."]
     else:
@@ -326,6 +364,30 @@ def get_public_incident_view(
         ],
         observations=observations,
         evidence_projections=evidence_projections,
+        active_fire_zone=(
+            PublicActiveFireZone(
+                zone_revision_id=active_zone.zone_revision_id,
+                revision=active_zone.revision,
+                valid_at=as_utc(active_zone.valid_at),
+                geometry_geojson=active_zone.geometry_geojson,
+            )
+            if active_zone is not None
+            else None
+        ),
+        map_gallery=[
+            PublicIncidentMapCapture(
+                capture_id=item.capture_id,
+                zone_revision_id=item.active_zone_revision.zone_revision_id,
+                local_date=item.local_date,
+                captured_at=as_utc(item.captured_at),
+                image_url=(
+                    f"/api/v1/incident/{incident.fire_id}/map-gallery/{item.capture_id}"
+                ),
+                width_px=item.width_px,
+                height_px=item.height_px,
+            )
+            for item in map_captures
+        ],
         sources=sources,
         timeline=timeline,
         model=model,

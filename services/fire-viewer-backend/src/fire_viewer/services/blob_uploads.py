@@ -50,6 +50,8 @@ ALLOWED_SOURCE_CONTENT_TYPES = (
     "text/markdown",
     "text/html",
 )
+ALLOWED_GALLERY_CONTENT_TYPES = ("image/jpeg", "image/png")
+INCIDENT_GALLERY_MAX_BYTES = 8 * 1_024 * 1_024
 _ALLOWED_SUFFIXES = frozenset(
     {".json", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".glb", ".fwtile", ".fwterrain"}
 )
@@ -74,6 +76,7 @@ _ALLOWED_SOURCE_SUFFIXES = frozenset(
         ".htm",
     }
 )
+_ALLOWED_GALLERY_SUFFIXES = frozenset({".jpg", ".png"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,6 +169,44 @@ def create_source_blob_upload_grant(
     return BlobUploadGrant(upload_id, pathname_prefix, grant, expires_at)
 
 
+def create_gallery_blob_upload_grant(
+    *,
+    fire_id: str,
+    zone_revision_id: str,
+    size_bytes: int,
+    actor: Actor,
+    settings: Settings,
+) -> BlobUploadGrant:
+    token = _read_write_token(settings)
+    if size_bytes <= 0 or size_bytes > INCIDENT_GALLERY_MAX_BYTES:
+        raise BadRequestError("map_capture_too_large", "The map capture exceeds the size limit.")
+    upload_id = uuid4().hex
+    pathname_prefix = build_object_store(settings).pathname_for(
+        f"gallery-captures/{upload_id}"
+    )
+    now = utcnow()
+    expires_at = now + timedelta(minutes=settings.blob_upload_grant_minutes)
+    grant = jwt.encode(
+        {
+            "iss": BLOB_UPLOAD_GRANT_ISSUER,
+            "aud": BLOB_UPLOAD_GRANT_AUDIENCE,
+            "sub": actor.actor_id,
+            "iat": now,
+            "exp": expires_at,
+            "upload_id": upload_id,
+            "pathname_prefix": pathname_prefix,
+            "package_id": zone_revision_id,
+            "fire_id": fire_id,
+            "file_count": 1,
+            "total_size_bytes": size_bytes,
+            "purpose": "incident_gallery",
+        },
+        token,
+        algorithm="HS256",
+    )
+    return BlobUploadGrant(upload_id, pathname_prefix, grant, expires_at)
+
+
 def _decode_upload_grant(grant: str, *, settings: Settings) -> dict[str, Any]:
     token = _read_write_token(settings)
     try:
@@ -232,6 +273,10 @@ def issue_blob_client_token(
         allowed_suffixes = _ALLOWED_SUFFIXES
         allowed_content_types = ALLOWED_PACKAGE_CONTENT_TYPES
         maximum_size = settings.zone_upload_max_bytes
+    elif purpose == "incident_gallery":
+        allowed_suffixes = _ALLOWED_GALLERY_SUFFIXES
+        allowed_content_types = ALLOWED_GALLERY_CONTENT_TYPES
+        maximum_size = INCIDENT_GALLERY_MAX_BYTES
     else:
         raise ForbiddenError("The Blob upload grant purpose is invalid.")
     _safe_granted_path(pathname, prefix=prefix, allowed_suffixes=allowed_suffixes)

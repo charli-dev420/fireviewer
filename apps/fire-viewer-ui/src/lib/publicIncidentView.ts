@@ -55,6 +55,21 @@ export type PublicIncidentView = {
     readonly label: string;
     readonly observed_at: string | null;
   }[];
+  readonly active_fire_zone: {
+    readonly zone_revision_id: string;
+    readonly revision: number;
+    readonly valid_at: string;
+    readonly geometry_geojson: Readonly<Record<string, unknown>>;
+  } | null;
+  readonly map_gallery: readonly {
+    readonly capture_id: string;
+    readonly zone_revision_id: string;
+    readonly local_date: string;
+    readonly captured_at: string;
+    readonly image_url: string;
+    readonly width_px: number;
+    readonly height_px: number;
+  }[];
   readonly sources: readonly { readonly source_id: string; readonly type: string; readonly name: string | null; readonly trust: string; readonly license: string | null; readonly external_reference: string | null; readonly transformations: readonly string[]; readonly observation_count: number }[];
   readonly timeline: readonly { readonly occurred_at: string; readonly kind: 'incident' | 'episode' | 'observation' | 'model'; readonly label: string; readonly episode_id: string | null }[];
   readonly model: { readonly state: 'available' | 'not_available' | 'withheld'; readonly version: number | null; readonly sha256: string | null; readonly size_bytes: number | null; readonly lod: string | null; readonly terrain_source_year: number | null; readonly generated_at: string | null; readonly public_download_available: boolean; readonly limitations: readonly string[] };
@@ -115,6 +130,28 @@ function point(
   };
 }
 
+function activeFireZone(value: unknown): PublicIncidentView['active_fire_zone'] {
+  if (value === null) return null;
+  const item = record(value);
+  const geometry = item ? record(item.geometry_geojson) : null;
+  if (
+    !item
+    || typeof item.zone_revision_id !== 'string'
+    || typeof item.revision !== 'number'
+    || !Number.isInteger(item.revision)
+    || item.revision < 1
+    || !geometry
+    || geometry.type !== 'MultiPolygon'
+    || !Array.isArray(geometry.coordinates)
+  ) throw new PublicIncidentViewError(null, 'Calque incendie public invalide.');
+  return {
+    zone_revision_id: item.zone_revision_id,
+    revision: item.revision,
+    valid_at: iso(item.valid_at, 'active_fire_zone.valid_at')!,
+    geometry_geojson: geometry,
+  };
+}
+
 function parseView(value: unknown): PublicIncidentView {
   const root = record(value);
   if (!root || root.schema_version !== '1.0' || typeof root.fire_id !== 'string' || !VIEWER_MANIFEST_FIRE_ID_RE.test(root.fire_id)) throw new PublicIncidentViewError(null, 'La fiche publique ne respecte pas le contrat attendu.');
@@ -140,6 +177,13 @@ function parseView(value: unknown): PublicIncidentView {
     if (!itemRecord || typeof itemRecord.source_id !== 'string' || typeof itemRecord.type !== 'string' || typeof itemRecord.trust !== 'string' || typeof itemRecord.observation_count !== 'number') throw new PublicIncidentViewError(null, 'Source publique invalide.');
     return { source_id: itemRecord.source_id, type: itemRecord.type, name: string(itemRecord.name, 'name', true), trust: itemRecord.trust, license: string(itemRecord.license, 'license', true), external_reference: string(itemRecord.external_reference, 'external_reference', true), transformations: list(itemRecord.transformations, 'transformations').map((entry) => string(entry, 'transformation')!), observation_count: itemRecord.observation_count };
   });
+  const mapGallery: PublicIncidentView['map_gallery'][number][] = list(root.map_gallery, 'map_gallery').map((item) => {
+    const itemRecord = record(item);
+    if (!itemRecord || typeof itemRecord.width_px !== 'number' || itemRecord.width_px < 640 || typeof itemRecord.height_px !== 'number' || itemRecord.height_px < 360) throw new PublicIncidentViewError(null, 'Capture cartographique publique invalide.');
+    const localDate = string(itemRecord.local_date, 'map_gallery.local_date')!;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(localDate)) throw new PublicIncidentViewError(null, 'Date de capture cartographique invalide.');
+    return { capture_id: string(itemRecord.capture_id, 'map_gallery.capture_id')!, zone_revision_id: string(itemRecord.zone_revision_id, 'map_gallery.zone_revision_id')!, local_date: localDate, captured_at: iso(itemRecord.captured_at, 'map_gallery.captured_at')!, image_url: string(itemRecord.image_url, 'map_gallery.image_url')!, width_px: itemRecord.width_px, height_px: itemRecord.height_px };
+  });
   const timeline = list(root.timeline, 'timeline').map((item) => {
     const itemRecord = record(item);
     if (!itemRecord || !['incident', 'episode', 'observation', 'model'].includes(String(itemRecord.kind))) throw new PublicIncidentViewError(null, 'Événement public invalide.');
@@ -152,7 +196,7 @@ function parseView(value: unknown): PublicIncidentView {
     if (!itemRecord || (itemRecord.id !== 'incident-json' && itemRecord.id !== 'timeline-csv') || (itemRecord.media_type !== 'application/json' && itemRecord.media_type !== 'text/csv')) throw new PublicIncidentViewError(null, 'Téléchargement public invalide.');
     return { id: itemRecord.id as 'incident-json' | 'timeline-csv', label: string(itemRecord.label, 'label')!, media_type: itemRecord.media_type as 'application/json' | 'text/csv', url: string(itemRecord.url, 'url')! };
   });
-  return { schema_version: '1.0', fire_id: root.fire_id, canonical_name: string(root.canonical_name, 'canonical_name', true), public_note: string(root.public_note, 'public_note', true), status: string(root.status, 'status')!, verification: root.verification === 'verified' || root.verification === 'corroborated' || root.verification === 'review_required' ? root.verification : (() => { throw new PublicIncidentViewError(null, 'Vérification invalide.'); })(), freshness_at: iso(root.freshness_at, 'freshness_at')!, last_human_validation_at: iso(root.last_human_validation_at, 'last_human_validation_at', true), location, facts: list(root.facts, 'facts').map((entry) => string(entry, 'fact')!), limitations: list(root.limitations, 'limitations').map((entry) => string(entry, 'limitation')!), episodes, observations, evidence_projections: evidenceProjections, sources, timeline, model: { state: model.state as PublicIncidentView['model']['state'], version: typeof model.version === 'number' ? model.version : null, sha256: string(model.sha256, 'sha256', true), size_bytes: typeof model.size_bytes === 'number' ? model.size_bytes : null, lod: string(model.lod, 'lod', true), terrain_source_year: typeof model.terrain_source_year === 'number' ? model.terrain_source_year : null, generated_at: iso(model.generated_at, 'generated_at', true), public_download_available: model.public_download_available, limitations: list(model.limitations, 'model.limitations').map((entry) => string(entry, 'model limitation')!) }, downloads };
+  return { schema_version: '1.0', fire_id: root.fire_id, canonical_name: string(root.canonical_name, 'canonical_name', true), public_note: string(root.public_note, 'public_note', true), status: string(root.status, 'status')!, verification: root.verification === 'verified' || root.verification === 'corroborated' || root.verification === 'review_required' ? root.verification : (() => { throw new PublicIncidentViewError(null, 'Vérification invalide.'); })(), freshness_at: iso(root.freshness_at, 'freshness_at')!, last_human_validation_at: iso(root.last_human_validation_at, 'last_human_validation_at', true), location, facts: list(root.facts, 'facts').map((entry) => string(entry, 'fact')!), limitations: list(root.limitations, 'limitations').map((entry) => string(entry, 'limitation')!), episodes, observations, evidence_projections: evidenceProjections, active_fire_zone: activeFireZone(root.active_fire_zone), map_gallery: mapGallery, sources, timeline, model: { state: model.state as PublicIncidentView['model']['state'], version: typeof model.version === 'number' ? model.version : null, sha256: string(model.sha256, 'sha256', true), size_bytes: typeof model.size_bytes === 'number' ? model.size_bytes : null, lod: string(model.lod, 'lod', true), terrain_source_year: typeof model.terrain_source_year === 'number' ? model.terrain_source_year : null, generated_at: iso(model.generated_at, 'generated_at', true), public_download_available: model.public_download_available, limitations: list(model.limitations, 'model.limitations').map((entry) => string(entry, 'model limitation')!) }, downloads };
 }
 
 function baseUrl(fireId: string): string {

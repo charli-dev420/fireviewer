@@ -160,6 +160,7 @@ export interface AdminIncidentSpatialMarker {
 }
 export interface AdminActiveFireZoneRevision {
   readonly zone_revision_id: string; readonly revision: number; readonly valid_at: string;
+  readonly analysis_id: string | null;
   readonly geometry_geojson: Readonly<Record<string, unknown>>;
   readonly gltf_polygons: readonly (readonly (readonly AdminGltfPoint[])[])[];
   readonly geometry_origin: string; readonly supporting_marker_ids: readonly string[];
@@ -168,11 +169,21 @@ export interface AdminActiveFireZoneRevision {
   readonly reviewed_by: string | null; readonly reviewed_at: string | null; readonly review_reason: string | null;
   readonly created_at: string;
 }
+export interface AdminIncidentMapCapture {
+  readonly capture_id: string;
+  readonly zone_revision_id: string;
+  readonly local_date: string;
+  readonly captured_at: string;
+  readonly image_url: string;
+  readonly width_px: number;
+  readonly height_px: number;
+}
 export interface AdminIncidentSpatialReviewWorkspace {
   readonly fire_id: string; readonly episode_id: string;
   readonly scene: { readonly asset_url: string | null; readonly asset_version: number | null; readonly sha256: string | null; readonly package_id: string | null; readonly zone_id: string | null; readonly zone_revision: number | null; readonly package_state: string | null; readonly publication_id: string | null; readonly publication_state: string | null; readonly publication_active: boolean; readonly catalog_url: string | null; readonly files: Readonly<Record<string, string>>; readonly origin_wgs84: readonly [number, number, number]; readonly local_frame: 'ENU'; readonly gltf_profile: 'gltf-eun-negz-metric-v1' } | null;
   readonly markers: readonly AdminIncidentSpatialMarker[];
   readonly zone_revisions: readonly AdminActiveFireZoneRevision[];
+  readonly map_gallery: readonly AdminIncidentMapCapture[];
   readonly agent_reviews: readonly { readonly review_id: string; readonly batch_id: string; readonly state: string; readonly reason_codes: readonly string[]; readonly completed_at: string | null; readonly result: Readonly<Record<string, unknown>> | null }[];
 }
 
@@ -889,15 +900,28 @@ function parseGltfPoint(value: unknown, field: string): AdminGltfPoint {
 function parseActiveFireZoneRevision(value: unknown): AdminActiveFireZoneRevision {
   if (!isRecord(value) || !isRecord(value.geometry_geojson) || !Array.isArray(value.gltf_polygons) || !Array.isArray(value.supporting_marker_ids) || !Array.isArray(value.source_revision_ids)) throw new Error('Révision de zone active invalide.');
   return {
-    zone_revision_id: readString(value.zone_revision_id, 'zone_revision_id', { max: 128 })!, revision: readPositiveInteger(value.revision, 'revision'), valid_at: readIsoDate(value.valid_at, 'valid_at'), geometry_geojson: value.geometry_geojson,
+    zone_revision_id: readString(value.zone_revision_id, 'zone_revision_id', { max: 128 })!, revision: readPositiveInteger(value.revision, 'revision'), valid_at: readIsoDate(value.valid_at, 'valid_at'), analysis_id: readString(value.analysis_id, 'analysis_id', { nullable: true, max: 128 }), geometry_geojson: value.geometry_geojson,
     gltf_polygons: value.gltf_polygons.map((polygon, polygonIndex) => { if (!Array.isArray(polygon)) throw new Error('Polygone glTF invalide.'); return polygon.map((ring, ringIndex) => { if (!Array.isArray(ring)) throw new Error('Anneau glTF invalide.'); return ring.map((point, pointIndex) => parseGltfPoint(point, `gltf_polygons.${polygonIndex}.${ringIndex}.${pointIndex}`)); }); }),
     geometry_origin: readString(value.geometry_origin, 'geometry_origin', { max: 64 })!, supporting_marker_ids: value.supporting_marker_ids.map((item) => readString(item, 'supporting_marker_id', { max: 128 })!), source_revision_ids: value.source_revision_ids.map((item) => readString(item, 'source_revision_id', { max: 128 })!), review_state: readEnum(value.review_state, 'review_state', ['DRAFT', 'READY_FOR_PUBLICATION', 'REJECTED'] as const),
     supersedes_zone_revision_id: readString(value.supersedes_zone_revision_id, 'supersedes_zone_revision_id', { nullable: true, max: 128 }), reason: readString(value.reason, 'reason', { max: 500 })!, created_by: readString(value.created_by, 'created_by', { max: 255 })!, reviewed_by: readString(value.reviewed_by, 'reviewed_by', { nullable: true, max: 255 }), reviewed_at: value.reviewed_at === null ? null : readIsoDate(value.reviewed_at, 'reviewed_at'), review_reason: readString(value.review_reason, 'review_reason', { nullable: true, max: 500 }), created_at: readIsoDate(value.created_at, 'created_at'),
   };
 }
 
+function parseIncidentMapCapture(value: unknown): AdminIncidentMapCapture {
+  if (!isRecord(value)) throw new Error('Capture cartographique invalide.');
+  return {
+    capture_id: readString(value.capture_id, 'capture_id', { max: 128 })!,
+    zone_revision_id: readString(value.zone_revision_id, 'zone_revision_id', { max: 128 })!,
+    local_date: readIsoDate(value.local_date, 'local_date').slice(0, 10),
+    captured_at: readIsoDate(value.captured_at, 'captured_at'),
+    image_url: readString(value.image_url, 'image_url', { max: 2_048 })!,
+    width_px: readPositiveInteger(value.width_px, 'width_px'),
+    height_px: readPositiveInteger(value.height_px, 'height_px'),
+  };
+}
+
 function parseIncidentSpatialReviewWorkspace(value: unknown): AdminIncidentSpatialReviewWorkspace {
-  if (!isRecord(value) || !Array.isArray(value.markers) || !Array.isArray(value.zone_revisions) || !Array.isArray(value.agent_reviews)) throw new Error('Espace de revue spatiale invalide.');
+  if (!isRecord(value) || !Array.isArray(value.markers) || !Array.isArray(value.zone_revisions) || !Array.isArray(value.map_gallery) || !Array.isArray(value.agent_reviews)) throw new Error('Espace de revue spatiale invalide.');
   let scene: AdminIncidentSpatialReviewWorkspace['scene'] = null;
   if (value.scene !== null) {
     if (!isRecord(value.scene) || (value.scene.files !== undefined && !isRecord(value.scene.files)) || !Array.isArray(value.scene.origin_wgs84) || value.scene.origin_wgs84.length !== 3) throw new Error('Scène 3D invalide.');
@@ -924,6 +948,7 @@ function parseIncidentSpatialReviewWorkspace(value: unknown): AdminIncidentSpati
     fire_id: readString(value.fire_id, 'fire_id', { max: 32 })!, episode_id: readString(value.episode_id, 'episode_id', { max: 16 })!, scene,
     markers: value.markers.map((item) => { if (!isRecord(item) || typeof item.spatial_display_allowed !== 'boolean') throw new Error('Marqueur spatial invalide.'); return { marker_id: readString(item.marker_id, 'marker_id', { max: 128 })!, source_kind: readEnum(item.source_kind, 'source_kind', ['observation', 'agent_media'] as const), marker_type: readString(item.marker_type, 'marker_type', { max: 64 })!, longitude: readFiniteNumber(item.longitude, 'longitude'), latitude: readFiniteNumber(item.latitude, 'latitude'), altitude_m: item.altitude_m === null ? null : readFiniteNumber(item.altitude_m, 'altitude_m'), horizontal_accuracy_m: item.horizontal_accuracy_m === null ? null : readFiniteNumber(item.horizontal_accuracy_m, 'horizontal_accuracy_m'), geometry_origin: readString(item.geometry_origin, 'geometry_origin', { max: 64 })!, review_state: readString(item.review_state, 'review_state', { max: 64 })!, observed_at: item.observed_at === null ? null : readIsoDate(item.observed_at, 'observed_at'), spatial_display_allowed: item.spatial_display_allowed, gltf_position: item.gltf_position === null ? null : parseGltfPoint(item.gltf_position, 'gltf_position'), version: readPositiveInteger(item.version, 'version') }; }),
     zone_revisions: value.zone_revisions.map(parseActiveFireZoneRevision),
+    map_gallery: value.map_gallery.map(parseIncidentMapCapture),
     agent_reviews: value.agent_reviews.map((item) => { if (!isRecord(item) || !Array.isArray(item.reason_codes) || (item.result !== null && !isRecord(item.result))) throw new Error('Revue agentique invalide.'); return { review_id: readString(item.review_id, 'review_id', { max: 128 })!, batch_id: readString(item.batch_id, 'batch_id', { max: 128 })!, state: readString(item.state, 'state', { max: 64 })!, reason_codes: item.reason_codes.map((reason) => readString(reason, 'reason_code', { max: 128 })!), completed_at: item.completed_at === null ? null : readIsoDate(item.completed_at, 'completed_at'), result: item.result }; }),
   };
 }
@@ -1841,6 +1866,40 @@ export class AdminApiClient {
     }
   }
 
+  async createIncidentMapCaptureUploadGrant(
+    fireId: string,
+    input: { readonly zone_revision_id: string; readonly size_bytes: number; readonly media_type: 'image/jpeg' | 'image/png' },
+    options: AdminRequestOptions = {},
+  ): Promise<AdminBlobUploadGrant> {
+    if (!/^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(fireId) || !input.zone_revision_id || !Number.isSafeInteger(input.size_bytes) || input.size_bytes < 1) {
+      throw new AdminApiError('configuration', 'La capture cartographique est invalide.');
+    }
+    const payload = await this.request(`/incidents/${encodeURIComponent(fireId)}/map-gallery/upload-grant`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }, options);
+    try { return parseBlobUploadGrant(payload); }
+    catch { throw new AdminApiError('parse', 'L’autorisation d’envoi de la capture est invalide.'); }
+  }
+
+  async finalizeIncidentMapCaptureFromBlob(
+    fireId: string,
+    input: { readonly upload_id: string; readonly zone_revision_id: string; readonly object: AdminBlobObjectReference },
+    options: AdminRequestOptions = {},
+  ): Promise<AdminIncidentMapCapture> {
+    if (!/^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(fireId) || !/^[a-f0-9]{32}$/.test(input.upload_id) || !input.zone_revision_id || !['capture.jpg', 'capture.png'].includes(input.object.path)) {
+      throw new AdminApiError('configuration', 'La finalisation de la capture cartographique est invalide.');
+    }
+    const payload = await this.request(`/incidents/${encodeURIComponent(fireId)}/map-gallery/from-blob`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }, options);
+    try { return parseIncidentMapCapture(payload); }
+    catch { throw new AdminApiError('parse', 'La capture cartographique enregistrée est invalide.'); }
+  }
+
   async openIncidentSourcePackage(fireId: string, input: { readonly file_count: number; readonly total_size_bytes: number; readonly known_start_date: string; readonly known_end_date?: string | null; readonly location_hint?: string | null; readonly authorize_private_analysis: true }, options: AdminRequestOptions): Promise<AdminSourcePackageOpen> {
     if (!/^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(fireId) || input.file_count < 1 || input.total_size_bytes < 1 || !/^\d{4}-\d{2}-\d{2}$/.test(input.known_start_date)) throw new AdminApiError('configuration', 'Package de sources invalide.');
     const payload = await this.postJsonV2(`/agent-batches/incidents/${encodeURIComponent(fireId)}/source-packages/open`, input, options);
@@ -1897,7 +1956,7 @@ export class AdminApiClient {
     if (!isRecord(payload) || payload.marker_id !== markerId) throw new AdminApiError('parse', 'La réponse de revue du marqueur est invalide.');
   }
 
-  async createActiveFireZoneRevision(fireId: string, input: { expected_latest_revision: number; valid_at: string; geometry_geojson: Readonly<Record<string, unknown>>; supporting_marker_ids: readonly string[]; geometry_origin?: 'HUMAN_AUTHORED' | 'SATELLITE_PRODUCT'; reason: string }, options: AdminRequestOptions): Promise<AdminActiveFireZoneRevision> {
+  async createActiveFireZoneRevision(fireId: string, input: { expected_latest_revision: number; valid_at: string; analysis_id?: string | null; geometry_geojson: Readonly<Record<string, unknown>>; supporting_marker_ids: readonly string[]; geometry_origin?: 'HUMAN_AUTHORED' | 'SATELLITE_PRODUCT'; reason: string }, options: AdminRequestOptions): Promise<AdminActiveFireZoneRevision> {
     const payload = await this.postJson(`/incidents/${encodeURIComponent(fireId)}/active-zone-revisions`, input, options);
     try { return parseActiveFireZoneRevision(payload); }
     catch { throw new AdminApiError('parse', 'La révision de zone active retournée est invalide.'); }

@@ -95,6 +95,10 @@
 .fw-incident-side-panel ul, .fw-incident-side-panel ol { display: grid; gap: 8px; padding: 0; list-style: none; }
 .fw-incident-side-panel li { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--fw-line); border-radius: 5px; }
 .fw-incident-side-panel li span { color: var(--fw-muted); font-size: .68rem; }
+.fw-map-gallery { display: grid; gap: 12px; margin: 16px 0; }
+.fw-map-gallery figure { overflow: hidden; margin: 0; border: 1px solid var(--fw-line); border-radius: 6px; background: #fff; }
+.fw-map-gallery img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: #102429; }
+.fw-map-gallery figcaption { padding: 9px 11px; color: var(--fw-muted); font-size: .7rem; }
 .fw-panel-empty { padding: 20px; border: 1px dashed var(--fw-line); border-radius: 6px; color: var(--fw-muted); font-size: .74rem; text-align: center; }
 
 @media (max-width: 760px) {

@@ -1,7 +1,15 @@
 from __future__ import annotations
 
-from fire_viewer.db.models import Observation, Source
-from fire_viewer.domain.enums import MatchDecision, SourceTrust, SourceType, VerificationState
+from datetime import UTC, datetime
+
+from fire_viewer.db.models import ActiveFireZoneRevision, Observation, Source
+from fire_viewer.domain.enums import (
+    ActiveFireZoneReviewState,
+    MatchDecision,
+    SourceTrust,
+    SourceType,
+    VerificationState,
+)
 
 
 def _verified_observation(session, incident, episode, *, state: VerificationState) -> None:
@@ -97,3 +105,47 @@ def test_public_report_is_deduplicated_and_never_changes_public_view(client, see
     assert duplicate.status_code == 202
     assert duplicate.json()["replayed"] is True
     assert client.get(f"/api/v1/incident/{incident.fire_id}/public-view").status_code == 200
+
+
+def test_public_view_exposes_only_the_human_approved_2d_activity_zone(
+    client, seed_incident, session
+) -> None:
+    incident, episode = seed_incident(
+        fire_id="FR-83-00603", sequence=603, lon=6.04, lat=43.31
+    )
+    zone = ActiveFireZoneRevision(
+        zone_revision_id="azr-public-zone-603",
+        incident_id=incident.id,
+        episode_id=episode.id,
+        revision=1,
+        valid_at=datetime(2026, 7, 19, 12, tzinfo=UTC),
+        geometry_geojson={
+            "type": "MultiPolygon",
+            "coordinates": [[[[6.03, 43.30], [6.05, 43.30], [6.04, 43.32], [6.03, 43.30]]]],
+        },
+        geometry_origin="AGENT_DERIVED",
+        supporting_marker_ids=[],
+        source_revision_ids=[],
+        review_state=ActiveFireZoneReviewState.DRAFT,
+        created_by="worker-test",
+        reason="Private AI-derived daily layer awaiting human review.",
+    )
+    session.add(zone)
+    session.commit()
+
+    private_body = client.get(f"/api/v1/incident/{incident.fire_id}/public-view").json()
+    assert private_body["active_fire_zone"] is None
+
+    zone.review_state = ActiveFireZoneReviewState.READY_FOR_PUBLICATION
+    zone.reviewed_by = "admin-test"
+    zone.reviewed_at = datetime(2026, 7, 19, 12, 5, tzinfo=UTC)
+    zone.review_reason = "Geometry and evidence checked by a human operator."
+    session.commit()
+
+    public_body = client.get(f"/api/v1/incident/{incident.fire_id}/public-view").json()
+    assert public_body["active_fire_zone"] == {
+        "zone_revision_id": zone.zone_revision_id,
+        "revision": 1,
+        "valid_at": "2026-07-19T12:00:00Z",
+        "geometry_geojson": zone.geometry_geojson,
+    }

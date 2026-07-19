@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import func, select
 
 from fire_viewer.db.models import (
+    ActiveFireZoneRevision,
     AgentAnalysisWindow,
     AgentDeadLetter,
     AgentDispatch,
@@ -17,6 +18,7 @@ from fire_viewer.db.models import (
     Job,
 )
 from fire_viewer.domain.enums import (
+    ActiveFireZoneReviewState,
     AgentAnalysisState,
     AgentDispatchState,
     AgentProposalReviewState,
@@ -279,6 +281,13 @@ def test_v2_result_stays_private_and_persists_grounding_abstention_and_report(
         proposal.review_state == AgentProposalReviewState.PENDING for proposal in proposals
     )
     assert session.scalar(select(func.count()).select_from(AgentFactProposal)) == 1
+    zone = session.scalar(select(ActiveFireZoneRevision))
+    assert zone is not None
+    assert zone.analysis_window_id == analysis.id
+    assert zone.geometry_origin == "AGENT_DERIVED"
+    assert zone.review_state.value == "DRAFT"
+    assert zone.supporting_marker_ids == ["proposal:spatial-fire-0001"]
+    assert zone.geometry_geojson["type"] == "MultiPolygon"
     report = session.scalar(select(AgentSituationReportRevision))
     assert report is not None and report.review_state == AgentReportReviewState.DRAFT
     assert session.scalar(select(func.count()).select_from(IncidentSpatialMarker)) == 0
@@ -304,6 +313,50 @@ def test_v2_rejects_output_bound_to_another_analysis_window(
     assert session.scalar(select(func.count()).select_from(AgentFactProposal)) == 0
 
 
+def test_human_edit_keeps_the_agent_analysis_day(
+    client, session, app, settings, seed_incident
+) -> None:
+    _create_and_enqueue_v2(client, session, seed_incident)
+    _run_to_completion(app, session, settings, FakeRunPodV2(_v2_output()))
+
+    proposal = session.scalar(
+        select(AgentSpatialProposal).where(AgentSpatialProposal.status == "ground_point")
+    )
+    analysis = session.scalar(select(AgentAnalysisWindow))
+    zone = session.scalar(select(ActiveFireZoneRevision))
+    assert proposal is not None and analysis is not None and zone is not None
+    reviewed = client.post(
+        f"/api/v1/admin/incidents/FR-26-00001/spatial-markers/proposal:{proposal.proposal_id}/review",
+        json={
+            "action": "validate",
+            "expected_version": proposal.version,
+            "reason": "Point actif et géolocalisation contrôlés dans la preuve source.",
+        },
+    )
+    assert reviewed.status_code == 200, reviewed.text
+
+    edited = client.post(
+        "/api/v1/admin/incidents/FR-26-00001/active-zone-revisions",
+        json={
+            "expected_latest_revision": zone.revision,
+            "valid_at": "2026-07-19T21:00:00Z",
+            "analysis_id": analysis.analysis_id,
+            "geometry_geojson": zone.geometry_geojson,
+            "supporting_marker_ids": [f"proposal:{proposal.proposal_id}"],
+            "reason": "Contour quotidien corrigé manuellement sans changer sa journée d'analyse.",
+        },
+    )
+
+    assert edited.status_code == 201, edited.text
+    assert edited.json()["analysis_id"] == analysis.analysis_id
+    returned_valid_at = datetime.fromisoformat(edited.json()["valid_at"].replace("Z", "+00:00"))
+    assert returned_valid_at.replace(tzinfo=None) == analysis.window_end_at.replace(tzinfo=None)
+    persisted = session.scalar(
+        select(ActiveFireZoneRevision).where(ActiveFireZoneRevision.revision == 2)
+    )
+    assert persisted is not None and persisted.analysis_window_id == analysis.id
+
+
 def test_withdrawing_consent_invalidates_private_v2_results(
     client, session, app, settings, seed_incident
 ) -> None:
@@ -323,5 +376,7 @@ def test_withdrawing_consent_invalidates_private_v2_results(
     )
     fact = session.scalar(select(AgentFactProposal))
     report = session.scalar(select(AgentSituationReportRevision))
+    zone = session.scalar(select(ActiveFireZoneRevision))
     assert fact is not None and fact.review_state == AgentProposalReviewState.INVALIDATED
     assert report is not None and report.review_state == AgentReportReviewState.INVALIDATED
+    assert zone is not None and zone.review_state == ActiveFireZoneReviewState.REJECTED

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { loadPublicIncidentView, type PublicIncidentView } from '../../lib/publicIncidentView';
+import { loadPublicIncidentView, publicIncidentDownloadUrl, type PublicIncidentView } from '../../lib/publicIncidentView';
 import { getViewerManifestApiOrigin } from '../../lib/manifestClient';
 import type { ViewerManifestStatusCode, ViewerManifestSummary } from '../../lib/viewerManifest';
 import { IncidentGlbViewer } from './IncidentGlbViewer';
@@ -127,15 +127,15 @@ function ViewerView({ view, summary, lowData }: { readonly view: PublicIncidentV
         ['extended', 'Vue étendue'],
       ] as const).map(([preset, label]) => <button key={preset} type="button" className={viewPreset === preset ? 'is-active' : undefined} aria-pressed={viewPreset === preset} onClick={() => setViewPreset(preset)}>{label}</button>)}
     </div>
-    {tiledSource ? <Suspense fallback={<div className="incident-tiled-scene__loading" role="status">Initialisation du moteur cartographique 3D…</div>}><TiledSpatialScene3D source={tiledSource} overlayOriginWgs84={summary.frame?.origin_wgs84} viewPreset={viewPreset} /></Suspense> : summary.asset ? <IncidentGlbViewer assetUrl={summary.asset.url} version={summary.asset.version} sha256={summary.asset.sha256} frame={summary.frame} terrainSourceYear={summary.freshness.terrain_source_year} observations={view?.observations ?? []} /> : null}
+    {tiledSource ? <Suspense fallback={<div className="incident-tiled-scene__loading" role="status">Initialisation du moteur cartographique 3D…</div>}><TiledSpatialScene3D source={tiledSource} overlayOriginWgs84={summary.frame?.origin_wgs84} viewPreset={viewPreset} overlayGeometriesWgs84={view?.active_fire_zone ? [{ geometry: view.active_fire_zone.geometry_geojson, color: '#ff5b43' }] : []} /></Suspense> : summary.asset ? <IncidentGlbViewer assetUrl={summary.asset.url} version={summary.asset.version} sha256={summary.asset.sha256} frame={summary.frame} terrainSourceYear={summary.freshness.terrain_source_year} observations={view?.observations ?? []} /> : null}
     <footer><span>Représentation : {formatDate(summary.freshness.generated_at)}</span><span>Nord et échelle visibles dans le viewer</span></footer>
   </div>;
 }
 
 function SidePanelView({ panel, view, onClose }: { readonly panel: Exclude<SidePanel, null>; readonly view: PublicIncidentView | null; readonly onClose: () => void }) {
-  const titles = { media: 'Images géolocalisées', comments: 'Commentaires de la communauté', episodes: 'Épisodes de l’incident' };
+  const titles = { media: 'Galerie cartographique', comments: 'Commentaires de la communauté', episodes: 'Épisodes de l’incident' };
   return <aside className="fw-incident-side-panel" aria-label={titles[panel]}><header><h2>{titles[panel]}</h2><button type="button" onClick={onClose} aria-label="Fermer le panneau"><PublicIcon name="close" size={21} /></button></header>
-    {panel === 'media' ? <><p>Seuls les marqueurs visibles et validés dans la zone affichée sont listés. Il ne s’agit pas d’une galerie.</p>{view?.evidence_projections.length ? <ul>{view.evidence_projections.map((item) => <li key={item.projection_id}><strong>{item.label}</strong><span>{formatDate(item.observed_at)} · position {item.kind === 'validated_marker' ? 'validée' : 'généralisée'}</span></li>)}</ul> : <p>Aucune image utilisateur autorisée à la publication dans cette vue.</p>}</> : null}
+    {panel === 'media' ? <>{view?.map_gallery.length ? <div className="fw-map-gallery">{view.map_gallery.map((item) => <figure key={item.capture_id}><img src={publicIncidentDownloadUrl(view.fire_id, item.image_url)} alt={`Vue 3D du calque incendie du ${item.local_date}`} width={item.width_px} height={item.height_px} loading="lazy" /><figcaption>Zone d’activité validée · {item.local_date}</figcaption></figure>)}</div> : <p>Aucune vue cartographique validée n’est encore publiée.</p>}<h3>Repères publiés</h3>{view?.evidence_projections.length ? <ul>{view.evidence_projections.map((item) => <li key={item.projection_id}><strong>{item.label}</strong><span>{formatDate(item.observed_at)} · position {item.kind === 'validated_marker' ? 'validée' : 'généralisée'}</span></li>)}</ul> : <p>Aucun repère média n’est publié dans cette vue.</p>}</> : null}
     {panel === 'comments' ? <><p>Les commentaires sont secondaires, modérés et ne modifient jamais les informations publiées.</p><div className="fw-panel-empty">Aucun commentaire public n’est disponible pour cet incident.</div></> : null}
     {panel === 'episodes' ? view?.episodes.length ? <ol>{view.episodes.map((item) => <li key={item.episode_id}><strong>Épisode {item.ordinal} · {item.status}</strong><span>{formatDate(item.started_at)} à {formatDate(item.ended_at)}</span></li>)}</ol> : <p>Aucun épisode détaillé n’est publié.</p> : null}
   </aside>;
@@ -194,7 +194,7 @@ export function PublicIncidentRealPage({ summary, checkedAt, stale, refreshing, 
     </main>
 
     <section className="fw-page fw-incident-secondary" aria-label="Accès complémentaires">
-      <button type="button" onClick={() => setPanel('media')}><PublicIcon name="image" size={20} />Images géolocalisées</button>
+      <button type="button" onClick={() => setPanel('media')}><PublicIcon name="image" size={20} />Galerie cartographique</button>
       <button type="button" onClick={() => setPanel('comments')}><PublicIcon name="message" size={20} />Commentaires</button>
       <button type="button" onClick={() => setPanel('episodes')}><PublicIcon name="calendar" size={20} />Épisodes</button>
       <a href={`/incendie/${summary.fireId}/ajouter-preuve`}><PublicIcon name="plus" size={20} />Ajouter une preuve</a>

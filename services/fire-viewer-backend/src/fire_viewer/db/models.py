@@ -1686,6 +1686,7 @@ class AgentSpatialProposal(Base, TimestampMixin):
     reviewed_by: Mapped[str | None] = mapped_column(String(255))
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     review_reason: Mapped[str | None] = mapped_column(String(500))
+
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
     analysis_window: Mapped[AgentAnalysisWindow] = relationship(back_populates="spatial_proposals")
@@ -2113,6 +2114,9 @@ class ActiveFireZoneRevision(Base, TimestampMixin):
     episode_id: Mapped[int] = mapped_column(
         ForeignKey("episode.id", ondelete="RESTRICT"), nullable=False, index=True
     )
+    analysis_window_id: Mapped[int | None] = mapped_column(
+        ForeignKey("agent_analysis_window.id", ondelete="RESTRICT"), index=True
+    )
     revision: Mapped[int] = mapped_column(Integer, nullable=False)
     valid_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     geometry_geojson: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
@@ -2134,14 +2138,61 @@ class ActiveFireZoneRevision(Base, TimestampMixin):
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     review_reason: Mapped[str | None] = mapped_column(String(500))
 
+    analysis_window: Mapped[AgentAnalysisWindow | None] = relationship()
+
     __table_args__ = (
         UniqueConstraint("incident_id", "episode_id", "revision", name="uq_active_zone_revision"),
         CheckConstraint("revision >= 1", name="ck_active_zone_revision_positive"),
         CheckConstraint(
-            "geometry_origin IN ('HUMAN_AUTHORED', 'DETERMINISTIC_UNION', 'SATELLITE_PRODUCT')",
+            "geometry_origin IN ('HUMAN_AUTHORED', 'DETERMINISTIC_UNION', "
+            "'SATELLITE_PRODUCT', 'AGENT_DERIVED')",
             name="ck_active_zone_geometry_origin",
         ),
         CheckConstraint("length(reason) >= 10", name="ck_active_zone_reason"),
+    )
+
+
+class IncidentMapCapture(Base, TimestampMixin):
+    """Human-published 3D map capture tied to one reviewed geographic layer."""
+
+    __tablename__ = "incident_map_capture"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    capture_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, unique=True, index=True
+    )
+    incident_id: Mapped[int] = mapped_column(
+        ForeignKey("incident_series.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    episode_id: Mapped[int] = mapped_column(
+        ForeignKey("episode.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    active_zone_revision_id: Mapped[int] = mapped_column(
+        ForeignKey("active_fire_zone_revision.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    local_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    object_uri: Mapped[str] = mapped_column(String(2_048), nullable=False, unique=True)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    media_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    width_px: Mapped[int] = mapped_column(Integer, nullable=False)
+    height_px: Mapped[int] = mapped_column(Integer, nullable=False)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_by: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    active_zone_revision: Mapped[ActiveFireZoneRevision] = relationship()
+
+    __table_args__ = (
+        CheckConstraint(sha256_hex_check("sha256"), name="ck_map_capture_sha256"),
+        CheckConstraint("size_bytes > 0", name="ck_map_capture_size"),
+        CheckConstraint(
+            "media_type IN ('image/jpeg', 'image/png')", name="ck_map_capture_media_type"
+        ),
+        CheckConstraint(
+            "width_px >= 640 AND height_px >= 360", name="ck_map_capture_dimensions"
+        ),
     )
 
 
