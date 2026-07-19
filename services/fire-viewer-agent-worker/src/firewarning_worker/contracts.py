@@ -72,6 +72,16 @@ class FrameInput(StrictModel):
     working_file_url: AnyHttpUrl
 
 
+class SourceContext(StrictModel):
+    source_reference_url: AnyHttpUrl | None = None
+    attribution: str | None = Field(default=None, max_length=500)
+    trust: Literal["unverified", "partner", "institutional", "operator"] | None = None
+    source_kind: str | None = Field(default=None, max_length=64)
+    source_confidence: Literal["A+", "A", "B", "lead"] | None = None
+    publication_policy: str | None = Field(default=None, max_length=64)
+    claim_types: tuple[str, ...] = Field(default=(), max_length=32)
+
+
 class BatchItem(StrictModel):
     input_id: Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")]
     media_type: MediaType
@@ -80,6 +90,7 @@ class BatchItem(StrictModel):
     frames: tuple[FrameInput, ...] = Field(default=(), max_length=64)
     audio_url: AnyHttpUrl | None = None
     article_text: str | None = Field(default=None, max_length=100_000)
+    source_context: SourceContext | None = None
 
     @model_validator(mode="after")
     def has_processable_content(self) -> BatchItem:
@@ -259,6 +270,32 @@ class SourceProvenanceV2(StrictModel):
     license_identifier: str = Field(min_length=1, max_length=128)
     attribution: str | None = Field(default=None, max_length=500)
     trust: Literal["unverified", "partner", "institutional", "operator"]
+    source_registry_version: str | None = Field(default=None, min_length=3, max_length=64)
+    source_policy_domain: str | None = Field(default=None, min_length=3, max_length=253)
+    source_kind: (
+        Literal[
+            "authority",
+            "emergency_service",
+            "satellite",
+            "weather",
+            "air_quality",
+            "context",
+            "directory",
+            "press",
+        ]
+        | None
+    ) = None
+    source_confidence: Literal["A+", "A", "B", "lead"] | None = None
+    publication_policy: (
+        Literal[
+            "facts_with_attribution",
+            "dataset_license_required",
+            "per_item_license_check",
+            "private_analysis_only",
+        ]
+        | None
+    ) = None
+    claim_types: tuple[str, ...] = Field(default=(), max_length=32)
 
 
 class CameraMetadataV2(StrictModel):
@@ -648,4 +685,138 @@ class WorkerOutputV2(StrictModel):
             unknown = referenced - set(all_fact_ids)
             if unknown:
                 raise ValueError(f"report references an unknown fact: {sorted(unknown)[0]}")
+        return self
+
+
+class ResearchUploadV1(StrictModel):
+    pathname_prefix: str = Field(min_length=3, max_length=512)
+    upload_grant: str = Field(min_length=64, max_length=4_096)
+    token_endpoint: AnyHttpUrl
+    resource_id: SafeIdentifierV2
+    maximum_file_size_bytes: int = Field(gt=0)
+    allowed_content_types: tuple[str, ...] = Field(min_length=1, max_length=32)
+
+
+class ResearchSourcePolicyV1(StrictModel):
+    source_name: str = Field(min_length=1, max_length=255)
+    kind: Literal[
+        "authority",
+        "emergency_service",
+        "satellite",
+        "weather",
+        "air_quality",
+        "context",
+        "directory",
+        "press",
+    ]
+    scope: Literal["national", "regional", "departmental", "local", "global"]
+    confidence_level: Literal["A+", "A", "B", "lead"]
+    claim_types: tuple[str, ...] = Field(min_length=1, max_length=32)
+    publication_policy: Literal[
+        "facts_with_attribution",
+        "dataset_license_required",
+        "per_item_license_check",
+        "private_analysis_only",
+    ]
+    minimum_refresh_minutes: int = Field(ge=1, le=43_200)
+
+
+class ResearchInputV1(StrictModel):
+    schema_version: Literal["research-1.0"] = "research-1.0"
+    operation: Literal["source_research"] = "source_research"
+    research_id: SafeIdentifierV2
+    analysis_window: AnalysisWindowV2
+    incident_name: str | None = Field(default=None, max_length=255)
+    incident_reference: tuple[float, float]
+    cutoff_at: datetime
+    location_hint: str | None = Field(default=None, max_length=500)
+    source_registry_version: str = Field(min_length=3, max_length=64)
+    allowed_domains: tuple[str, ...] = Field(min_length=1, max_length=200)
+    source_policies: dict[str, ResearchSourcePolicyV1]
+    search_templates: dict[str, AnyHttpUrl]
+    max_fetch_bytes: int = Field(gt=0, le=104_857_600)
+    request_timeout_seconds: int = Field(ge=2, le=120)
+    private_upload: ResearchUploadV1
+
+    @model_validator(mode="after")
+    def validate_research(self) -> ResearchInputV1:
+        if not _is_timezone_aware_v2(self.cutoff_at):
+            raise ValueError("research cutoff_at must include a timezone")
+        if self.cutoff_at != self.analysis_window.window_end_at:
+            raise ValueError("research cutoff must equal the analysis window end")
+        if len(self.allowed_domains) != len(set(self.allowed_domains)):
+            raise ValueError("research domains must be unique")
+        if set(self.source_policies) != set(self.allowed_domains):
+            raise ValueError("every research domain requires one source policy")
+        if not self.search_templates:
+            raise ValueError("at least one search provider is required")
+        if set(self.search_templates) & set(self.allowed_domains):
+            raise ValueError("search providers must be separate from source domains")
+        longitude, latitude = self.incident_reference
+        if not (-180 <= longitude <= 180 and -90 <= latitude <= 90):
+            raise ValueError("incident reference must be WGS84")
+        return self
+
+
+class ResearchCandidateV1(StrictModel):
+    candidate_id: SafeIdentifierV2
+    canonical_url: AnyHttpUrl
+    source_domain: str = Field(min_length=1, max_length=255)
+    title: str | None = Field(default=None, max_length=500)
+    published_at: datetime | None = None
+    acquired_at: datetime | None = None
+    media_type: MediaType | None = None
+    blob_pathname: str | None = Field(default=None, min_length=3, max_length=1_024)
+    media_sha256: Sha256HexV2 | None = None
+    size_bytes: int | None = Field(default=None, gt=0, le=1_073_741_824)
+    excerpt: str | None = Field(default=None, max_length=100_000)
+    license_identifier: str | None = Field(default=None, max_length=128)
+    attribution: str | None = Field(default=None, max_length=500)
+    provenance: dict[str, object] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_candidate(self) -> ResearchCandidateV1:
+        for timestamp in (self.published_at, self.acquired_at):
+            if timestamp is not None and not _is_timezone_aware_v2(timestamp):
+                raise ValueError("candidate timestamps must include a timezone")
+        stored_fields = (self.blob_pathname, self.media_sha256, self.size_bytes)
+        if any(value is not None for value in stored_fields) and not all(
+            value is not None for value in stored_fields
+        ):
+            raise ValueError("stored candidate media requires path, hash, and size")
+        if self.media_type == MediaType.ARTICLE and not self.excerpt:
+            raise ValueError("article candidates require extracted text")
+        if self.media_type not in {None, MediaType.ARTICLE} and self.blob_pathname is None:
+            raise ValueError("media candidates require a private uploaded object")
+        return self
+
+
+class ResearchModelRunV1(StrictModel):
+    model_role: Literal["source_research"] = "source_research"
+    model_id: str
+    revision: str
+    status: Literal["succeeded", "failed", "skipped"]
+    started_at: datetime
+    finished_at: datetime
+    load_ms: int = Field(ge=0)
+    inference_ms: int = Field(ge=0)
+    peak_vram_bytes: int | None = Field(default=None, ge=0)
+    error_code: str | None = None
+
+
+class ResearchOutputV1(StrictModel):
+    schema_version: Literal["research-1.0"] = "research-1.0"
+    research_id: SafeIdentifierV2
+    status: Literal["succeeded", "partial_failure", "failed"]
+    retryable: bool
+    model_run: ResearchModelRunV1
+    queries: tuple[str, ...] = Field(default=(), max_length=100)
+    candidates: tuple[ResearchCandidateV1, ...] = Field(default=(), max_length=500)
+    validation_errors: tuple[str, ...] = Field(default=(), max_length=100)
+
+    @model_validator(mode="after")
+    def validate_output(self) -> ResearchOutputV1:
+        ids = [candidate.candidate_id for candidate in self.candidates]
+        if len(ids) != len(set(ids)):
+            raise ValueError("research candidate ids must be unique")
         return self

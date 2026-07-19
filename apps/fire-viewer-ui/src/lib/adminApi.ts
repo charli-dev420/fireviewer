@@ -90,27 +90,48 @@ export interface AdminIncidentSourcesMediaWorkspace {
   }[];
 }
 
-export type AdminAgentOperationType = 'user_media' | 'external_media' | 'satellite_media';
+export type AdminAgentOperationType = 'user_media' | 'source_research' | 'satellite_media';
 export interface AdminAgentOperationsOverview {
   readonly fire_id: string;
   readonly episode_id: string;
+  readonly local_date: string;
   readonly actions: readonly {
-    readonly batch_type: AdminAgentOperationType;
+    readonly operation_type: AdminAgentOperationType;
     readonly pending_files: number;
     readonly pending_analyses: number;
     readonly running_analyses: number;
     readonly last_run_at: string | null;
     readonly can_run: boolean;
-    readonly blocked_reason: 'dispatch_disabled' | 'nothing_to_process' | null;
+    readonly blocked_reason: 'dispatch_disabled' | 'research_disabled' | 'nothing_to_process' | 'already_running' | null;
   }[];
 }
 
 export interface AdminAgentOperationRunResponse {
   readonly fire_id: string;
   readonly episode_id: string;
-  readonly batch_type: AdminAgentOperationType;
-  readonly queued_batch_ids: readonly string[];
+  readonly operation_type: AdminAgentOperationType;
+  readonly operation_ids: readonly string[];
   readonly queued_files: number;
+}
+
+export interface AdminSourcePackageOpen {
+  readonly package_id: string;
+  readonly upload_id: string;
+  readonly pathname_prefix: string;
+  readonly upload_grant: string;
+  readonly expires_at: string;
+  readonly maximum_file_size_bytes: number;
+  readonly allowed_content_types: readonly string[];
+}
+
+export interface AdminSourcePackageResult {
+  readonly package_id: string;
+  readonly state: string;
+  readonly known_start_date: string;
+  readonly known_end_date: string;
+  readonly publication_authorized: boolean;
+  readonly batch_ids: readonly string[];
+  readonly item_count: number;
 }
 
 export interface AdminIncidentModelsPipelineWorkspace {
@@ -942,16 +963,17 @@ function parseAgentOperationsOverview(value: unknown): AdminAgentOperationsOverv
   return {
     fire_id: readString(value.fire_id, 'fire_id', { max: 32 })!,
     episode_id: readString(value.episode_id, 'episode_id', { max: 128 })!,
+    local_date: readIsoDate(value.local_date, 'local_date').slice(0, 10),
     actions: value.actions.map((item) => {
       if (!isRecord(item)) throw new Error('Commande IA invalide.');
       return {
-        batch_type: readEnum(item.batch_type, 'batch_type', ['user_media', 'external_media', 'satellite_media'] as const),
+        operation_type: readEnum(item.operation_type, 'operation_type', ['user_media', 'source_research', 'satellite_media'] as const),
         pending_files: readNonNegativeInteger(item.pending_files, 'pending_files'),
         pending_analyses: readNonNegativeInteger(item.pending_analyses, 'pending_analyses'),
         running_analyses: readNonNegativeInteger(item.running_analyses, 'running_analyses'),
         last_run_at: item.last_run_at === null ? null : readIsoDate(item.last_run_at, 'last_run_at'),
         can_run: readBoolean(item.can_run, 'can_run'),
-        blocked_reason: item.blocked_reason === null ? null : readEnum(item.blocked_reason, 'blocked_reason', ['dispatch_disabled', 'nothing_to_process'] as const),
+        blocked_reason: item.blocked_reason === null ? null : readEnum(item.blocked_reason, 'blocked_reason', ['dispatch_disabled', 'research_disabled', 'nothing_to_process', 'already_running'] as const),
       };
     }),
   };
@@ -1793,30 +1815,60 @@ export class AdminApiClient {
     catch { throw new AdminApiError('parse', 'Les sources et médias de l’incident sont invalides.'); }
   }
 
-  async getIncidentAgentOperations(fireId: string, options: AdminRequestOptions = {}): Promise<AdminAgentOperationsOverview> {
-    if (!/^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(fireId)) throw new AdminApiError('configuration', 'Identifiant fire_id invalide.');
-    const payload = await this.requestV2(`/agent-batches/incidents/${encodeURIComponent(fireId)}/operations`, { method: 'GET' }, options);
+  async getIncidentAgentOperations(fireId: string, localDate: string, options: AdminRequestOptions = {}): Promise<AdminAgentOperationsOverview> {
+    if (!/^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(fireId) || !/^\d{4}-\d{2}-\d{2}$/.test(localDate)) throw new AdminApiError('configuration', 'Incident ou journée d’analyse invalide.');
+    const payload = await this.requestV2(`/agent-batches/incidents/${encodeURIComponent(fireId)}/operations?local_date=${encodeURIComponent(localDate)}`, { method: 'GET' }, options);
     try { return parseAgentOperationsOverview(payload); }
     catch { throw new AdminApiError('parse', 'Les commandes d’analyse IA sont invalides.'); }
   }
 
-  async runIncidentAgentOperation(fireId: string, batchType: AdminAgentOperationType, options: AdminRequestOptions): Promise<AdminAgentOperationRunResponse> {
-    if (!/^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(fireId) || !['user_media', 'external_media', 'satellite_media'].includes(batchType)) {
+  async runIncidentAgentOperation(fireId: string, operationType: AdminAgentOperationType, input: { readonly local_date: string; readonly location_hint?: string | null }, options: AdminRequestOptions): Promise<AdminAgentOperationRunResponse> {
+    if (!/^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(fireId) || !['user_media', 'source_research', 'satellite_media'].includes(operationType) || !/^\d{4}-\d{2}-\d{2}$/.test(input.local_date)) {
       throw new AdminApiError('configuration', 'Commande d’analyse IA invalide.');
     }
-    const payload = await this.postJsonV2(`/agent-batches/incidents/${encodeURIComponent(fireId)}/operations/${batchType}/run`, {}, options);
-    if (!isRecord(payload) || !Array.isArray(payload.queued_batch_ids)) throw new AdminApiError('parse', 'Le lancement de l’analyse IA est invalide.');
+    const payload = await this.postJsonV2(`/agent-batches/incidents/${encodeURIComponent(fireId)}/operations/${operationType}/run`, input, options);
+    if (!isRecord(payload) || !Array.isArray(payload.operation_ids)) throw new AdminApiError('parse', 'Le lancement de l’analyse IA est invalide.');
     try {
       return {
         fire_id: readString(payload.fire_id, 'fire_id', { max: 32 })!,
         episode_id: readString(payload.episode_id, 'episode_id', { max: 128 })!,
-        batch_type: readEnum(payload.batch_type, 'batch_type', ['user_media', 'external_media', 'satellite_media'] as const),
-        queued_batch_ids: payload.queued_batch_ids.map((item) => readString(item, 'queued_batch_id', { max: 128 })!),
+        operation_type: readEnum(payload.operation_type, 'operation_type', ['user_media', 'source_research', 'satellite_media'] as const),
+        operation_ids: payload.operation_ids.map((item) => readString(item, 'operation_id', { max: 128 })!),
         queued_files: readNonNegativeInteger(payload.queued_files, 'queued_files'),
       };
     } catch {
       throw new AdminApiError('parse', 'Le lancement de l’analyse IA est invalide.');
     }
+  }
+
+  async openIncidentSourcePackage(fireId: string, input: { readonly file_count: number; readonly total_size_bytes: number; readonly known_start_date: string; readonly known_end_date?: string | null; readonly location_hint?: string | null; readonly authorize_private_analysis: true }, options: AdminRequestOptions): Promise<AdminSourcePackageOpen> {
+    if (!/^FR-[0-9A-Z]{2,3}-[0-9]{5}$/.test(fireId) || input.file_count < 1 || input.total_size_bytes < 1 || !/^\d{4}-\d{2}-\d{2}$/.test(input.known_start_date)) throw new AdminApiError('configuration', 'Package de sources invalide.');
+    const payload = await this.postJsonV2(`/agent-batches/incidents/${encodeURIComponent(fireId)}/source-packages/open`, input, options);
+    if (!isRecord(payload) || !Array.isArray(payload.allowed_content_types)) throw new AdminApiError('parse', 'Autorisation d’envoi des sources invalide.');
+    return {
+      package_id: readString(payload.package_id, 'package_id', { max: 128 })!,
+      upload_id: readString(payload.upload_id, 'upload_id', { max: 128 })!,
+      pathname_prefix: readString(payload.pathname_prefix, 'pathname_prefix', { max: 512 })!,
+      upload_grant: readString(payload.upload_grant, 'upload_grant', { max: 4_096 })!,
+      expires_at: readIsoDate(payload.expires_at, 'expires_at'),
+      maximum_file_size_bytes: readPositiveInteger(payload.maximum_file_size_bytes, 'maximum_file_size_bytes'),
+      allowed_content_types: payload.allowed_content_types.map((item) => readString(item, 'allowed_content_type', { max: 128 })!),
+    };
+  }
+
+  async finalizeIncidentSourcePackage(packageId: string, options: AdminRequestOptions): Promise<AdminSourcePackageResult> {
+    if (!packageId || packageId.length > 128) throw new AdminApiError('configuration', 'Identifiant de package de sources invalide.');
+    const payload = await this.postJsonV2(`/agent-batches/source-packages/${encodeURIComponent(packageId)}/finalize`, {}, options);
+    if (!isRecord(payload) || !Array.isArray(payload.batch_ids) || !Array.isArray(payload.items)) throw new AdminApiError('parse', 'Finalisation des sources invalide.');
+    return {
+      package_id: readString(payload.package_id, 'package_id', { max: 128 })!,
+      state: readString(payload.state, 'state', { max: 64 })!,
+      known_start_date: readIsoDate(payload.known_start_date, 'known_start_date').slice(0, 10),
+      known_end_date: readIsoDate(payload.known_end_date, 'known_end_date').slice(0, 10),
+      publication_authorized: readBoolean(payload.publication_authorized, 'publication_authorized'),
+      batch_ids: payload.batch_ids.map((item) => readString(item, 'batch_id', { max: 128 })!),
+      item_count: payload.items.length,
+    };
   }
 
   async getIncidentModelsPipeline(fireId: string, options: AdminRequestOptions = {}): Promise<AdminIncidentModelsPipelineWorkspace> {

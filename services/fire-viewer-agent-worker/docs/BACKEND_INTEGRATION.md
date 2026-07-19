@@ -3,18 +3,20 @@
 ## Frontière retenue
 
 Le navigateur ne contacte jamais RunPod. Le backend CPU est l'unique client de l'endpoint et reste
-responsable de l'incident, des consentements, de la collecte, du prétraitement, du stockage temporaire,
+responsable de l'incident, des consentements, de la réception des packages utilisateur, du stockage temporaire,
 des décisions humaines et de la publication.
 
 ```text
-contribution ou collecte
+package utilisateur ou recherche publique demandée par l'administrateur
   -> validation consentement/licence
-  -> antivirus, EXIF, FFprobe, OCR, frames, audio, déduplication
+  -> empreintes, types, métadonnées, déduplication et stockage privé
   -> fichiers de travail privés + URLs HTTPS signées
-  -> batch et dispatch dédiés persistés
+  -> batch user_media ou opération source_research dédiés et persistés
   -> transport RunPod sélectionné par configuration
      -> recette : pod persistant /v1/jobs
      -> production future : Serverless /run
+  -> recherche Qwen : socket Unix vers courtier HTTPS à liste blanche
+  -> médias externes acceptés : mêmes batches et même dispatcher que les médias utilisateur
   -> polling et persistance immédiate du résultat
   -> validation déterministe backend
   -> tâche de revue humaine
@@ -26,6 +28,17 @@ contribution ou collecte
 La table historique `job` reste réservée au terrain et à la publication d'assets. L'analyse média
 utilise exclusivement `agent_media_batch`, `agent_media_item`, `agent_media_consent`,
 `agent_dispatch`, `agent_model_run`, `agent_dead_letter` et `agent_review_task`.
+
+L'envoi utilisateur normal ajoute `agent_source_package` et `agent_source_package_item` : ouverture
+d'un transfert privé, upload, puis finalisation. Le backend calcule tailles, types et empreintes et
+découpe automatiquement en batches `user_media` de 32 éléments. Le corpus historique de Die doit
+obligatoirement traverser ce contrat ; aucun chemin local, `test_mode` ou backend de replay n'existe.
+
+La recherche publique utilise `agent_source_research_run` et `agent_source_candidate`, jamais la
+table `job`. Qwen3-4B choisit les requêtes et les pages ; le courtier n'est qu'un exécuteur borné des
+outils `search`, `inspect` et `fetch`. Les candidats acceptés deviennent des batches
+`external_media` ou `satellite_media`, puis traversent le dispatcher normal. URL canonique, empreinte
+et contenu permettent la déduplication avec les packages utilisateur.
 
 L'API privée `/api/v2/admin/agent-batches` crée un lot idempotent, persiste les preuves de
 consentement, l'enfile et permet le retrait par élément. Le retrait avance la purge, demande
@@ -46,6 +59,13 @@ Le pod démarre avec `FW_RUN_MODE=pod`, expose `8000/http` et monte son volume s
 `/runpod-volume`. `FW_POD_AUTH_TOKEN` contient au moins 32 caractères et n'est partagé qu'entre le
 backend et le pod. La file HTTP n'exécute qu'un lot à la fois afin de respecter le déchargement
 séquentiel des modèles et le plafond VRAM. `/healthz` ne révèle que l'état du processus.
+
+Le bootstrap lance le courtier sous l'utilisateur `broker`, sans accès au groupe des poids, puis le
+service de recherche sous `researcher`. Le lanceur applique `no_new_privs` et un filtre seccomp qui
+refuse `AF_INET`, `AF_INET6` et `AF_PACKET`, mais conserve `AF_UNIX`. Un probe du noyau est obligatoire
+avant l'ouverture du service : le pod refuse de démarrer si l'isolation n'est pas réellement active.
+Le courtier n'obtient jamais le token RunPod, les poids ni les autres lots. Chaque session réseau est
+révoquée à la fin de la recherche, tandis que le pod et son cache de modèles restent chauds.
 
 Le backend utilise `FV_AGENT_RUNPOD_TRANSPORT=pod`, l'URL HTTPS du proxy RunPod et le même token.
 Il ne faut pas activer le dispatcher avant que le pod soit sain et son cache de poids verrouillé

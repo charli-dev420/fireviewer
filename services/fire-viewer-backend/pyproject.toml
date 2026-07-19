@@ -24,6 +24,7 @@ dependencies = [
   "prometheus-client==0.25.0",
   "pyproj==3.7.2",
   "shapely==2.1.2",
+  "pillow==12.1.1",
 ]
 
 [project.optional-dependencies]

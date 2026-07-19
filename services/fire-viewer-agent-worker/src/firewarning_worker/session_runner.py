@@ -22,7 +22,8 @@ from firewarning_worker.memory_manager import MemoryManager, synchronize_cuda
 from firewarning_worker.model_registry import ModelRole, ModelSpec
 from firewarning_worker.validation import OutputValidationError, validate_item_result
 
-ROLE_ORDER: tuple[ModelRole, ...] = (
+PipelineModelRole = Literal["asr", "fire_detection", "visual_grounding", "multimodal_extraction"]
+ROLE_ORDER: tuple[PipelineModelRole, ...] = (
     "asr",
     "fire_detection",
     "visual_grounding",
@@ -136,7 +137,7 @@ def _validated_candidates(
     return candidate
 
 
-def _role_has_work(role: ModelRole, batch: WorkerInput) -> bool:
+def _role_has_work(role: PipelineModelRole, batch: WorkerInput) -> bool:
     if role == "asr":
         return any(item.audio_url is not None for item in batch.items)
     if role in {"fire_detection", "visual_grounding"}:

@@ -5,7 +5,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 from urllib.parse import urlsplit
 
-from firewarning_worker.contracts import BatchItem, ItemResult
+from firewarning_worker.contracts import BatchItem, ItemResult, WorkerInputV2
 
 
 class OutputValidationError(ValueError):
@@ -49,6 +49,20 @@ def validate_internal_urls(items: Iterable[BatchItem], allowed_hosts: frozenset[
                 raise OutputValidationError("media URLs must not contain user information")
             if parsed.hostname not in allowed_hosts:
                 raise OutputValidationError(f"media URL host is not allowed: {parsed.hostname}")
+
+
+def validate_v2_internal_urls(batch: WorkerInputV2, allowed_hosts: frozenset[str]) -> None:
+    validate_internal_urls(batch.items, allowed_hosts)  # type: ignore[arg-type]
+    if batch.reference_bundle is None:
+        return
+    for asset in batch.reference_bundle.assets:
+        parsed = urlsplit(str(asset.working_file_url))
+        if parsed.scheme != "https":
+            raise OutputValidationError("reference URLs must use HTTPS")
+        if parsed.username or parsed.password:
+            raise OutputValidationError("reference URLs must not contain user information")
+        if parsed.hostname not in allowed_hosts:
+            raise OutputValidationError(f"reference URL host is not allowed: {parsed.hostname}")
 
 
 def _walk(value: Any, path: str = "output") -> Iterable[tuple[str, Any]]:

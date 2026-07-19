@@ -23,6 +23,7 @@ runtime = [
   "runpod==1.10.1",
   "safetensors==0.8.0",
   "transformers==4.57.6",
+  "vercel==0.7.0",
 ]
 roma-registration = [
   "einops==0.8.2",

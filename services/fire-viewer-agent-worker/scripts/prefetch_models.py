@@ -4,9 +4,10 @@ import argparse
 import os
 from pathlib import Path
 
-# This is the only network-enabled entry point in the image.  It runs on an
-# administration/CPU pod before the billed GPU worker and writes only to the
-# mounted persistent volumes.  The handler keeps the image-level offline flags.
+# Optional manual provisioning uses the same pinned downloader as the normal
+# pod bootstrap. The bootstrap invokes it automatically when mounted weights
+# are missing; both paths write only to persistent model volumes and restore
+# offline mode before any inference process starts.
 os.environ["HF_HUB_OFFLINE"] = "0"
 os.environ["TRANSFORMERS_OFFLINE"] = "0"
 

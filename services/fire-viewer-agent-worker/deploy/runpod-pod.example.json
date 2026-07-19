@@ -20,16 +20,22 @@
     "FW_ROMA_ROOT": "/runpod-volume/firewarning-roma",
     "FW_AUTO_PREFETCH_MODELS": "true",
     "FW_ATTENTION_IMPLEMENTATION": "flash_attention_2",
+    "FW_ENABLE_SOURCE_RESEARCH": "true",
+    "FW_RESEARCH_RUN_DIRECTORY": "/run/firewarning",
+    "FW_RESEARCH_MODEL_TIMEOUT_SECONDS": "840",
     "FW_RTDETR_CHECKPOINT_PATH": "/runpod-volume/firewarning-rtdetr",
     "FW_RTDETR_CHECKPOINT_SHA256": "REPLACE_WITH_64_HEX_CHARACTERS"
   },
   "backend": {
     "FV_AGENT_RUNPOD_TRANSPORT": "pod",
     "FV_AGENT_RUNPOD_POD_BASE_URL": "https://REPLACE_WITH_POD_PROXY_HOST",
-    "FV_AGENT_RUNPOD_POD_AUTH_TOKEN": "SAME_SECRET_AS_FW_POD_AUTH_TOKEN"
+    "FV_AGENT_RUNPOD_POD_AUTH_TOKEN": "SAME_SECRET_AS_FW_POD_AUTH_TOKEN",
+    "FV_AGENT_RESEARCH_ENABLED": "true",
+    "FV_AGENT_RESEARCH_SOURCE_REGISTRY_VERSION": "firewarning-fr-sources-2026-07-19-v1"
   },
   "constraints": [
     "No model weights, datasets, signed URLs, environment files, or secrets in the image.",
+    "The pod must fail startup when the seccomp AF_INET denial probe fails.",
     "Stop the pod after validation; retain only the model volume.",
     "Do not create a Serverless endpoint during this phase."
   ]

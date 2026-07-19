@@ -4170,6 +4170,275 @@
         }
       }
     },
+    "/api/v2/admin/agent-batches/incidents/{fire_id}/source-packages/open": {
+      "post": {
+        "tags": [
+          "admin-agent-batches"
+        ],
+        "summary": "Open Incident Source Package",
+        "operationId": "open_incident_source_package_api_v2_admin_agent_batches_incidents__fire_id__source_packages_open_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fire_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^FR-[0-9A-Z]{2,3}-[0-9]{5}$",
+              "title": "Fire Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentSourcePackageOpenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSourcePackageOpenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/agent-batches/source-packages/{package_id}/finalize": {
+      "post": {
+        "tags": [
+          "admin-agent-batches"
+        ],
+        "summary": "Finalize Incident Source Package",
+        "operationId": "finalize_incident_source_package_api_v2_admin_agent_batches_source_packages__package_id__finalize_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+              "title": "Package Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSourcePackageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/agent-batches/source-packages/{package_id}": {
+      "get": {
+        "tags": [
+          "admin-agent-batches"
+        ],
+        "summary": "Read Incident Source Package",
+        "operationId": "read_incident_source_package_api_v2_admin_agent_batches_source_packages__package_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+              "title": "Package Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSourcePackageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/agent-batches/incidents/{fire_id}/source-research": {
+      "post": {
+        "tags": [
+          "admin-agent-batches"
+        ],
+        "summary": "Run Incident Source Research",
+        "operationId": "run_incident_source_research_api_v2_admin_agent_batches_incidents__fire_id__source_research_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fire_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^FR-[0-9A-Z]{2,3}-[0-9]{5}$",
+              "title": "Fire Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentSourceResearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSourceResearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/agent-batches/source-research/{research_id}": {
+      "get": {
+        "tags": [
+          "admin-agent-batches"
+        ],
+        "summary": "Read Incident Source Research",
+        "operationId": "read_incident_source_research_api_v2_admin_agent_batches_source_research__research_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "research_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+              "title": "Research Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSourceResearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/admin/agent-batches": {
       "post": {
         "tags": [
@@ -4264,6 +4533,16 @@
               "pattern": "^FR-[0-9A-Z]{2,3}-[0-9]{5}$",
               "title": "Fire Id"
             }
+          },
+          {
+            "name": "local_date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "title": "Local Date"
+            }
           }
         ],
         "responses": {
@@ -4290,13 +4569,13 @@
         }
       }
     },
-    "/api/v2/admin/agent-batches/incidents/{fire_id}/operations/{batch_type}/run": {
+    "/api/v2/admin/agent-batches/incidents/{fire_id}/operations/{operation_type}/run": {
       "post": {
         "tags": [
           "admin-agent-batches"
         ],
         "summary": "Run Incident Operation",
-        "operationId": "run_incident_operation_api_v2_admin_agent_batches_incidents__fire_id__operations__batch_type__run_post",
+        "operationId": "run_incident_operation_api_v2_admin_agent_batches_incidents__fire_id__operations__operation_type__run_post",
         "security": [
           {
             "HTTPBearer": []
@@ -4314,14 +4593,30 @@
             }
           },
           {
-            "name": "batch_type",
+            "name": "operation_type",
             "in": "path",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/AgentBatchType"
+              "enum": [
+                "user_media",
+                "source_research",
+                "satellite_media"
+              ],
+              "type": "string",
+              "title": "Operation Type"
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentOperationRunRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -10102,7 +10397,8 @@
         "enum": [
           "explicit_upload",
           "source_license",
-          "institutional_mandate"
+          "institutional_mandate",
+          "public_source_analysis"
         ],
         "title": "AgentConsentBasis"
       },
@@ -10735,6 +11031,34 @@
         ],
         "title": "AgentMediaType"
       },
+      "AgentOperationRunRequest": {
+        "properties": {
+          "local_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Local Date"
+          },
+          "location_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Hint"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "local_date"
+        ],
+        "title": "AgentOperationRunRequest"
+      },
       "AgentOperationRunResponse": {
         "properties": {
           "fire_id": {
@@ -10747,16 +11071,22 @@
             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
             "title": "Episode Id"
           },
-          "batch_type": {
-            "$ref": "#/components/schemas/AgentBatchType"
+          "operation_type": {
+            "type": "string",
+            "enum": [
+              "user_media",
+              "source_research",
+              "satellite_media"
+            ],
+            "title": "Operation Type"
           },
-          "queued_batch_ids": {
+          "operation_ids": {
             "items": {
               "type": "string",
               "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
             },
             "type": "array",
-            "title": "Queued Batch Ids"
+            "title": "Operation Ids"
           },
           "queued_files": {
             "type": "integer",
@@ -10769,16 +11099,22 @@
         "required": [
           "fire_id",
           "episode_id",
-          "batch_type",
-          "queued_batch_ids",
+          "operation_type",
+          "operation_ids",
           "queued_files"
         ],
         "title": "AgentOperationRunResponse"
       },
       "AgentOperationStatus": {
         "properties": {
-          "batch_type": {
-            "$ref": "#/components/schemas/AgentBatchType"
+          "operation_type": {
+            "type": "string",
+            "enum": [
+              "user_media",
+              "source_research",
+              "satellite_media"
+            ],
+            "title": "Operation Type"
           },
           "pending_files": {
             "type": "integer",
@@ -10817,7 +11153,9 @@
                 "type": "string",
                 "enum": [
                   "dispatch_disabled",
-                  "nothing_to_process"
+                  "research_disabled",
+                  "nothing_to_process",
+                  "already_running"
                 ]
               },
               {
@@ -10830,7 +11168,7 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "batch_type",
+          "operation_type",
           "pending_files",
           "pending_analyses",
           "running_analyses",
@@ -10850,6 +11188,11 @@
             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
             "title": "Episode Id"
           },
+          "local_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Local Date"
+          },
           "actions": {
             "items": {
               "$ref": "#/components/schemas/AgentOperationStatus"
@@ -10863,6 +11206,7 @@
         "required": [
           "fire_id",
           "episode_id",
+          "local_date",
           "actions"
         ],
         "title": "AgentOperationsOverview"
@@ -10900,6 +11244,570 @@
           "reason"
         ],
         "title": "AgentReviewResolutionRequest"
+      },
+      "AgentSourceCandidateResponse": {
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Candidate Id"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AgentSourceCandidateState"
+          },
+          "canonical_url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "title": "Canonical Url"
+          },
+          "source_domain": {
+            "type": "string",
+            "title": "Source Domain"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "acquired_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acquired At"
+          },
+          "media_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentMediaType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "media_sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Sha256"
+          },
+          "cutoff_eligible": {
+            "type": "boolean",
+            "title": "Cutoff Eligible"
+          },
+          "license_identifier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License Identifier"
+          },
+          "attribution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attribution"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "state",
+          "canonical_url",
+          "source_domain",
+          "title",
+          "published_at",
+          "acquired_at",
+          "media_type",
+          "media_sha256",
+          "cutoff_eligible",
+          "license_identifier",
+          "attribution"
+        ],
+        "title": "AgentSourceCandidateResponse"
+      },
+      "AgentSourceCandidateState": {
+        "type": "string",
+        "enum": [
+          "DISCOVERED",
+          "ACCEPTED",
+          "REJECTED",
+          "DUPLICATE"
+        ],
+        "title": "AgentSourceCandidateState"
+      },
+      "AgentSourcePackageItemResponse": {
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Item Id"
+          },
+          "original_filename": {
+            "type": "string",
+            "title": "Original Filename"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "media_type": {
+            "$ref": "#/components/schemas/AgentMediaType"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Size Bytes"
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At"
+          },
+          "batch_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Id"
+          },
+          "input_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "item_id",
+          "original_filename",
+          "content_type",
+          "media_type",
+          "sha256",
+          "size_bytes"
+        ],
+        "title": "AgentSourcePackageItemResponse"
+      },
+      "AgentSourcePackageOpenRequest": {
+        "properties": {
+          "file_count": {
+            "type": "integer",
+            "maximum": 5000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "File Count"
+          },
+          "total_size_bytes": {
+            "type": "integer",
+            "maximum": 4294967296.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Total Size Bytes"
+          },
+          "known_start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Known Start Date"
+          },
+          "known_end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known End Date"
+          },
+          "location_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Hint"
+          },
+          "authorize_private_analysis": {
+            "type": "boolean",
+            "const": true,
+            "title": "Authorize Private Analysis"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "file_count",
+          "total_size_bytes",
+          "known_start_date",
+          "authorize_private_analysis"
+        ],
+        "title": "AgentSourcePackageOpenRequest"
+      },
+      "AgentSourcePackageOpenResponse": {
+        "properties": {
+          "package_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Package Id"
+          },
+          "upload_id": {
+            "type": "string",
+            "title": "Upload Id"
+          },
+          "pathname_prefix": {
+            "type": "string",
+            "title": "Pathname Prefix"
+          },
+          "upload_grant": {
+            "type": "string",
+            "title": "Upload Grant"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "maximum_file_size_bytes": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Maximum File Size Bytes"
+          },
+          "allowed_content_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Content Types"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "package_id",
+          "upload_id",
+          "pathname_prefix",
+          "upload_grant",
+          "expires_at",
+          "maximum_file_size_bytes",
+          "allowed_content_types"
+        ],
+        "title": "AgentSourcePackageOpenResponse"
+      },
+      "AgentSourcePackageResponse": {
+        "properties": {
+          "package_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Package Id"
+          },
+          "fire_id": {
+            "type": "string",
+            "pattern": "^FR-[0-9A-Z]{2,3}-[0-9]{5}$",
+            "title": "Fire Id"
+          },
+          "episode_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Episode Id"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AgentSourcePackageState"
+          },
+          "known_start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Known Start Date"
+          },
+          "known_end_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Known End Date"
+          },
+          "location_hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Hint"
+          },
+          "analysis_authorized": {
+            "type": "boolean",
+            "title": "Analysis Authorized"
+          },
+          "publication_authorized": {
+            "type": "boolean",
+            "title": "Publication Authorized"
+          },
+          "purge_after": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Purge After"
+          },
+          "finalized_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finalized At"
+          },
+          "batch_ids": {
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "type": "array",
+            "title": "Batch Ids"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentSourcePackageItemResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "package_id",
+          "fire_id",
+          "episode_id",
+          "state",
+          "known_start_date",
+          "known_end_date",
+          "location_hint",
+          "analysis_authorized",
+          "publication_authorized",
+          "purge_after",
+          "finalized_at",
+          "batch_ids",
+          "items"
+        ],
+        "title": "AgentSourcePackageResponse"
+      },
+      "AgentSourcePackageState": {
+        "type": "string",
+        "enum": [
+          "OPEN",
+          "FINALIZING",
+          "CONVERTED",
+          "FAILED",
+          "PURGED"
+        ],
+        "title": "AgentSourcePackageState"
+      },
+      "AgentSourceResearchRequest": {
+        "properties": {
+          "local_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Local Date"
+          },
+          "location_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Hint"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "local_date"
+        ],
+        "title": "AgentSourceResearchRequest"
+      },
+      "AgentSourceResearchResponse": {
+        "properties": {
+          "research_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Research Id"
+          },
+          "fire_id": {
+            "type": "string",
+            "pattern": "^FR-[0-9A-Z]{2,3}-[0-9]{5}$",
+            "title": "Fire Id"
+          },
+          "episode_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Episode Id"
+          },
+          "analysis_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Analysis Id"
+          },
+          "local_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Local Date"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AgentSourceResearchState"
+          },
+          "progress_percent": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Progress Percent"
+          },
+          "queued_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Queued At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/AgentSourceCandidateResponse"
+            },
+            "type": "array",
+            "title": "Candidates"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "research_id",
+          "fire_id",
+          "episode_id",
+          "analysis_id",
+          "local_date",
+          "state",
+          "progress_percent",
+          "queued_at",
+          "started_at",
+          "completed_at",
+          "candidates"
+        ],
+        "title": "AgentSourceResearchResponse"
+      },
+      "AgentSourceResearchState": {
+        "type": "string",
+        "enum": [
+          "QUEUED",
+          "SUBMITTING",
+          "RUNNING",
+          "SUCCEEDED",
+          "PARTIAL_FAILURE",
+          "FAILED",
+          "DEAD_LETTER",
+          "CANCEL_REQUESTED",
+          "CANCELLED"
+        ],
+        "title": "AgentSourceResearchState"
       },
       "AnalysisWindowV2": {
         "properties": {
@@ -13170,6 +14078,95 @@
               "operator"
             ],
             "title": "Trust"
+          },
+          "source_registry_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Registry Version"
+          },
+          "source_policy_domain": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 253,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Policy Domain"
+          },
+          "source_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "authority",
+                  "emergency_service",
+                  "satellite",
+                  "weather",
+                  "air_quality",
+                  "context",
+                  "directory",
+                  "press"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Kind"
+          },
+          "source_confidence": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "A+",
+                  "A",
+                  "B",
+                  "lead"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Confidence"
+          },
+          "publication_policy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "facts_with_attribution",
+                  "dataset_license_required",
+                  "per_item_license_check",
+                  "private_analysis_only"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publication Policy"
+          },
+          "claim_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Claim Types"
           }
         },
         "additionalProperties": false,

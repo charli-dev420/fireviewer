@@ -313,6 +313,14 @@ Return one JSON object with exactly these arrays: observations, explicit_places,
 Every entry must contain evidence_kind and evidence_id. Never infer a geographic position,
 forecast, propagation, threatened area, probability, or missing fact. Unknown means omitted.
 Observation fields: type, evidence_kind, evidence_id, optional region_id, description, certainty.
+For a situation report, use a precise type when the source explicitly states one: fire_progression,
+burned_area, evacuation_count, evacuation_instruction, shelter_opening, personnel_engaged,
+ground_resources_engaged, aircraft_engaged, casualty_or_damage, access_restriction,
+service_disruption, air_quality_alert, public_relief_and_donations, or public_instruction.
+Keep every number, unit, status and time in description. Do not merge contradictory values.
+source_context describes provenance, not truth. A source_confidence=lead statement may be extracted
+for the private draft only as a reported claim; it must not be rewritten as confirmed. A media
+license controls republication, not whether the media may be privately analysed.
 Place/time fields: literal, evidence_kind, evidence_id. JSON only."""
 
     def load(self) -> None:
@@ -405,6 +413,11 @@ Place/time fields: literal, evidence_kind, evidence_id. JSON only."""
                 transcript = accumulated[item.input_id].transcript
                 context_payload = {
                     "article_text": item.article_text,
+                    "source_context": (
+                        item.source_context.model_dump(mode="json", exclude_none=True)
+                        if item.source_context
+                        else None
+                    ),
                     "transcript": transcript.model_dump(mode="json") if transcript else None,
                     "pixel_regions": [
                         region.model_dump(mode="json")

@@ -7,7 +7,13 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Literal
 
-ModelRole = Literal["asr", "fire_detection", "visual_grounding", "multimodal_extraction"]
+ModelRole = Literal[
+    "asr",
+    "fire_detection",
+    "visual_grounding",
+    "multimodal_extraction",
+    "source_research",
+]
 _IMMUTABLE_REVISION = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -30,6 +36,11 @@ class ModelSpec:
 
 
 PUBLIC_MODELS: tuple[ModelSpec, ...] = (
+    ModelSpec(
+        role="source_research",
+        model_id="Qwen/Qwen3-4B-Instruct-2507",
+        revision="e7974da369bd887ad4f10a072ec4f933ac5391bf",
+    ),
     ModelSpec(
         role="asr",
         model_id="openai/whisper-large-v3-turbo",

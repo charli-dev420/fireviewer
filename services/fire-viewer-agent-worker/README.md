@@ -20,6 +20,8 @@ Le service contient :
 - le contrôle des liens de preuve, du vocabulaire spéculatif et des marqueurs géographiques ;
 - des métriques par modèle : chargement, inférence, pic VRAM, statut et code d'erreur ;
 - un téléchargement borné aux hôtes HTTPS internes explicitement autorisés, sans redirection.
+- une recherche Qwen3-4B pilotant uniquement `search`, `inspect` et `fetch` via un courtier réseau ;
+- un processus de recherche sans socket IPv4/IPv6, vérifié par seccomp au démarrage du pod.
 
 Le checkpoint `RT-DETRv2-R18 FireWarning` entraîné n'est pas dans le dépôt. L'absence de ce checkpoint
 est annoncée comme une étape `skipped`; elle ne doit pas être masquée en production.
@@ -78,6 +80,7 @@ Vérifier ensuite que les répertoires exacts existent :
 ```text
 /runpod-volume/huggingface-cache/hub/models--openai--whisper-large-v3-turbo/snapshots/41f01f...
 /runpod-volume/huggingface-cache/hub/models--microsoft--Florence-2-large-ft/snapshots/4a12a2...
+/runpod-volume/huggingface-cache/hub/models--Qwen--Qwen3-4B-Instruct-2507/snapshots/e7974d...
 /runpod-volume/huggingface-cache/hub/models--Qwen--Qwen3-VL-4B-Instruct/snapshots/ebb281...
 /runpod-volume/firewarning-roma/weights/roma_extre.pth
 /runpod-volume/firewarning-roma/weights/dinov2_vitl14_pretrain.pth
@@ -100,6 +103,9 @@ absente échoue donc immédiatement, sans repli vers `main` ni téléchargement 
 | `FW_AUTO_PREFETCH_MODELS` | `true` par défaut ; télécharge les poids publics épinglés absents avant le worker |
 | `FW_MODEL_PREFETCH_LOCK_PATH` | Verrou partagé de provisionnement ; défaut dans la racine du cache monté |
 | `FW_ATTENTION_IMPLEMENTATION` | `flash_attention_2`, obligatoire; aucun repli SDPA |
+| `FW_ENABLE_SOURCE_RESEARCH` | `true` pour démarrer le courtier et le service Qwen isolé |
+| `FW_RESEARCH_RUN_DIRECTORY` | Répertoire privé des sockets Unix, `/run/firewarning` par défaut |
+| `FW_RESEARCH_MODEL_TIMEOUT_SECONDS` | Limite d’une recherche Qwen, 840 secondes par défaut |
 | `FW_RTDETR_CHECKPOINT_PATH` | Répertoire contenant `model.safetensors` et la configuration Transformers |
 | `FW_RTDETR_CHECKPOINT_SHA256` | SHA-256 exact de `model.safetensors` |
 

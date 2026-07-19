@@ -34,6 +34,35 @@ def test_public_image_provisions_models_only_on_an_external_volume() -> None:
     assert "COPY datasets" not in dockerfile
 
 
+def test_public_image_runs_research_behind_dedicated_users_and_seccomp() -> None:
+    dockerfile = (PROJECT_ROOT / "Dockerfile").read_text(encoding="utf-8")
+    sandbox = (PROJECT_ROOT / "sandbox" / "research_sandbox.c").read_text(encoding="utf-8")
+
+    assert "useradd --create-home --uid 10002 --groups firewarning broker" in dockerfile
+    assert "useradd --create-home --uid 10003" in dockerfile
+    assert "FW_ENABLE_SOURCE_RESEARCH=true" in dockerfile
+    assert "fw-research-sandbox" in dockerfile
+    assert "PR_SET_NO_NEW_PRIVS" in sandbox
+    assert "PR_SET_SECCOMP" in sandbox
+    assert "AF_INET" in sandbox
+    assert "AF_INET6" in sandbox
+    assert "AF_PACKET" in sandbox
+
+
+def test_persistent_pod_enables_research_without_embedding_weights_or_secrets() -> None:
+    pod = json.loads(
+        (PROJECT_ROOT / "deploy" / "runpod-pod.example.json").read_text(encoding="utf-8")
+    )
+
+    assert pod["environment"]["FW_ENABLE_SOURCE_RESEARCH"] == "true"
+    assert pod["environment"]["FW_ATTENTION_IMPLEMENTATION"] == "flash_attention_2"
+    assert pod["backend"]["FV_AGENT_RESEARCH_ENABLED"] == "true"
+    assert pod["backend"]["FV_AGENT_RESEARCH_SOURCE_REGISTRY_VERSION"].startswith(
+        "firewarning-fr-sources-"
+    )
+    assert any("seccomp" in constraint for constraint in pod["constraints"])
+
+
 def test_git_repository_excludes_model_weights_and_datasets() -> None:
     gitignore = (PROJECT_ROOT.parents[1] / ".gitignore").read_text(encoding="utf-8")
     for private_pattern in (

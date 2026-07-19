@@ -1,3 +1,11 @@
+FROM pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime@sha256:417bd75df6365104c283ea4c1651fb3530d9eb5a4c2fafa51943cff2a94e6385 AS sandbox-builder
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends gcc libc6-dev linux-libc-dev \
+    && rm -rf /var/lib/apt/lists/*
+COPY sandbox/research_sandbox.c /tmp/research_sandbox.c
+RUN gcc -O2 -Wall -Wextra -Werror /tmp/research_sandbox.c -o /fw-research-sandbox
+
 FROM pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime@sha256:417bd75df6365104c283ea4c1651fb3530d9eb5a4c2fafa51943cff2a94e6385
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -10,7 +18,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     FW_ROMA_ROOT=/runpod-volume/firewarning-roma \
     FW_AUTO_PREFETCH_MODELS=true \
     FW_ENABLE_TRANSFORMERS_RUNTIME=true \
+    FW_ENABLE_SOURCE_RESEARCH=true \
+    FW_RESEARCH_SANDBOX_LAUNCHER=/usr/local/bin/fw-research-sandbox \
     FW_ATTENTION_IMPLEMENTATION=flash_attention_2
+
+COPY --from=sandbox-builder /fw-research-sandbox /usr/local/bin/fw-research-sandbox
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends ffmpeg libgl1 \
@@ -48,7 +60,12 @@ RUN python -c "from urllib.request import urlretrieve; urlretrieve('${FLASH_ATTN
 
 COPY scripts/prefetch_models.py ./scripts/prefetch_models.py
 
-RUN useradd --create-home --uid 10001 worker
+RUN groupadd --gid 10000 firewarning \
+    && groupadd --gid 10001 firewarning-model \
+    && useradd --create-home --uid 10001 --groups firewarning,firewarning-model worker \
+    && useradd --create-home --uid 10002 --groups firewarning broker \
+    && useradd --create-home --uid 10003 --groups firewarning,firewarning-model researcher \
+    && chmod 0755 /usr/local/bin/fw-research-sandbox
 # The bootstrap needs to initialize a fresh root-owned RunPod mount. It drops
 # to this unprivileged account before exec'ing the inference handler.
 ENV FW_RUNTIME_USER=worker

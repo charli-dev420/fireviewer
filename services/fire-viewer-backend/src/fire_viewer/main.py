@@ -19,6 +19,7 @@ from fire_viewer.api.middleware import (
     SecurityHeadersMiddleware,
     TraceMiddleware,
 )
+from fire_viewer.api.private_agent_media import router as private_agent_media_router
 from fire_viewer.api.router import api_router
 from fire_viewer.core.config import Settings, get_settings
 from fire_viewer.core.logging import configure_logging
@@ -91,6 +92,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(api_router, prefix=settings.api_prefix)
     app.include_router(admin_v2_router)
     app.include_router(agent_batches_router)
+    app.include_router(private_agent_media_router)
     app.mount("/metrics", make_asgi_app())
 
     default_openapi = app.openapi

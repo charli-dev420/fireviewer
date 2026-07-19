@@ -14,6 +14,9 @@ from fire_viewer.domain.enums import (
     AgentConsentState,
     AgentDispatchState,
     AgentMediaType,
+    AgentSourceCandidateState,
+    AgentSourcePackageState,
+    AgentSourceResearchState,
 )
 
 
@@ -23,6 +26,7 @@ class StrictAgentModel(BaseModel):
 
 SafeIdentifier = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")]
 Sha256Hex = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+AgentOperationType = Literal["user_media", "source_research", "satellite_media"]
 
 
 def _is_timezone_aware(value: datetime) -> bool:
@@ -85,6 +89,11 @@ class AgentConsentInput(StrictAgentModel):
             self.source_reference_url is None or self.license_identifier is None
         ):
             raise ValueError("source_license requires its HTTPS reference and identifier")
+        if (
+            self.basis == AgentConsentBasis.PUBLIC_SOURCE_ANALYSIS
+            and self.source_reference_url is None
+        ):
+            raise ValueError("public_source_analysis requires its HTTPS source reference")
         if self.expires_at is not None and self.expires_at <= self.granted_at:
             raise ValueError("consent expires_at must follow granted_at")
         return self
@@ -198,27 +207,254 @@ class AgentConsentWithdrawResponse(StrictAgentModel):
 
 
 class AgentOperationStatus(StrictAgentModel):
-    batch_type: AgentBatchType
+    operation_type: AgentOperationType
     pending_files: int = Field(ge=0)
     pending_analyses: int = Field(ge=0)
     running_analyses: int = Field(ge=0)
     last_run_at: datetime | None = None
     can_run: bool
-    blocked_reason: Literal["dispatch_disabled", "nothing_to_process"] | None = None
+    blocked_reason: (
+        Literal[
+            "dispatch_disabled",
+            "research_disabled",
+            "nothing_to_process",
+            "already_running",
+        ]
+        | None
+    ) = None
 
 
 class AgentOperationsOverview(StrictAgentModel):
     fire_id: str = Field(pattern=r"^FR-[0-9A-Z]{2,3}-[0-9]{5}$")
     episode_id: SafeIdentifier
+    local_date: date
     actions: list[AgentOperationStatus]
+
+
+class AgentOperationRunRequest(StrictAgentModel):
+    local_date: date
+    location_hint: str | None = Field(default=None, min_length=2, max_length=500)
 
 
 class AgentOperationRunResponse(StrictAgentModel):
     fire_id: str = Field(pattern=r"^FR-[0-9A-Z]{2,3}-[0-9]{5}$")
     episode_id: SafeIdentifier
-    batch_type: AgentBatchType
-    queued_batch_ids: list[SafeIdentifier]
+    operation_type: AgentOperationType
+    operation_ids: list[SafeIdentifier]
     queued_files: int = Field(ge=0)
+
+
+class AgentSourcePackageOpenRequest(StrictAgentModel):
+    file_count: int = Field(gt=0, le=5_000)
+    total_size_bytes: int = Field(gt=0, le=4_294_967_296)
+    known_start_date: date
+    known_end_date: date | None = None
+    location_hint: str | None = Field(default=None, min_length=2, max_length=500)
+    authorize_private_analysis: Literal[True]
+
+    @model_validator(mode="after")
+    def validate_period(self) -> AgentSourcePackageOpenRequest:
+        end_date = self.known_end_date or self.known_start_date
+        if end_date < self.known_start_date:
+            raise ValueError("known_end_date must not precede known_start_date")
+        if (end_date - self.known_start_date).days > 31:
+            raise ValueError("one source package may cover at most 32 days")
+        return self
+
+
+class AgentSourcePackageOpenResponse(StrictAgentModel):
+    package_id: SafeIdentifier
+    upload_id: str
+    pathname_prefix: str
+    upload_grant: str
+    expires_at: datetime
+    maximum_file_size_bytes: int = Field(gt=0)
+    allowed_content_types: list[str]
+
+
+class AgentSourcePackageItemResponse(StrictAgentModel):
+    item_id: SafeIdentifier
+    original_filename: str
+    content_type: str
+    media_type: AgentMediaType
+    sha256: Sha256Hex
+    size_bytes: int = Field(gt=0)
+    captured_at: datetime | None = None
+    batch_id: SafeIdentifier | None = None
+    input_id: SafeIdentifier | None = None
+
+
+class AgentSourcePackageResponse(StrictAgentModel):
+    package_id: SafeIdentifier
+    fire_id: str = Field(pattern=r"^FR-[0-9A-Z]{2,3}-[0-9]{5}$")
+    episode_id: SafeIdentifier
+    state: AgentSourcePackageState
+    known_start_date: date
+    known_end_date: date
+    location_hint: str | None
+    analysis_authorized: bool
+    publication_authorized: bool
+    purge_after: datetime
+    finalized_at: datetime | None
+    batch_ids: list[SafeIdentifier]
+    items: list[AgentSourcePackageItemResponse]
+
+
+class AgentSourceResearchRequest(StrictAgentModel):
+    local_date: date
+    location_hint: str | None = Field(default=None, min_length=2, max_length=500)
+
+
+class AgentSourceCandidateResponse(StrictAgentModel):
+    candidate_id: SafeIdentifier
+    state: AgentSourceCandidateState
+    canonical_url: AnyHttpUrl
+    source_domain: str
+    title: str | None
+    published_at: datetime | None
+    acquired_at: datetime | None
+    media_type: AgentMediaType | None
+    media_sha256: Sha256Hex | None
+    cutoff_eligible: bool
+    license_identifier: str | None
+    attribution: str | None
+
+
+class AgentSourceResearchResponse(StrictAgentModel):
+    research_id: SafeIdentifier
+    fire_id: str = Field(pattern=r"^FR-[0-9A-Z]{2,3}-[0-9]{5}$")
+    episode_id: SafeIdentifier
+    analysis_id: SafeIdentifier
+    local_date: date
+    state: AgentSourceResearchState
+    progress_percent: int = Field(ge=0, le=100)
+    queued_at: datetime
+    started_at: datetime | None
+    completed_at: datetime | None
+    candidates: list[AgentSourceCandidateResponse]
+
+
+class WorkerResearchUploadV1(StrictAgentModel):
+    pathname_prefix: str = Field(min_length=3, max_length=512)
+    upload_grant: str = Field(min_length=64, max_length=4_096)
+    token_endpoint: AnyHttpUrl
+    resource_id: SafeIdentifier
+    maximum_file_size_bytes: int = Field(gt=0)
+    allowed_content_types: list[str] = Field(min_length=1, max_length=32)
+
+
+class WorkerResearchSourcePolicyV1(StrictAgentModel):
+    source_name: str = Field(min_length=1, max_length=255)
+    kind: Literal[
+        "authority",
+        "emergency_service",
+        "satellite",
+        "weather",
+        "air_quality",
+        "context",
+        "directory",
+        "press",
+    ]
+    scope: Literal["national", "regional", "departmental", "local", "global"]
+    confidence_level: Literal["A+", "A", "B", "lead"]
+    claim_types: list[str] = Field(min_length=1, max_length=32)
+    publication_policy: Literal[
+        "facts_with_attribution",
+        "dataset_license_required",
+        "per_item_license_check",
+        "private_analysis_only",
+    ]
+    minimum_refresh_minutes: int = Field(ge=1, le=43_200)
+
+
+class WorkerResearchInputV1(StrictAgentModel):
+    schema_version: Literal["research-1.0"] = "research-1.0"
+    operation: Literal["source_research"] = "source_research"
+    research_id: SafeIdentifier
+    analysis_window: AnalysisWindowV2
+    incident_name: str | None = Field(default=None, max_length=255)
+    incident_reference: tuple[float, float]
+    cutoff_at: datetime
+    location_hint: str | None = Field(default=None, max_length=500)
+    source_registry_version: str = Field(min_length=3, max_length=64)
+    allowed_domains: list[str] = Field(min_length=1, max_length=200)
+    source_policies: dict[str, WorkerResearchSourcePolicyV1]
+    search_templates: dict[str, AnyHttpUrl]
+    max_fetch_bytes: int = Field(gt=0, le=104_857_600)
+    request_timeout_seconds: int = Field(ge=2, le=120)
+    private_upload: WorkerResearchUploadV1
+
+    @model_validator(mode="after")
+    def validate_research(self) -> WorkerResearchInputV1:
+        if not _is_timezone_aware(self.cutoff_at):
+            raise ValueError("research cutoff_at must include a timezone")
+        if self.cutoff_at != self.analysis_window.window_end_at:
+            raise ValueError("research cutoff must equal the analysis window end")
+        if len(self.allowed_domains) != len(set(self.allowed_domains)):
+            raise ValueError("research domains must be unique")
+        if set(self.source_policies) != set(self.allowed_domains):
+            raise ValueError("every research domain requires one source policy")
+        if not self.search_templates:
+            raise ValueError("at least one search provider is required")
+        if set(self.search_templates) & set(self.allowed_domains):
+            raise ValueError("search providers must be separate from source domains")
+        longitude, latitude = self.incident_reference
+        if not (-180 <= longitude <= 180 and -90 <= latitude <= 90):
+            raise ValueError("incident reference must be WGS84")
+        return self
+
+
+class WorkerResearchCandidateV1(StrictAgentModel):
+    candidate_id: SafeIdentifier
+    canonical_url: AnyHttpUrl
+    source_domain: str = Field(min_length=1, max_length=255)
+    title: str | None = Field(default=None, max_length=500)
+    published_at: datetime | None = None
+    acquired_at: datetime | None = None
+    media_type: AgentMediaType | None = None
+    blob_pathname: str | None = Field(default=None, min_length=3, max_length=1_024)
+    media_sha256: Sha256Hex | None = None
+    size_bytes: int | None = Field(default=None, gt=0, le=1_073_741_824)
+    excerpt: str | None = Field(default=None, max_length=100_000)
+    license_identifier: str | None = Field(default=None, max_length=128)
+    attribution: str | None = Field(default=None, max_length=500)
+    provenance: dict[str, object] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_candidate(self) -> WorkerResearchCandidateV1:
+        for timestamp in (self.published_at, self.acquired_at):
+            if timestamp is not None and not _is_timezone_aware(timestamp):
+                raise ValueError("candidate timestamps must include a timezone")
+        stored_fields = (self.blob_pathname, self.media_sha256, self.size_bytes)
+        if any(value is not None for value in stored_fields) and not all(
+            value is not None for value in stored_fields
+        ):
+            raise ValueError("stored candidate media requires path, hash, and size")
+        if self.media_type == AgentMediaType.ARTICLE and not self.excerpt:
+            raise ValueError("article candidates require extracted text")
+        if self.media_type not in {None, AgentMediaType.ARTICLE} and self.blob_pathname is None:
+            raise ValueError("media candidates require a private uploaded object")
+        return self
+
+
+class WorkerResearchOutputV1(StrictAgentModel):
+    schema_version: Literal["research-1.0"] = "research-1.0"
+    research_id: SafeIdentifier
+    status: Literal["succeeded", "partial_failure", "failed"]
+    retryable: bool
+    model_run: WorkerModelRun
+    queries: list[str] = Field(default_factory=list, max_length=100)
+    candidates: list[WorkerResearchCandidateV1] = Field(default_factory=list, max_length=500)
+    validation_errors: list[str] = Field(default_factory=list, max_length=100)
+
+    @model_validator(mode="after")
+    def validate_output(self) -> WorkerResearchOutputV1:
+        if self.model_run.model_role != "source_research":
+            raise ValueError("research output requires the source_research model role")
+        ids = [candidate.candidate_id for candidate in self.candidates]
+        if len(ids) != len(set(ids)):
+            raise ValueError("research candidate ids must be unique")
+        return self
 
 
 class WorkerFrameInput(StrictAgentModel):
@@ -341,7 +577,13 @@ class WorkerItemResult(StrictAgentModel):
 
 
 class WorkerModelRun(StrictAgentModel):
-    model_role: Literal["asr", "fire_detection", "visual_grounding", "multimodal_extraction"]
+    model_role: Literal[
+        "asr",
+        "fire_detection",
+        "visual_grounding",
+        "multimodal_extraction",
+        "source_research",
+    ]
     model_id: str
     revision: str
     status: Literal["succeeded", "failed", "skipped"]
@@ -390,6 +632,32 @@ class SourceProvenanceV2(StrictAgentModel):
     license_identifier: str = Field(min_length=1, max_length=128)
     attribution: str | None = Field(default=None, max_length=500)
     trust: Literal["unverified", "partner", "institutional", "operator"]
+    source_registry_version: str | None = Field(default=None, min_length=3, max_length=64)
+    source_policy_domain: str | None = Field(default=None, min_length=3, max_length=253)
+    source_kind: (
+        Literal[
+            "authority",
+            "emergency_service",
+            "satellite",
+            "weather",
+            "air_quality",
+            "context",
+            "directory",
+            "press",
+        ]
+        | None
+    ) = None
+    source_confidence: Literal["A+", "A", "B", "lead"] | None = None
+    publication_policy: (
+        Literal[
+            "facts_with_attribution",
+            "dataset_license_required",
+            "per_item_license_check",
+            "private_analysis_only",
+        ]
+        | None
+    ) = None
+    claim_types: list[str] = Field(default_factory=list, max_length=32)
 
 
 class CameraMetadataV2(StrictAgentModel):

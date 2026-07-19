@@ -50,6 +50,10 @@ from fire_viewer.services.agent_intelligence import (
     persist_worker_output_v2,
     validate_worker_output_v2,
 )
+from fire_viewer.services.agent_source_research import (
+    claim_next_source_research,
+    process_claimed_source_research,
+)
 from fire_viewer.services.common import record_operator_audit
 
 ACTIVE_REMOTE_STATES = frozenset({"IN_QUEUE", "IN_PROGRESS", "RUNNING"})
@@ -139,9 +143,7 @@ class RunPodPodClient:
             raise ValueError("RunPod pod URL and authentication token are not configured")
         self._jobs_url = f"{str(settings.agent_runpod_pod_base_url).rstrip('/')}/v1/jobs"
         self._headers = {
-            "Authorization": (
-                f"Bearer {settings.agent_runpod_pod_auth_token.get_secret_value()}"
-            ),
+            "Authorization": (f"Bearer {settings.agent_runpod_pod_auth_token.get_secret_value()}"),
             "Content-Type": "application/json",
         }
         self._policy = {
@@ -177,9 +179,7 @@ class RunPodPodClient:
         return self._object_response(self._client.get(f"{self._jobs_url}/{remote_job_id}"))
 
     def cancel(self, remote_job_id: str) -> dict[str, Any]:
-        return self._object_response(
-            self._client.post(f"{self._jobs_url}/{remote_job_id}/cancel")
-        )
+        return self._object_response(self._client.post(f"{self._jobs_url}/{remote_job_id}/cancel"))
 
     def close(self) -> None:
         self._client.close()
@@ -935,6 +935,20 @@ def run_dispatcher_once(
 ) -> bool:
     with factory() as session:
         purge_due_agent_media(session)
+        research_row_id = claim_next_source_research(
+            session,
+            worker_id=worker_id,
+            settings=settings,
+        )
+        if research_row_id is not None:
+            process_claimed_source_research(
+                session,
+                research_row_id=research_row_id,
+                worker_id=worker_id,
+                settings=settings,
+                client=client,
+            )
+            return True
         dispatch_id = claim_next_dispatch(
             session,
             worker_id=worker_id,

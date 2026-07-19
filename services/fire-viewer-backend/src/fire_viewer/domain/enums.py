@@ -184,6 +184,7 @@ class AgentConsentBasis(StrEnum):
     EXPLICIT_UPLOAD = "explicit_upload"
     SOURCE_LICENSE = "source_license"
     INSTITUTIONAL_MANDATE = "institutional_mandate"
+    PUBLIC_SOURCE_ANALYSIS = "public_source_analysis"
 
 
 class AgentConsentState(StrEnum):
@@ -230,6 +231,33 @@ class AgentAnalysisState(StrEnum):
     REVIEW_PENDING = "REVIEW_PENDING"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
+
+
+class AgentSourcePackageState(StrEnum):
+    OPEN = "OPEN"
+    FINALIZING = "FINALIZING"
+    CONVERTED = "CONVERTED"
+    FAILED = "FAILED"
+    PURGED = "PURGED"
+
+
+class AgentSourceResearchState(StrEnum):
+    QUEUED = "QUEUED"
+    SUBMITTING = "SUBMITTING"
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    PARTIAL_FAILURE = "PARTIAL_FAILURE"
+    FAILED = "FAILED"
+    DEAD_LETTER = "DEAD_LETTER"
+    CANCEL_REQUESTED = "CANCEL_REQUESTED"
+    CANCELLED = "CANCELLED"
+
+
+class AgentSourceCandidateState(StrEnum):
+    DISCOVERED = "DISCOVERED"
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+    DUPLICATE = "DUPLICATE"
 
 
 class AgentProposalReviewState(StrEnum):

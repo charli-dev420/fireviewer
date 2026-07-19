@@ -218,7 +218,7 @@ describe('pages de workflow administrateur', () => {
     });
   });
 
-  it('limite l’édition d’une source aux choix compréhensibles et conserve les métadonnées techniques', async () => {
+  it('présente seulement le package quotidien et les trois analyses validées', async () => {
     vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
     const workspace = {
       fire_id: 'FR-26-00001',
@@ -232,13 +232,13 @@ describe('pages de workflow administrateur', () => {
     };
     const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
       if (String(input).includes('/api/v2/admin/agent-batches/')) return response({
-        fire_id: 'FR-26-00001', episode_id: 'E01', actions: [
-          { batch_type: 'user_media', pending_files: 0, pending_analyses: 0, running_analyses: 0, last_run_at: null, can_run: false, blocked_reason: 'nothing_to_process' },
-          { batch_type: 'external_media', pending_files: 2, pending_analyses: 1, running_analyses: 0, last_run_at: '2026-07-18T10:00:00Z', can_run: true, blocked_reason: null },
-          { batch_type: 'satellite_media', pending_files: 0, pending_analyses: 0, running_analyses: 0, last_run_at: null, can_run: false, blocked_reason: 'nothing_to_process' },
+        fire_id: 'FR-26-00001', episode_id: 'E01', local_date: '2026-07-09', actions: [
+          { operation_type: 'user_media', pending_files: 2, pending_analyses: 1, running_analyses: 0, last_run_at: null, can_run: true, blocked_reason: null },
+          { operation_type: 'source_research', pending_files: 0, pending_analyses: 1, running_analyses: 0, last_run_at: '2026-07-18T10:00:00Z', can_run: true, blocked_reason: null },
+          { operation_type: 'satellite_media', pending_files: 0, pending_analyses: 0, running_analyses: 0, last_run_at: null, can_run: false, blocked_reason: 'nothing_to_process' },
         ],
       });
-      if (init?.method === 'PUT') return response({ id: 'presse-locale' });
+      if (init?.method === 'POST') return response({ fire_id: 'FR-26-00001', episode_id: 'E01', operation_type: 'source_research', operation_ids: ['research-1'], queued_files: 0 });
       return response(workspace);
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -246,22 +246,16 @@ describe('pages de workflow administrateur', () => {
     renderAdmin(<AdminIncidentSourcesMediaPage fireId="FR-26-00001" />);
 
     await screen.findByRole('heading', { name: 'Sources liées' });
-    expect(await screen.findByRole('button', { name: 'Lancer presse et médias' })).toBeEnabled();
-    await user.click(screen.getByText('Modifier l’affichage de cette source'));
-    expect(screen.queryByLabelText(/licence|transformations|référence externe|motif audité/i)).not.toBeInTheDocument();
-    await user.type(screen.getByLabelText('Nom affiché au public'), 'Journal local');
-    await user.click(screen.getByRole('button', { name: 'Enregistrer' }));
-
-    const updateCall = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
-    expect(JSON.parse(String(updateCall?.[1]?.body))).toMatchObject({
-      type: 'image',
-      trust: 'partner',
-      public_display_name: 'Journal local',
-      public_license: 'CC-BY-4.0',
-      public_reference_url: 'https://example.test/source',
-      public_transformations: ['recadrage'],
-      reason: 'Registre source mis à jour manuellement depuis la fiche incident.',
-    });
+    expect(screen.getByLabelText('Date')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Photos, vidéos, audios ou textes/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/autorise l’analyse privée/)).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Analyser les fichiers reçus' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Rechercher et analyser les sources publiques' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Rien à traiter' })).toBeDisabled();
+    expect(screen.queryByText('Modifier l’affichage de cette source')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Rechercher et analyser les sources publiques' }));
+    const researchCall = fetchMock.mock.calls.find(([url, init]) => String(url).includes('/operations/source_research/run') && init?.method === 'POST');
+    expect(JSON.parse(String(researchCall?.[1]?.body))).toMatchObject({ location_hint: null });
   });
 
   it('publie depuis l’aperçu avec la session administrateur active', async () => {
