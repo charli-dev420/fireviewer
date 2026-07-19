@@ -122,8 +122,10 @@ Configurer la racine du projet Vercel sur `services/fire-viewer-backend`. Le fic
 `pyproject.toml`, conformément à la
 [documentation du runtime Python](https://vercel.com/docs/functions/runtimes/python).
 
-Les migrations ne doivent pas être lancées au démarrage d'une Function. Les exécuter une seule
-fois avec la chaîne directe Neon avant le déploiement de l'API.
+Les migrations ne doivent pas être lancées au démarrage d'une Function. Le build Vercel exécute
+`uv run --frozen alembic upgrade head` avant la création et la promotion des Functions, avec la
+chaîne `FV_DATABASE_URL` de l'environnement ciblé. Un échec Alembic doit faire échouer le build et
+laisser le déploiement actif inchangé.
 
 Après le déploiement :
 

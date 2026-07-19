@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "uv run --frozen alembic upgrade head",
   "env": {
     "FV_DATABASE_SCHEMA_REVISION": "f9c8b7a6d510"
   },

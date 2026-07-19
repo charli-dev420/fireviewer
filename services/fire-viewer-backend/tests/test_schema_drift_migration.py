@@ -21,6 +21,7 @@ def test_runtime_and_vercel_expect_the_current_schema_revision() -> None:
     vercel_config = json.loads((PROJECT_ROOT / "vercel.json").read_text(encoding="utf-8"))
 
     assert Settings().database_schema_revision == SOURCE_INGESTION_REVISION
+    assert vercel_config["buildCommand"] == "uv run --frozen alembic upgrade head"
     assert (
         vercel_config["env"]["FV_DATABASE_SCHEMA_REVISION"] == SOURCE_INGESTION_REVISION
     )
