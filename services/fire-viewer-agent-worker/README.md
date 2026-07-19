@@ -106,6 +106,7 @@ absente échoue donc immédiatement, sans repli vers `main` ni téléchargement 
 | `FW_ENABLE_SOURCE_RESEARCH` | `true` pour démarrer le courtier et le service Qwen isolé |
 | `FW_RESEARCH_RUN_DIRECTORY` | Répertoire privé des sockets Unix, `/run/firewarning` par défaut |
 | `FW_RESEARCH_MODEL_TIMEOUT_SECONDS` | Limite d’une recherche Qwen, 840 secondes par défaut |
+| `FW_BOOTSTRAP_FAILURE_HOLD_SECONDS` | Durée bornée (0–900 s, 300 par défaut) pendant laquelle `/healthz` conserve l’erreur de bootstrap avant l’arrêt |
 | `FW_RTDETR_CHECKPOINT_PATH` | Répertoire contenant `model.safetensors` et la configuration Transformers |
 | `FW_RTDETR_CHECKPOINT_SHA256` | SHA-256 exact de `model.safetensors` |
 

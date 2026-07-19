@@ -13,6 +13,7 @@ from hashlib import sha256
 from pathlib import Path
 from typing import BinaryIO, Protocol, cast
 
+from firewarning_worker.bootstrap_status import BootstrapStatusServer, start_bootstrap_status_server
 from firewarning_worker.model_provisioning import cache_status, provision_model_cache
 
 DEFAULT_CACHE_ROOT = Path("/runpod-volume/huggingface-cache/hub")
@@ -330,27 +331,48 @@ def start_research_runtime() -> None:
 
 
 def main() -> None:
+    status_server: BootstrapStatusServer | None = None
     try:
         runtime_module = _runtime_module()
+        if runtime_module == RUNTIME_MODULES["pod"]:
+            status_server = start_bootstrap_status_server(int(os.getenv("FW_POD_PORT", "8000")))
+            status_server.status.update("provisioning_models")
         ensure_model_cache()
+        if status_server is not None:
+            status_server.status.update("securing_model_storage")
         secure_model_storage()
         if runtime_module != RUNTIME_MODULES["pod_validation"] and _enabled(
             os.getenv("FW_ENABLE_SOURCE_RESEARCH"), default=True
         ):
+            if status_server is not None:
+                status_server.status.update("starting_research_sandbox")
             start_research_runtime()
+
+        # A fresh process guarantees that every inference library observes the
+        # restored offline flags; the worker can never download a floating model.
+        os.environ["HF_HUB_OFFLINE"] = "1"
+        os.environ["TRANSFORMERS_OFFLINE"] = "1"
+        if status_server is not None:
+            status_server.status.update("launching_worker")
+        _drop_runtime_privileges()
+        # File descriptors are non-inheritable by default. The bootstrap health
+        # socket therefore closes atomically at exec so the pod server can bind
+        # the same port without an unobservable gap.
+        os.execv(  # noqa: S606 - fixed executable and argv; shell invocation is intentional
+            sys.executable,
+            [sys.executable, "-m", runtime_module],
+        )
     except Exception as exc:
         print(f"firewarning bootstrap failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+        if status_server is not None:
+            status_server.status.fail(exc)
+            try:
+                hold_seconds = int(os.getenv("FW_BOOTSTRAP_FAILURE_HOLD_SECONDS", "300"))
+            except ValueError:
+                hold_seconds = 300
+            time.sleep(max(0, min(hold_seconds, 900)))
+            status_server.close()
         raise SystemExit(78) from exc
-
-    # A fresh process guarantees that every inference library observes the
-    # restored offline flags; the worker can never download a floating model.
-    os.environ["HF_HUB_OFFLINE"] = "1"
-    os.environ["TRANSFORMERS_OFFLINE"] = "1"
-    _drop_runtime_privileges()
-    os.execv(  # noqa: S606 - fixed executable and argv; shell invocation is intentionally absent
-        sys.executable,
-        [sys.executable, "-m", runtime_module],
-    )
 
 
 if __name__ == "__main__":
