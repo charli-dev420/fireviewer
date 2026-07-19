@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Box3, Vector3 } from 'three';
 import { parseTiledSpatialCatalog } from '../../lib/tiledSpatialCatalog';
 import { parseUnitySpatialCatalog } from '../../lib/unitySpatialTile';
-import { terrainOcclusionProbeDistance, tileIsWithinNearDetailDistance } from '../../lib/spatialVisibility';
+import { terrainOcclusionProbeDistance } from '../../lib/spatialVisibility';
 
 const files = {
   'terrain/T00/colour.png': '/api/colour',
@@ -120,17 +120,5 @@ describe('terrainOcclusionProbeDistance', () => {
   it('ne masque jamais la tuile qui contient déjà la caméra', () => {
     const volume = new Box3(new Vector3(-10, -10, -20), new Vector3(110, 10, 120));
     expect(terrainOcclusionProbeDistance(new Vector3(0, 0, 100), new Vector3(100, 0, 0), volume)).toBe(0);
-  });
-});
-
-describe('tileIsWithinNearDetailDistance', () => {
-  const tile = (minimumEast: number) => [minimumEast, -50, minimumEast + 100, 50] as const;
-
-  it('conserve autour du point visé une tuile dans la portée near étendue de 30 %', () => {
-    expect(tileIsWithinNearDetailDistance(0, 0, tile(1_299), 1_000)).toBe(true);
-  });
-
-  it('écarte autour du point visé une tuile visible au-delà de la portée near', () => {
-    expect(tileIsWithinNearDetailDistance(0, 0, tile(1_301), 1_000)).toBe(false);
   });
 });

@@ -46,7 +46,7 @@ import {
   type UnitySpatialCatalog,
   type UnityTileGeometry,
 } from '../../lib/unitySpatialTile';
-import { terrainOcclusionProbeDistance, tileIsWithinNearDetailDistance } from '../../lib/spatialVisibility';
+import { terrainOcclusionProbeDistance } from '../../lib/spatialVisibility';
 
 export interface TiledSceneSource {
   readonly catalogUrl: string;
@@ -448,12 +448,6 @@ export function TiledSpatialScene3D({
       const frustum = cameraFrustum(instance.view.camera);
       desiredTiles = propsRef.current.detailLodEnabled ? catalog.tiles
         .filter((tile) => tileIntersectsCamera(frustum, tile, catalog!.origin_l93_m, terrainElevationRange))
-        .filter((tile) => tileIsWithinNearDetailDistance(
-          absoluteEast,
-          absoluteNorth,
-          tile.bounds_l93_m,
-          catalog!.lod_policy.detail.publish_distance_m,
-        ))
         .map((tile) => ({ tile, distance: tileVolume(tile, catalog!.origin_l93_m, terrainElevationRange).distanceToPoint(instance!.view.camera.position) }))
         .filter((entry) => tileHasTerrainLineOfSight(entry.tile))
         .sort((left, right) => left.distance - right.distance || left.tile.id.localeCompare(right.tile.id))
