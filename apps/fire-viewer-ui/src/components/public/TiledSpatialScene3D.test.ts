@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Box3, Vector3 } from 'three';
 import { parseTiledSpatialCatalog } from '../../lib/tiledSpatialCatalog';
 import { parseUnitySpatialCatalog } from '../../lib/unitySpatialTile';
-import { terrainOcclusionProbeDistance } from '../../lib/spatialVisibility';
+import { terrainOcclusionProbeDistance, tileIsWithinDetailDistance } from '../../lib/spatialVisibility';
 
 const files = {
   'terrain/T00/colour.png': '/api/colour',
@@ -120,5 +120,21 @@ describe('terrainOcclusionProbeDistance', () => {
   it('ne masque jamais la tuile qui contient déjà la caméra', () => {
     const volume = new Box3(new Vector3(-10, -10, -20), new Vector3(110, 10, 120));
     expect(terrainOcclusionProbeDistance(new Vector3(0, 0, 100), new Vector3(100, 0, 0), volume)).toBe(0);
+  });
+});
+
+describe('tileIsWithinDetailDistance', () => {
+  const bounds = [650_000, 6_800_000, 650_250, 6_800_250] as const;
+
+  it('keeps a tile containing the camera position', () => {
+    expect(tileIsWithinDetailDistance(650_125, 6_800_125, bounds, 600)).toBe(true);
+  });
+
+  it('keeps a tile whose edge reaches the publication distance', () => {
+    expect(tileIsWithinDetailDistance(649_400, 6_800_125, bounds, 600)).toBe(true);
+  });
+
+  it('rejects a frustum tile beyond the camera publication distance', () => {
+    expect(tileIsWithinDetailDistance(649_399, 6_800_125, bounds, 600)).toBe(false);
   });
 });
