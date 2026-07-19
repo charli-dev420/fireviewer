@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Box3, Vector3 } from 'three';
 import { parseTiledSpatialCatalog } from '../../lib/tiledSpatialCatalog';
+import { parseUnitySpatialCatalog } from '../../lib/unitySpatialTile';
 import { terrainOcclusionProbeDistance, tileIsWithinNearDetailDistance } from '../../lib/spatialVisibility';
 
 const files = {
@@ -50,6 +51,48 @@ describe('parseTiledSpatialCatalog', () => {
       ...files,
       'terrain/T00/elevation.cog.tif': '',
     })).toThrow('absent du package publié');
+  });
+});
+
+describe('parseUnitySpatialCatalog', () => {
+  const asset = (path: string) => ({ path, sha256: 'a'.repeat(64), byte_count: 128 });
+  const unityCatalog = {
+    schema: 'fireviewer.remote-tile-catalog.v1',
+    catalog_version: 1,
+    crs: 'EPSG:2154',
+    linear_unit: 'metre',
+    origin_l93_m: [650_000, 6_800_000, 75],
+    exported_detail_tile_count: 1,
+    lod_policy: {
+      far: {
+        bounds_l93_m: [640_000, 6_790_000, 660_000, 6_810_000],
+        terrain: asset('assets/far/global.fwterrain'),
+        imagery: asset('assets/far/global.jpg'),
+      },
+      detail: {
+        publish_distance_m: 600,
+        preload_radius_m: 750,
+        maximum_resident_tile_count: 32,
+      },
+    },
+    tiles: [{
+      id: 'T0001',
+      bounds_l93_m: [650_000, 6_800_000, 650_250, 6_800_250],
+      payload: asset('assets/detail/T0001.fwtile'),
+      imagery: asset('assets/detail/T0001.jpg'),
+      sections: ['terrain', 'trees', 'buildings', 'roads', 'water'],
+    }],
+  };
+
+  it('accepte le budget 32 du catalogue Unity Fontainebleau', () => {
+    expect(parseUnitySpatialCatalog(unityCatalog).lod_policy.detail.maximum_resident_tile_count).toBe(32);
+  });
+
+  it('rejette toujours un budget nul', () => {
+    expect(() => parseUnitySpatialCatalog({
+      ...unityCatalog,
+      lod_policy: { ...unityCatalog.lod_policy, detail: { ...unityCatalog.lod_policy.detail, maximum_resident_tile_count: 0 } },
+    })).toThrow('entier positif');
   });
 });
 

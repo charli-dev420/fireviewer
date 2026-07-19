@@ -163,7 +163,7 @@ export function parseUnitySpatialCatalog(value: unknown): UnitySpatialCatalog {
   const far = record(policy.far, 'lod_policy.far');
   const detail = record(policy.detail, 'lod_policy.detail');
   const maximum = finite(detail.maximum_resident_tile_count, 'maximum_resident_tile_count');
-  if (!Number.isInteger(maximum) || maximum < 1 || maximum > 16) throw new Error('Le budget Unity doit être compris entre 1 et 16 tuiles.');
+  if (!Number.isSafeInteger(maximum) || maximum < 1) throw new Error('Le budget Unity doit être un entier positif.');
   const rows = source.tiles;
   if (!Array.isArray(rows)) throw new Error('La liste des tuiles Unity est absente.');
   const tiles = rows.map((raw, index): UnityCatalogTile => {
