@@ -16,7 +16,10 @@ from firewarning_worker.roma_registration import (
 )
 
 
-def test_asset_download_is_atomic_and_digest_verified(tmp_path: Path) -> None:
+def test_asset_download_is_atomic_and_digest_verified(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     payload = b"pinned model bytes"
     spec = AssetSpec(
         filename="model.pth",
@@ -31,6 +34,11 @@ def test_asset_download_is_atomic_and_digest_verified(tmp_path: Path) -> None:
     assert path.read_bytes() == payload
     assert not path.with_suffix(".pth.partial").exists()
     verify_asset(path, spec)
+    output = capsys.readouterr().out
+    assert "downloading spatial model asset=model.pth" in output
+    assert "spatial model progress asset=model.pth" in output
+    assert "percent=100" in output
+    assert "spatial model ready asset=model.pth" in output
 
 
 def test_altered_asset_is_rejected_and_partial_is_removed(tmp_path: Path) -> None:

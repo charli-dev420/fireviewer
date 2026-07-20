@@ -6,10 +6,10 @@ from http.client import HTTPConnection
 from firewarning_worker.bootstrap_status import start_bootstrap_status_server
 
 
-def _get_health(port: int) -> tuple[int, dict[str, object]]:
+def _get_json(port: int, path: str = "/healthz") -> tuple[int, dict[str, object]]:
     connection = HTTPConnection("127.0.0.1", port, timeout=5)
     try:
-        connection.request("GET", "/healthz")
+        connection.request("GET", path)
         response = connection.getresponse()
         return response.status, json.loads(response.read())
     finally:
@@ -21,7 +21,7 @@ def test_bootstrap_health_reports_progress_before_worker_is_ready() -> None:
     try:
         status_server.status.update("provisioning_models")
 
-        status, payload = _get_health(status_server.port)
+        status, payload = _get_json(status_server.port)
 
         assert status == 503
         assert payload["status"] == "provisioning"
@@ -44,7 +44,7 @@ def test_bootstrap_health_redacts_failure_secrets() -> None:
             )
         )
 
-        status, payload = _get_health(status_server.port)
+        status, payload = _get_json(status_server.port)
 
         assert status == 503
         assert payload["status"] == "failed"
@@ -57,5 +57,22 @@ def test_bootstrap_health_redacts_failure_secrets() -> None:
         assert "password" not in detail
         assert "query-token" not in detail
         assert detail.count("[redacted]") == 5
+    finally:
+        status_server.close()
+
+
+def test_bootstrap_root_is_liveness_but_not_readiness() -> None:
+    status_server = start_bootstrap_status_server(0)
+    try:
+        status_server.status.update("provisioning_models")
+
+        root_status, root_payload = _get_json(status_server.port, "/")
+        health_status, health_payload = _get_json(status_server.port, "/healthz")
+
+        assert root_status == 200
+        assert root_payload["ready"] is False
+        assert root_payload["stage"] == "provisioning_models"
+        assert health_status == 503
+        assert health_payload["ready"] is False
     finally:
         status_server.close()

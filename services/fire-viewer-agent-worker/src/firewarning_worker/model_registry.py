@@ -58,9 +58,29 @@ PUBLIC_MODELS: tuple[ModelSpec, ...] = (
     ),
 )
 
+RTDETR_BASELINE = ModelSpec(
+    role="fire_detection",
+    model_id="PekingU/rtdetr_v2_r18vd",
+    revision="5650961749fa93567c0d46fc7f43ea4f9e914107",
+)
+
+
+def rtdetr_baseline_enabled() -> bool:
+    value = os.getenv("FW_ENABLE_RTDETR_BASELINE", "false")
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def enabled_public_models() -> tuple[ModelSpec, ...]:
+    if not rtdetr_baseline_enabled():
+        return PUBLIC_MODELS
+    # Provisioning follows the media pipeline order: Whisper, optional visual
+    # filtering, Florence, then Qwen3-VL. Source research remains first because
+    # it is an independent operation sharing the same persistent cache.
+    return (*PUBLIC_MODELS[:2], RTDETR_BASELINE, *PUBLIC_MODELS[2:])
+
 
 def build_registry() -> dict[ModelRole, ModelSpec]:
-    registry = {spec.role: spec for spec in PUBLIC_MODELS}
+    registry = {spec.role: spec for spec in enabled_public_models()}
     checkpoint = os.getenv("FW_RTDETR_CHECKPOINT_PATH")
     digest = os.getenv("FW_RTDETR_CHECKPOINT_SHA256")
     if checkpoint or digest:

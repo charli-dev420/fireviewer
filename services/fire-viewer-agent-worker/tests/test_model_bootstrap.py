@@ -80,6 +80,36 @@ def test_runtime_mode_selects_only_fixed_modules(monkeypatch: pytest.MonkeyPatch
         bootstrap._runtime_module()
 
 
+def test_runtime_dependencies_are_reported_without_installing_at_boot(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    versions = {"torch": "2.8.0", "transformers": "4.55.0", "flash-attn": "2.8.3"}
+    monkeypatch.setattr(bootstrap, "version", versions.__getitem__)
+    monkeypatch.setenv("FW_ATTENTION_IMPLEMENTATION", "flash_attention_2")
+
+    bootstrap.report_runtime_dependencies()
+
+    output = capsys.readouterr().out
+    assert "torch=2.8.0" in output
+    assert "transformers=4.55.0" in output
+    assert "flash_attn=2.8.3" in output
+    assert "attention=flash_attention_2" in output
+
+
+def test_rtdetr_baseline_changes_the_persisted_model_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FW_ENABLE_RTDETR_BASELINE", "false")
+    without_detector = provisioning._selected_models(skip_qwen=False)
+    assert "fire_detection" not in {spec.role for spec in without_detector}
+
+    monkeypatch.setenv("FW_ENABLE_RTDETR_BASELINE", "true")
+    with_detector = provisioning._selected_models(skip_qwen=False)
+    assert "fire_detection" in {spec.role for spec in with_detector}
+    assert len(with_detector) == len(without_detector) + 1
+
+
 def test_provisioner_reuses_only_marked_complete_snapshots(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -87,7 +117,7 @@ def test_provisioner_reuses_only_marked_complete_snapshots(
     cache_root = tmp_path / "cache" / "hub"
     roma_root = tmp_path / "roma"
     cache_root.mkdir(parents=True)
-    first, *missing = provisioning.PUBLIC_MODELS
+    first, *missing = provisioning.enabled_public_models()
     first_snapshot = provisioning._snapshot_path(cache_root, first)
     first_snapshot.mkdir(parents=True)
     (first_snapshot / "config.json").write_text("{}", encoding="utf-8")

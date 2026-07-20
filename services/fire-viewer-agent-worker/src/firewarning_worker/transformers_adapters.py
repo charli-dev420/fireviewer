@@ -110,6 +110,18 @@ class RTDETRAdapter(_BaseAdapter):
             "flame_visible",
             "firefighting_aircraft_visible",
             "fire_response_vehicle_visible",
+            # The opt-in Apache-2.0 COCO baseline is used only to rank views and
+            # expose generic objects during capability tests. Generic targets
+            # are never relabelled as firefighting resources.
+            "person",
+            "bicycle",
+            "car",
+            "motorcycle",
+            "airplane",
+            "bus",
+            "train",
+            "truck",
+            "boat",
         }
     )
 

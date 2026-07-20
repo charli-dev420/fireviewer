@@ -73,13 +73,21 @@ class _BootstrapRequestHandler(BaseHTTPRequestHandler):
     server: _BootstrapHttpServer
 
     def do_GET(self) -> None:
-        if self.path != "/healthz":
+        if self.path == "/favicon.ico":
+            self.send_response(HTTPStatus.NO_CONTENT)
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return
+        if self.path not in {"/", "/healthz"}:
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         body = json.dumps(
             self.server.bootstrap_status.payload(), separators=(",", ":"), ensure_ascii=False
         ).encode("utf-8")
-        self.send_response(HTTPStatus.SERVICE_UNAVAILABLE)
+        # RunPod probes the root path while the image is provisioning. Root is
+        # a liveness endpoint; /healthz remains the strict readiness endpoint
+        # used by the dispatcher and stays unavailable until the worker starts.
+        self.send_response(HTTPStatus.OK if self.path == "/" else HTTPStatus.SERVICE_UNAVAILABLE)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")

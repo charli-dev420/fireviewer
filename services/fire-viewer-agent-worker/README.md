@@ -24,7 +24,12 @@ Le service contient :
 - un processus de recherche sans socket IPv4/IPv6, vérifié par seccomp au démarrage du pod.
 
 Le checkpoint `RT-DETRv2-R18 FireWarning` entraîné n'est pas dans le dépôt. L'absence de ce checkpoint
-est annoncée comme une étape `skipped`; elle ne doit pas être masquée en production.
+est annoncée comme une étape `skipped`; elle ne doit pas être masquée en production. Pour une recette
+comparative explicite, `FW_ENABLE_RTDETR_BASELINE=true` active le modèle COCO Apache-2.0
+`PekingU/rtdetr_v2_r18vd` au commit immuable `5650961749fa93567c0d46fc7f43ea4f9e914107`.
+Cette baseline sélectionne des vues et expose des objets génériques ; elle ne transforme jamais une
+voiture ou un avion en moyen de lutte contre l'incendie. Un checkpoint FireWarning privé valide la
+remplace automatiquement.
 
 ## Stratégie de démarrage et coût
 
@@ -82,6 +87,7 @@ Vérifier ensuite que les répertoires exacts existent :
 /runpod-volume/huggingface-cache/hub/models--microsoft--Florence-2-large-ft/snapshots/4a12a2...
 /runpod-volume/huggingface-cache/hub/models--Qwen--Qwen3-4B-Instruct-2507/snapshots/e7974d...
 /runpod-volume/huggingface-cache/hub/models--Qwen--Qwen3-VL-4B-Instruct/snapshots/ebb281...
+/runpod-volume/huggingface-cache/hub/models--PekingU--rtdetr_v2_r18vd/snapshots/565096...
 /runpod-volume/firewarning-roma/weights/roma_extre.pth
 /runpod-volume/firewarning-roma/weights/dinov2_vitl14_pretrain.pth
 ```
@@ -106,7 +112,8 @@ absente échoue donc immédiatement, sans repli vers `main` ni téléchargement 
 | `FW_ENABLE_SOURCE_RESEARCH` | `true` pour démarrer le courtier et le service Qwen isolé |
 | `FW_RESEARCH_RUN_DIRECTORY` | Répertoire privé des sockets Unix, `/run/firewarning` par défaut |
 | `FW_RESEARCH_MODEL_TIMEOUT_SECONDS` | Limite d’une recherche Qwen, 840 secondes par défaut |
-| `FW_BOOTSTRAP_FAILURE_HOLD_SECONDS` | Durée bornée (0–900 s, 300 par défaut) pendant laquelle `/healthz` conserve l’erreur de bootstrap avant l’arrêt |
+| `FW_BOOTSTRAP_FAILURE_HOLD_SECONDS` | Durée bornée (0–900 s, 300 par défaut) pendant laquelle `/healthz` conserve l'erreur de bootstrap avant l'arrêt |
+| `FW_ENABLE_RTDETR_BASELINE` | `true` uniquement pour la recette comparative avec/sans baseline COCO ; `false` par défaut |
 | `FW_RTDETR_CHECKPOINT_PATH` | Répertoire contenant `model.safetensors` et la configuration Transformers |
 | `FW_RTDETR_CHECKPOINT_SHA256` | SHA-256 exact de `model.safetensors` |
 

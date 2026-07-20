@@ -10,6 +10,7 @@ import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from hashlib import sha256
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import BinaryIO, Protocol, cast
 
@@ -24,6 +25,24 @@ RUNTIME_MODULES = {
     "pod_validation": "firewarning_worker.pod_validation",
 }
 _RESEARCH_CHILDREN: list[subprocess.Popen[bytes]] = []
+
+
+def report_runtime_dependencies() -> None:
+    versions: dict[str, str] = {}
+    for distribution in ("torch", "transformers", "flash-attn"):
+        try:
+            versions[distribution] = version(distribution)
+        except PackageNotFoundError as exc:
+            raise RuntimeError(f"required runtime dependency is absent: {distribution}") from exc
+    attention = os.getenv("FW_ATTENTION_IMPLEMENTATION", "").strip()
+    if attention != "flash_attention_2":
+        raise RuntimeError("FW_ATTENTION_IMPLEMENTATION must be flash_attention_2")
+    print(
+        "firewarning bootstrap: runtime dependencies ready "
+        f"torch={versions['torch']} transformers={versions['transformers']} "
+        f"flash_attn={versions['flash-attn']} attention={attention}",
+        flush=True,
+    )
 
 
 class _PasswdEntry(Protocol):
@@ -336,6 +355,9 @@ def main() -> None:
         runtime_module = _runtime_module()
         if runtime_module == RUNTIME_MODULES["pod"]:
             status_server = start_bootstrap_status_server(int(os.getenv("FW_POD_PORT", "8000")))
+            status_server.status.update("validating_runtime")
+        report_runtime_dependencies()
+        if status_server is not None:
             status_server.status.update("provisioning_models")
         ensure_model_cache()
         if status_server is not None:

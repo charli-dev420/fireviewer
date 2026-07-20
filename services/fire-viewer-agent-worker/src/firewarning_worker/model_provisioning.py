@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from firewarning_worker.model_registry import PUBLIC_MODELS, ModelSpec
+from firewarning_worker.model_registry import ModelSpec, enabled_public_models
 from firewarning_worker.roma_registration import ROMA_ASSETS, provision_roma_assets
 
 MANIFEST_NAME = "firewarning-model-cache.json"
@@ -25,7 +25,9 @@ class CacheStatus:
 
 def _selected_models(*, skip_qwen: bool) -> tuple[ModelSpec, ...]:
     return tuple(
-        spec for spec in PUBLIC_MODELS if not (skip_qwen and spec.role == "multimodal_extraction")
+        spec
+        for spec in enabled_public_models()
+        if not (skip_qwen and spec.role == "multimodal_extraction")
     )
 
 
@@ -98,6 +100,11 @@ def provision_model_cache(
         snapshot = _snapshot_path(cache_root, spec)
         entry = {"model_id": spec.model_id, "revision": spec.revision, "role": spec.role}
         if entry not in marked_entries or not snapshot.is_dir() or not any(snapshot.iterdir()):
+            print(
+                "firewarning bootstrap: downloading model "
+                f"role={spec.role} model={spec.model_id} revision={spec.revision}",
+                flush=True,
+            )
             snapshot_download(
                 repo_id=spec.model_id,
                 revision=spec.revision,
@@ -105,8 +112,17 @@ def provision_model_cache(
                 local_files_only=False,
                 ignore_patterns=["*.bin", "*.onnx", "*.msgpack", "*.h5"],
             )
+        else:
+            print(
+                f"firewarning bootstrap: model cache hit role={spec.role} model={spec.model_id}",
+                flush=True,
+            )
         if not snapshot.is_dir() or not any(snapshot.iterdir()):
             raise RuntimeError(f"pinned snapshot was not provisioned: {snapshot}")
+        print(
+            f"firewarning bootstrap: model ready role={spec.role} model={spec.model_id}",
+            flush=True,
+        )
         model_entries.append(entry)
 
     roma_manifest = provision_roma_assets(roma_root)

@@ -21,6 +21,7 @@
     "FW_AUTO_PREFETCH_MODELS": "true",
     "FW_ATTENTION_IMPLEMENTATION": "flash_attention_2",
     "FW_ENABLE_SOURCE_RESEARCH": "true",
+    "FW_ENABLE_RTDETR_BASELINE": "false",
     "FW_RESEARCH_RUN_DIRECTORY": "/run/firewarning",
     "FW_RESEARCH_MODEL_TIMEOUT_SECONDS": "840",
     "FW_RTDETR_CHECKPOINT_PATH": "/runpod-volume/firewarning-rtdetr",

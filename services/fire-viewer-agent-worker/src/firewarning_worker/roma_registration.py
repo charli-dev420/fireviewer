@@ -19,6 +19,7 @@ ROMA_SOURCE_ARCHIVE_SHA256 = "c95644abd917c62d7bbcad4ff057201aecf61daab282520603
 ROMA_LICENSE = "MIT"
 DINO_LICENSE = "Apache-2.0"
 DEFAULT_ROMA_ROOT = Path("/runpod-volume/firewarning-roma")
+_DOWNLOAD_PROGRESS_STEP_BYTES = 128 * 1024 * 1024
 
 
 class RomaAssetError(RuntimeError):
@@ -114,15 +115,40 @@ def _download_asset(
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists():
         verify_asset(destination, spec)
+        print(
+            f"firewarning bootstrap: spatial model cache hit asset={spec.filename}",
+            flush=True,
+        )
         return destination
     partial = destination.with_suffix(destination.suffix + ".partial")
     partial.unlink(missing_ok=True)
     try:
+        print(
+            "firewarning bootstrap: downloading spatial model "
+            f"asset={spec.filename} bytes={spec.size}",
+            flush=True,
+        )
+        downloaded = 0
+        next_progress = _DOWNLOAD_PROGRESS_STEP_BYTES
         with opener(spec.url, timeout=120) as source, partial.open("wb") as output:
             while chunk := source.read(1024 * 1024):
                 output.write(chunk)
+                downloaded += len(chunk)
+                if downloaded >= next_progress or downloaded >= spec.size:
+                    percent = min(100, round(downloaded * 100 / spec.size))
+                    print(
+                        "firewarning bootstrap: spatial model progress "
+                        f"asset={spec.filename} downloaded={downloaded} "
+                        f"total={spec.size} percent={percent}",
+                        flush=True,
+                    )
+                    next_progress += _DOWNLOAD_PROGRESS_STEP_BYTES
         verify_asset(partial, spec)
         os.replace(partial, destination)
+        print(
+            f"firewarning bootstrap: spatial model ready asset={spec.filename}",
+            flush=True,
+        )
     except Exception:
         partial.unlink(missing_ok=True)
         raise

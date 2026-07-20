@@ -1,8 +1,33 @@
 from __future__ import annotations
 
+import json
 import threading
+from http.client import HTTPConnection
 
 from firewarning_worker import pod_server
+
+
+def test_root_and_health_are_public_ready_endpoints() -> None:
+    server = pod_server.PodHttpServer(("127.0.0.1", 0), auth_token="x" * 32)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        for path in ("/", "/healthz"):
+            connection = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+            try:
+                connection.request("GET", path)
+                response = connection.getresponse()
+                assert response.status == 200
+                assert json.loads(response.read()) == {
+                    "status": "ready",
+                    "mode": "runpod-pod",
+                }
+            finally:
+                connection.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
 
 
 def test_pod_queue_executes_one_wrapped_job(monkeypatch) -> None:
