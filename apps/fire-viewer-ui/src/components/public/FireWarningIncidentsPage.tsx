@@ -6,6 +6,16 @@ import { PublicIcon } from './PublicIcon';
 type ListState = { readonly kind: 'loading' } | { readonly kind: 'ready'; readonly items: readonly PublicIncidentIndexItem[] } | { readonly kind: 'error'; readonly message: string; readonly cached: readonly PublicIncidentIndexItem[] };
 
 function initialParams() { return new URL(window.location.href).searchParams; }
+function initialCoordinates(params: URLSearchParams): { latitude: number; longitude: number } | undefined {
+  const latitudeValue = params.get('latitude');
+  const longitudeValue = params.get('longitude');
+  if (latitudeValue === null || latitudeValue.trim() === '' || longitudeValue === null || longitudeValue.trim() === '') return undefined;
+
+  const latitude = Number(latitudeValue);
+  const longitude = Number(longitudeValue);
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) return undefined;
+  return { latitude, longitude };
+}
 function isClosed(status: string): boolean { return /closed|clôtur|éteint|extinguished|archiv/i.test(status); }
 function humanDate(value: string | null): string { return value && Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Paris' }).format(new Date(value)) : 'Non communiquée'; }
 function age(value: string | null): string { if (!value || !Number.isFinite(Date.parse(value))) return 'Fraîcheur inconnue'; const minutes = Math.max(1, Math.round((Date.now() - Date.parse(value)) / 60_000)); return minutes < 60 ? `Il y a ${minutes} min` : minutes < 1_440 ? `Il y a ${Math.round(minutes / 60)} h` : `Il y a ${Math.round(minutes / 1_440)} j`; }
@@ -35,9 +45,7 @@ export function FireWarningIncidentsPage() {
 
   useEffect(() => {
     if (!publicDiscoveryOrigin()) { setState({ kind: 'error', message: 'La connexion à l’API publique n’est pas configurée.', cached: [] }); return; }
-    const latitude = Number(params.get('latitude'));
-    const longitude = Number(params.get('longitude'));
-    void load(firstQuery, Number.isFinite(latitude) && Number.isFinite(longitude) ? { latitude, longitude } : undefined);
+    void load(firstQuery, initialCoordinates(params));
   // Les paramètres initiaux ne changent pas sans navigation complète.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
