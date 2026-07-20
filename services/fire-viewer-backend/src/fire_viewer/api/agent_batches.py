@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Path, Query, Response, status
+from fastapi import APIRouter, Path, Query, Request, Response, status
 
 from fire_viewer.api.dependencies import (
     ActorDep,
@@ -19,6 +19,7 @@ from fire_viewer.domain.agent_schemas import (
     AgentBatchResponse,
     AgentConsentWithdrawRequest,
     AgentConsentWithdrawResponse,
+    AgentDispatcherTickResponse,
     AgentOperationRunRequest,
     AgentOperationRunResponse,
     AgentOperationsOverview,
@@ -29,12 +30,14 @@ from fire_viewer.domain.agent_schemas import (
     AgentSourceResearchRequest,
     AgentSourceResearchResponse,
 )
+from fire_viewer.domain.errors import ConflictError
 from fire_viewer.services.agent_batches import (
     create_agent_batch,
     enqueue_agent_batch,
     get_agent_batch,
     withdraw_agent_consent,
 )
+from fire_viewer.services.agent_dispatcher import build_runpod_client, run_dispatcher_once
 from fire_viewer.services.agent_operations import get_agent_operations, run_agent_operation
 from fire_viewer.services.agent_source_packages import (
     finalize_source_package,
@@ -252,6 +255,31 @@ def run_incident_operation(
     )
     _private(response)
     return result
+
+
+@router.post("/dispatcher/tick", response_model=AgentDispatcherTickResponse)
+def tick_agent_dispatcher(
+    request: Request,
+    response: Response,
+    actor: ActorDep,
+    settings: SettingsDep,
+    trace_id: TraceIdDep,
+) -> AgentDispatcherTickResponse:
+    require_role(actor, "administrator", "security_operator")
+    if not settings.agent_dispatch_enabled:
+        raise ConflictError(
+            "agent_dispatch_disabled",
+            "The private inference dispatcher is not enabled.",
+        )
+    with build_runpod_client(settings) as client:
+        processed = run_dispatcher_once(
+            request.app.state.session_factory,
+            worker_id=f"admin-dispatcher:{trace_id}",
+            settings=settings,
+            client=client,
+        )
+    _private(response)
+    return AgentDispatcherTickResponse(processed=processed)
 
 
 @router.get("/{batch_id}", response_model=AgentBatchResponse)

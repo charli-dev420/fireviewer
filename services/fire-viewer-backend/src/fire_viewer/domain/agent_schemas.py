@@ -244,6 +244,10 @@ class AgentOperationRunResponse(StrictAgentModel):
     queued_files: int = Field(ge=0)
 
 
+class AgentDispatcherTickResponse(StrictAgentModel):
+    processed: bool
+
+
 class AgentSourcePackageOpenRequest(StrictAgentModel):
     file_count: int = Field(gt=0, le=5_000)
     total_size_bytes: int = Field(gt=0, le=4_294_967_296)

@@ -4858,6 +4858,32 @@
         }
       }
     },
+    "/api/v2/admin/agent-batches/dispatcher/tick": {
+      "post": {
+        "tags": [
+          "admin-agent-batches"
+        ],
+        "summary": "Tick Agent Dispatcher",
+        "operationId": "tick_agent_dispatcher_api_v2_admin_agent_batches_dispatcher_tick_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentDispatcherTickResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v2/admin/agent-batches/{batch_id}": {
       "get": {
         "tags": [
@@ -10986,6 +11012,20 @@
           "CANCELLED"
         ],
         "title": "AgentDispatchState"
+      },
+      "AgentDispatcherTickResponse": {
+        "properties": {
+          "processed": {
+            "type": "boolean",
+            "title": "Processed"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "processed"
+        ],
+        "title": "AgentDispatcherTickResponse"
       },
       "AgentFrameInput": {
         "properties": {
