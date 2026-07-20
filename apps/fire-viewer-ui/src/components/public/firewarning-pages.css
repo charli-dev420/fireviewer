@@ -161,6 +161,8 @@
 .fw-list-state strong { color: var(--fw-ink); }
 .fw-list-state > button, .fw-list-state > a { flex: 0 0 auto; padding: 8px 11px; border: 1px solid var(--fw-orange); border-radius: 5px; color: var(--fw-orange); background: #fff; font-size: .7rem; font-weight: 800; cursor: pointer; }
 .fw-incident-cards { display: grid; gap: 11px; margin: 0; padding: 0; list-style: none; }
+.fw-incident-card-link { display: block; color: inherit; text-decoration: none; }
+.fw-incident-card-link:focus-visible { border-radius: 7px; outline: 3px solid rgb(230 66 20 / 28%); outline-offset: 3px; }
 .fw-incident-cards article { display: grid; min-height: 130px; grid-template-columns: 170px 1fr auto; align-items: center; gap: 20px; padding: 17px 20px; border: 1px solid var(--fw-line); border-radius: 7px; background: rgb(255 255 255 / 72%); transition: border-color 150ms ease, transform 150ms ease; }
 .fw-incident-cards article:hover { border-color: var(--fw-orange); transform: translateX(3px); }
 .fw-incident-card-status { display: grid; justify-items: start; gap: 7px; }
@@ -171,7 +173,7 @@
 .fw-incident-cards p { margin: 0; color: var(--fw-muted); font-size: .78rem; }
 .fw-incident-card-actions { display: grid; justify-items: end; gap: 13px; }
 .fw-incident-card-actions span { display: inline-flex; align-items: center; gap: 6px; color: var(--fw-muted); font-size: .66rem; }
-.fw-incident-card-actions a { display: inline-flex; padding: 9px 12px; align-items: center; gap: 8px; border-radius: 5px; color: #fff !important; background: var(--fw-orange); font-size: .7rem; font-weight: 800; }
+.fw-incident-card-actions .fw-incident-card-cta { display: inline-flex; padding: 9px 12px; align-items: center; gap: 8px; border-radius: 5px; color: #fff; background: var(--fw-orange); font-size: .7rem; font-weight: 800; }
 
 @media (max-width: 900px) {
   .fw-page-hero { min-height: 174px; clip-path: polygon(0 0, 100% 0, 100% 94%, 86% 91%, 72% 95%, 57% 92%, 43% 96%, 28% 92%, 14% 95%, 0 92%); background-position: 62% center; }
@@ -255,6 +257,6 @@
   .fw-incidents-tools label { justify-content: space-between; }
   .fw-incident-cards article { grid-template-columns: 1fr; gap: 12px; }
   .fw-incident-card-actions { justify-items: stretch; }
-  .fw-incident-card-actions a { justify-content: center; }
+  .fw-incident-card-actions .fw-incident-card-cta { justify-content: center; }
   .fw-list-state { align-items: flex-start; flex-wrap: wrap; }
 }

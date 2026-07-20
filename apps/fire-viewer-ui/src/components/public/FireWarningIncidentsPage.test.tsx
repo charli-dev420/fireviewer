@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FireWarningIncidentsPage } from './FireWarningIncidentsPage';
 
@@ -42,7 +42,11 @@ describe('FireWarningIncidentsPage', () => {
 
     render(<FireWarningIncidentsPage />);
 
-    expect(await screen.findByRole('heading', { name: 'Incendie de Die - massif de Justin' })).toBeVisible();
+    const incidentHeading = await screen.findByRole('heading', { name: 'Incendie de Die - massif de Justin' });
+    const incidentLink = screen.getByRole('link', { name: 'Ouvrir la fiche Incendie de Die - massif de Justin' });
+    expect(incidentHeading).toBeVisible();
+    expect(incidentLink).toHaveAttribute('href', '/incendie/FR-26-00001');
+    expect(within(incidentLink).getByRole('heading', { name: 'Incendie de Die - massif de Justin' })).toBe(incidentHeading);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[0]).toBe(`${API_ORIGIN}/api/v1/incidents/recent?`);
     expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain('longitude=0');
