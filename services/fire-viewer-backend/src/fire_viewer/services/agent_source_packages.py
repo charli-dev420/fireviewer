@@ -176,8 +176,8 @@ def _package_response(package: AgentSourcePackage) -> AgentSourcePackageResponse
     )
     return AgentSourcePackageResponse(
         package_id=package.package_id,
-        fire_id=package.incident.fire_id,
-        episode_id=package.episode.episode_id,
+        fire_id=package.incident.fire_id if package.incident is not None else None,
+        episode_id=package.episode.episode_id if package.episode is not None else None,
         state=package.state,
         known_start_date=package.known_start_date,
         known_end_date=package.known_end_date,
@@ -423,26 +423,28 @@ def _create_media_batches(
         by_date.setdefault(item_date, []).append((item, content))
 
     for local_date, dated_items in sorted(by_date.items()):
-        window = ensure_daily_analysis_window(
-            session,
-            incident=package.incident,
-            episode=package.episode,
-            local_date=local_date,
-        )
-        if package.analysis_window_id is None and len(by_date) == 1:
-            package.analysis_window_id = window.id
+        window = None
+        if package.incident is not None and package.episode is not None:
+            window = ensure_daily_analysis_window(
+                session,
+                incident=package.incident,
+                episode=package.episode,
+                local_date=local_date,
+            )
+            if package.analysis_window_id is None and len(by_date) == 1:
+                package.analysis_window_id = window.id
         for offset in range(0, len(dated_items), 32):
             chunk = dated_items[offset : offset + 32]
             batch_id = new_prefixed_id("AB")
             batch = AgentMediaBatch(
                 batch_id=batch_id,
-                schema_version="2.0",
+                schema_version="2.0" if window is not None else "1.0",
                 batch_type=AgentBatchType.USER_MEDIA,
                 priority=AgentBatchPriority.SCHEDULED_COMBINED,
                 state=AgentBatchState.DRAFT,
                 incident_id=package.incident_id,
                 episode_id=package.episode_id,
-                analysis_window_id=window.id,
+                analysis_window_id=window.id if window is not None else None,
                 reference_bundle_payload=None,
                 idempotency_key=f"source-package:{package.package_id}:{local_date}:{offset // 32}",
                 request_hash=hashlib.sha256(
@@ -516,10 +518,10 @@ def _create_media_batches(
                 media_item.consent = AgentMediaConsent(
                     basis=AgentConsentBasis.EXPLICIT_UPLOAD,
                     state=AgentConsentState.GRANTED,
-                    scopes=["temporary_storage", "agent_analysis", "human_review"],
+                    scopes=list(package.consent_scopes),
                     terms_version=package.terms_version,
                     evidence_sha256=package.consent_evidence_sha256,
-                    subject_reference_hash=None,
+                    subject_reference_hash=package.subject_reference_hash,
                     source_reference_url=None,
                     license_identifier=None,
                     granted_at=package.created_at,

@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "uv run --frozen --no-sync alembic upgrade head",
   "env": {
-    "FV_DATABASE_SCHEMA_REVISION": "a3d7e9f1b520"
+    "FV_DATABASE_SCHEMA_REVISION": "b4e8f2a6c730"
   },
   "functions": {
     "api/index.py": {

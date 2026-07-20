@@ -13,6 +13,8 @@ export const ADMIN_INFORMATION_DECISIONS = ['APPROVED', 'REJECTED'] as const;
 export type AdminInformationDecision = (typeof ADMIN_INFORMATION_DECISIONS)[number];
 export const ADMIN_PUBLIC_REPORT_STATES = ['PENDING', 'CORRECTED', 'REJECTED'] as const;
 export type AdminPublicReportState = (typeof ADMIN_PUBLIC_REPORT_STATES)[number];
+export const ADMIN_PUBLIC_CONTRIBUTION_STATES = ['OPEN', 'PENDING', 'ACCEPTED', 'REJECTED', 'WITHDRAWN'] as const;
+export type AdminPublicContributionState = (typeof ADMIN_PUBLIC_CONTRIBUTION_STATES)[number];
 
 export interface AdminPublicReport {
   readonly report_id: string;
@@ -112,6 +114,33 @@ export interface AdminAgentOperationRunResponse {
   readonly operation_type: AdminAgentOperationType;
   readonly operation_ids: readonly string[];
   readonly queued_files: number;
+}
+export interface AdminPublicContribution {
+  readonly contribution_id: string;
+  readonly kind: 'new_fire' | 'incident_evidence';
+  readonly fire_id: string | null;
+  readonly state: AdminPublicContributionState;
+  readonly received_at: string | null;
+  readonly reviewed_at: string | null;
+  readonly review_reason: string | null;
+  readonly purge_after: string;
+  readonly media_count: number;
+  readonly location_label: string | null;
+  readonly observation_type: string;
+  readonly observed_at: string;
+  readonly version: number;
+  readonly description: string;
+  readonly direct_observation: boolean;
+  readonly location: {
+    readonly mode: 'place' | 'device' | 'manual';
+    readonly label: string | null;
+    readonly latitude: number | null;
+    readonly longitude: number | null;
+    readonly uncertainty_m: number | null;
+  };
+  readonly consent_scopes: readonly string[];
+  readonly contact_provided: boolean;
+  readonly private_media_urls: readonly string[];
 }
 
 export interface AdminSourcePackageOpen {
@@ -904,6 +933,41 @@ function parseActiveFireZoneRevision(value: unknown): AdminActiveFireZoneRevisio
     gltf_polygons: value.gltf_polygons.map((polygon, polygonIndex) => { if (!Array.isArray(polygon)) throw new Error('Polygone glTF invalide.'); return polygon.map((ring, ringIndex) => { if (!Array.isArray(ring)) throw new Error('Anneau glTF invalide.'); return ring.map((point, pointIndex) => parseGltfPoint(point, `gltf_polygons.${polygonIndex}.${ringIndex}.${pointIndex}`)); }); }),
     geometry_origin: readString(value.geometry_origin, 'geometry_origin', { max: 64 })!, supporting_marker_ids: value.supporting_marker_ids.map((item) => readString(item, 'supporting_marker_id', { max: 128 })!), source_revision_ids: value.source_revision_ids.map((item) => readString(item, 'source_revision_id', { max: 128 })!), review_state: readEnum(value.review_state, 'review_state', ['DRAFT', 'READY_FOR_PUBLICATION', 'REJECTED'] as const),
     supersedes_zone_revision_id: readString(value.supersedes_zone_revision_id, 'supersedes_zone_revision_id', { nullable: true, max: 128 }), reason: readString(value.reason, 'reason', { max: 500 })!, created_by: readString(value.created_by, 'created_by', { max: 255 })!, reviewed_by: readString(value.reviewed_by, 'reviewed_by', { nullable: true, max: 255 }), reviewed_at: value.reviewed_at === null ? null : readIsoDate(value.reviewed_at, 'reviewed_at'), review_reason: readString(value.review_reason, 'review_reason', { nullable: true, max: 500 }), created_at: readIsoDate(value.created_at, 'created_at'),
+  };
+}
+
+function parsePublicContribution(value: unknown): AdminPublicContribution {
+  if (!isRecord(value) || !isRecord(value.location) || !Array.isArray(value.consent_scopes) || !Array.isArray(value.private_media_urls)) {
+    throw new Error('Contribution publique invalide.');
+  }
+  const nullableIso = (field: unknown, name: string) => field === null ? null : readIsoDate(field, name);
+  const nullableNumber = (field: unknown, name: string) => field === null ? null : readFiniteNumber(field, name);
+  return {
+    contribution_id: readString(value.contribution_id, 'contribution_id', { max: 96 })!,
+    kind: readEnum(value.kind, 'kind', ['new_fire', 'incident_evidence'] as const),
+    fire_id: readString(value.fire_id, 'fire_id', { nullable: true, max: 32 }),
+    state: readEnum(value.state, 'state', ADMIN_PUBLIC_CONTRIBUTION_STATES),
+    received_at: nullableIso(value.received_at, 'received_at'),
+    reviewed_at: nullableIso(value.reviewed_at, 'reviewed_at'),
+    review_reason: readString(value.review_reason, 'review_reason', { nullable: true, max: 1_000 }),
+    purge_after: readIsoDate(value.purge_after, 'purge_after'),
+    media_count: readNonNegativeInteger(value.media_count, 'media_count'),
+    location_label: readString(value.location_label, 'location_label', { nullable: true, max: 500 }),
+    observation_type: readString(value.observation_type, 'observation_type', { max: 128 })!,
+    observed_at: readIsoDate(value.observed_at, 'observed_at'),
+    version: readPositiveInteger(value.version, 'version'),
+    description: readString(value.description, 'description', { max: 4_000 })!,
+    direct_observation: readBoolean(value.direct_observation, 'direct_observation'),
+    location: {
+      mode: readEnum(value.location.mode, 'location.mode', ['place', 'device', 'manual'] as const),
+      label: readString(value.location.label, 'location.label', { nullable: true, max: 500 }),
+      latitude: nullableNumber(value.location.latitude, 'location.latitude'),
+      longitude: nullableNumber(value.location.longitude, 'location.longitude'),
+      uncertainty_m: nullableNumber(value.location.uncertainty_m, 'location.uncertainty_m'),
+    },
+    consent_scopes: value.consent_scopes.map((scope) => readString(scope, 'consent_scope', { max: 64 })!),
+    contact_provided: readBoolean(value.contact_provided, 'contact_provided'),
+    private_media_urls: value.private_media_urls.map((url) => readString(url, 'private_media_url', { max: 2_048 })!),
   };
 }
 
@@ -1866,6 +1930,16 @@ export class AdminApiClient {
     }
   }
 
+  async listPublicContributions(state?: AdminPublicContributionState, options: AdminRequestOptions = {}): Promise<readonly AdminPublicContribution[]> {
+    const query = state ? `?state=${encodeURIComponent(state)}` : '';
+    const payload = await this.request(`/public-contributions${query}`, { method: 'GET' }, options);
+    if (!isRecord(payload) || !hasExactKeys(payload, ['contributions']) || !Array.isArray(payload.contributions)) {
+      throw new AdminApiError('parse', 'La liste des contributions est invalide.');
+    }
+    try { return payload.contributions.map(parsePublicContribution); }
+    catch { throw new AdminApiError('parse', 'La liste des contributions est invalide.'); }
+  }
+
   async createIncidentMapCaptureUploadGrant(
     fireId: string,
     input: { readonly zone_revision_id: string; readonly size_bytes: number; readonly media_type: 'image/jpeg' | 'image/png' },
@@ -2024,6 +2098,19 @@ export class AdminApiClient {
     const payload = await this.postJson(`/reports/${encodeURIComponent(reportId)}/review`, input, options);
     if (!isRecord(payload) || !hasExactKeys(payload, ['report', 'trace_id'])) throw new AdminApiError('parse', 'La réponse de revue est invalide.');
     try { return { report: parsePublicReport(payload.report), trace_id: parseTraceId(payload.trace_id) }; }
+    catch { throw new AdminApiError('parse', 'La réponse de revue est invalide.'); }
+  }
+
+
+  async reviewPublicContribution(
+    contributionId: string,
+    input: { readonly state: Extract<AdminPublicContributionState, 'ACCEPTED' | 'REJECTED'>; readonly reason: string; readonly expected_version: number },
+    options: AdminRequestOptions,
+  ): Promise<{ contribution: AdminPublicContribution; trace_id: string }> {
+    if (!contributionId || contributionId.length > 96) throw new AdminApiError('configuration', 'Identifiant de contribution invalide.');
+    const payload = await this.postJson(`/public-contributions/${encodeURIComponent(contributionId)}/review`, input, options);
+    if (!isRecord(payload) || !hasExactKeys(payload, ['contribution', 'trace_id'])) throw new AdminApiError('parse', 'La réponse de revue est invalide.');
+    try { return { contribution: parsePublicContribution(payload.contribution), trace_id: parseTraceId(payload.trace_id) }; }
     catch { throw new AdminApiError('parse', 'La réponse de revue est invalide.'); }
   }
 }

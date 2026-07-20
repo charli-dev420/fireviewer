@@ -7,11 +7,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const incidentApi = vi.hoisted(() => ({
   submitPublicIncidentReport: vi.fn(),
 }));
+const contributionApi = vi.hoisted(() => ({
+  createPublicContributionIdempotencyKey: vi.fn(() => 'public-test-idempotency'),
+  submitPublicContribution: vi.fn(),
+  readPublicContributionAccess: vi.fn(),
+  loadPublicContribution: vi.fn(),
+  withdrawPublicContribution: vi.fn(),
+}));
 
 vi.mock('../../lib/publicIncidentView', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../lib/publicIncidentView')>();
   return { ...original, submitPublicIncidentReport: incidentApi.submitPublicIncidentReport };
 });
+vi.mock('../../lib/publicContributionUpload', () => contributionApi);
 
 import {
   FireWarningContributionTrackingPage,
@@ -23,6 +31,10 @@ describe('parcours publics de contribution', () => {
   beforeEach(() => {
     localStorage.clear();
     incidentApi.submitPublicIncidentReport.mockReset();
+    contributionApi.submitPublicContribution.mockReset();
+    contributionApi.readPublicContributionAccess.mockReset();
+    contributionApi.loadPublicContribution.mockReset();
+    contributionApi.withdrawPublicContribution.mockReset();
   });
 
   afterEach(() => {
@@ -30,7 +42,22 @@ describe('parcours publics de contribution', () => {
     vi.restoreAllMocks();
   });
 
-  it('impose la barrière d’urgence puis enregistre uniquement un brouillon local avec consentements explicites', async () => {
+  it('impose la barrière d’urgence puis transmet la contribution privée avec consentement explicite', async () => {
+    contributionApi.submitPublicContribution.mockResolvedValue({
+      contribution_id: 'PC-20260720-0001',
+      kind: 'new_fire',
+      fire_id: null,
+      state: 'PENDING',
+      received_at: '2026-07-20T13:00:00Z',
+      reviewed_at: null,
+      review_reason: null,
+      purge_after: '2026-08-19T13:00:00Z',
+      media_count: 0,
+      location_label: 'Massif de Justin',
+      observation_type: 'Fumée',
+      observed_at: '2026-07-20T12:55:00Z',
+      version: 1,
+    });
     const user = userEvent.setup();
     render(<FireWarningReportPage />);
 
@@ -53,34 +80,40 @@ describe('parcours publics de contribution', () => {
     for (const consent of consents) expect(consent).not.toBeChecked();
     await user.click(screen.getByRole('checkbox', { name: /Analyser cette contribution/ }));
     await user.click(screen.getByRole('button', { name: /Continuer/ }));
-    await user.click(screen.getByRole('button', { name: /Enregistrer le brouillon/ }));
+    await user.click(screen.getByRole('button', { name: /Envoyer la contribution/ }));
 
-    expect(screen.getByRole('heading', { name: 'Aucune donnée n’a été transmise' })).toBeVisible();
-    const stored = localStorage.getItem('fw:contribution-drafts:v1');
-    expect(stored).toContain('Massif de Justin');
-    expect(stored).toContain('"status":"local-draft"');
-    expect(incidentApi.submitPublicIncidentReport).not.toHaveBeenCalled();
+    expect(await screen.findByRole('heading', { name: 'Transmise pour vérification humaine' })).toBeVisible();
+    expect(contributionApi.submitPublicContribution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'new_fire',
+        fireId: null,
+        location: expect.objectContaining({ label: 'Massif de Justin' }),
+        observation: expect.objectContaining({ type: 'Fumée' }),
+      }),
+      'public-test-idempotency',
+    );
   });
 
-  it('affiche un brouillon local sans inventer un statut serveur', () => {
-    localStorage.setItem('fw:contribution-drafts:v1', JSON.stringify([{
-      id: 'LOCAL-20260715-TEST0001',
-      kind: 'evidence',
+  it('charge le statut persistant avec le jeton privé de cet appareil', async () => {
+    contributionApi.readPublicContributionAccess.mockReturnValue({
+      contributionId: 'PC-20260720-0002',
+      trackingToken: 'tracking-token',
       fireId: 'FR-83-00042',
-      createdAt: '2026-07-15T10:00:00Z',
-      updatedAt: '2026-07-15T10:00:00Z',
-      status: 'local-draft',
-      location: { mode: 'place', label: 'Versant est', latitude: '', longitude: '', uncertainty: '' },
-      observation: { type: 'Fumée', date: '2026-07-15', time: '12:00', direct: true, description: 'Fumée observée depuis un point sûr.' },
-      media: null,
-      consent: { processing: true, retention: false, publicDisplay: false, modelDisplay: false },
-      contactEmail: '',
-    }]));
+      storedAt: '2026-07-20T13:00:00Z',
+    });
+    contributionApi.loadPublicContribution.mockResolvedValue({
+      contribution_id: 'PC-20260720-0002', kind: 'incident_evidence', fire_id: 'FR-83-00042',
+      state: 'PENDING', received_at: '2026-07-20T13:00:00Z', reviewed_at: null,
+      review_reason: null, purge_after: '2026-08-19T13:00:00Z', media_count: 1,
+      location_label: 'Versant est', observation_type: 'Fumée',
+      observed_at: '2026-07-20T12:00:00Z', version: 2,
+    });
 
-    render(<FireWarningContributionTrackingPage contributionId="LOCAL-20260715-TEST0001" />);
+    render(<FireWarningContributionTrackingPage contributionId="PC-20260720-0002" />);
 
-    expect(screen.getByText('Brouillon local · non transmis')).toBeVisible();
+    expect(await screen.findByText('En attente de vérification')).toBeVisible();
     expect(screen.getByText('Versant est')).toBeVisible();
+    expect(contributionApi.loadPublicContribution).toHaveBeenCalledWith('PC-20260720-0002', 'tracking-token', expect.any(AbortSignal));
     expect(screen.queryByText('Acceptée pour publication')).not.toBeInTheDocument();
   });
 

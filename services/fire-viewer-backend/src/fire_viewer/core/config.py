@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     database_pool_recycle_seconds: int = Field(default=300, ge=30, le=3_600)
     database_statement_timeout_ms: int = Field(default=15_000, ge=1_000, le=120_000)
     database_schema_revision: str = Field(
-        default="a3d7e9f1b520",
+        default="b4e8f2a6c730",
         pattern=r"^[0-9a-f]{12}$",
     )
     log_level: str = "INFO"
@@ -103,6 +103,10 @@ class Settings(BaseSettings):
     )
     public_report_rate_limit_per_day: int = Field(default=5, ge=1, le=25)
     public_report_hash_secret: str = "development-only-public-report-secret-change-me"  # noqa: S105
+    public_contribution_rate_limit_per_day: int = Field(default=5, ge=1, le=25)
+    public_contribution_max_image_bytes: int = Field(
+        default=15_728_640, ge=1_048_576, le=16_777_216
+    )
     corroboration_min_independent_proofs: int = Field(default=3, ge=3, le=20)
     model_generation_min_area_ha: float = Field(default=500.0, ge=1.0, le=1_000_000.0)
     raw_purge_delay_hours: int = Field(default=24, ge=1, le=24)

@@ -4646,6 +4646,7 @@ svg {
 .admin-table tbody th a { color: inherit; }
 .admin-table small { display: block; margin-top: 3px; color: var(--ink-600); font-size: 0.68rem; font-weight: 650; }
 .admin-table__muted { color: var(--ink-600); font-size: 0.76rem !important; }
+.admin-contribution-thumbnail { display: block; width: 92px; height: 64px; object-fit: cover; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
 
 .admin-incident-workspace-nav { display: flex; flex-wrap: wrap; gap: 7px; margin: 4px 0 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 .admin-incident-workspace-nav a { padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; color: var(--ink-700); font-size: 0.75rem; font-weight: 760; text-decoration: none; }

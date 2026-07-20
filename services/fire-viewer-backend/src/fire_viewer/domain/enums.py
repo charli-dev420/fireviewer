@@ -307,6 +307,19 @@ class PublicReportState(StrEnum):
     REJECTED = "REJECTED"
 
 
+class PublicContributionKind(StrEnum):
+    NEW_FIRE = "new_fire"
+    INCIDENT_EVIDENCE = "incident_evidence"
+
+
+class PublicContributionState(StrEnum):
+    OPEN = "OPEN"
+    PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+    WITHDRAWN = "WITHDRAWN"
+
+
 class ReviewResolutionAction(StrEnum):
     ATTACH = "attach"
     CREATE = "create"

@@ -51,6 +51,8 @@ from fire_viewer.domain.enums import (
     JobKind,
     JobState,
     MatchDecision,
+    PublicContributionKind,
+    PublicContributionState,
     PublicReportCategory,
     PublicReportState,
     PublicVisibility,
@@ -160,6 +162,9 @@ class IncidentSeries(Base, TimestampMixin):
         back_populates="incident", uselist=False
     )
     public_reports: Mapped[list[IncidentPublicReport]] = relationship(back_populates="incident")
+    public_contributions: Mapped[list[PublicContributionSubmission]] = relationship(
+        back_populates="incident"
+    )
 
     __table_args__ = (
         UniqueConstraint("territory_code", "sequence", name="uq_incident_territory_sequence"),
@@ -378,6 +383,82 @@ class IncidentPublicReport(Base):
         ),
         CheckConstraint(sha256_hex_check("content_hash"), name="ck_public_report_content_hash"),
         Index("ix_public_report_origin_day", "origin_fingerprint", "submitted_day"),
+    )
+
+
+class PublicContributionSubmission(Base, TimestampMixin):
+    """Anonymous public evidence kept private until an operator reviews it."""
+
+    __tablename__ = "public_contribution_submission"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    contribution_id: Mapped[str] = mapped_column(
+        String(96), nullable=False, unique=True, index=True
+    )
+    kind: Mapped[PublicContributionKind] = mapped_column(
+        enum_column(PublicContributionKind, name="public_contribution_kind"), nullable=False
+    )
+    state: Mapped[PublicContributionState] = mapped_column(
+        enum_column(PublicContributionState, name="public_contribution_state"),
+        nullable=False,
+        default=PublicContributionState.OPEN,
+        index=True,
+    )
+    incident_id: Mapped[int | None] = mapped_column(
+        ForeignKey("incident_series.id", ondelete="RESTRICT"), index=True
+    )
+    source_package_id: Mapped[int | None] = mapped_column(
+        ForeignKey("agent_source_package.id", ondelete="RESTRICT"),
+        unique=True,
+        index=True,
+    )
+    submission_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    consent_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    contact_reference_hash: Mapped[str | None] = mapped_column(String(64))
+    origin_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    submitted_day: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    tracking_token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    trace_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    purge_after: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_by: Mapped[str | None] = mapped_column(String(255))
+    review_reason: Mapped[str | None] = mapped_column(String(1_000))
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+    incident: Mapped[IncidentSeries | None] = relationship(back_populates="public_contributions")
+    source_package: Mapped[AgentSourcePackage | None] = relationship(
+        back_populates="public_contribution", foreign_keys=[source_package_id]
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "origin_fingerprint",
+            "submitted_day",
+            "idempotency_key",
+            name="uq_public_contribution_origin_day_idempotency",
+        ),
+        CheckConstraint(
+            sha256_hex_check("origin_fingerprint"), name="ck_public_contribution_origin_hash"
+        ),
+        CheckConstraint(
+            sha256_hex_check("request_hash"), name="ck_public_contribution_request_hash"
+        ),
+        CheckConstraint(
+            sha256_hex_check("tracking_token_hash"),
+            name="ck_public_contribution_tracking_hash",
+        ),
+        CheckConstraint(
+            "contact_reference_hash IS NULL OR ("
+            + sha256_hex_check("contact_reference_hash")
+            + ")",
+            name="ck_public_contribution_contact_hash",
+        ),
+        CheckConstraint("version >= 1", name="ck_public_contribution_version"),
     )
 
 
@@ -1165,11 +1246,11 @@ class AgentSourcePackage(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     package_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
-    incident_id: Mapped[int] = mapped_column(
-        ForeignKey("incident_series.id", ondelete="RESTRICT"), nullable=False, index=True
+    incident_id: Mapped[int | None] = mapped_column(
+        ForeignKey("incident_series.id", ondelete="RESTRICT"), nullable=True, index=True
     )
-    episode_id: Mapped[int] = mapped_column(
-        ForeignKey("episode.id", ondelete="RESTRICT"), nullable=False, index=True
+    episode_id: Mapped[int | None] = mapped_column(
+        ForeignKey("episode.id", ondelete="RESTRICT"), nullable=True, index=True
     )
     analysis_window_id: Mapped[int | None] = mapped_column(
         ForeignKey("agent_analysis_window.id", ondelete="RESTRICT"), index=True
@@ -1191,6 +1272,12 @@ class AgentSourcePackage(Base, TimestampMixin):
     publication_authorized: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     terms_version: Mapped[str] = mapped_column(String(64), nullable=False)
     consent_evidence_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    consent_scopes: Mapped[list[str]] = mapped_column(
+        JSON,
+        nullable=False,
+        default=lambda: ["temporary_storage", "agent_analysis", "human_review"],
+    )
+    subject_reference_hash: Mapped[str | None] = mapped_column(String(64))
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     trace_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
@@ -1201,13 +1288,18 @@ class AgentSourcePackage(Base, TimestampMixin):
     failure_code: Mapped[str | None] = mapped_column(String(128))
     failure_detail: Mapped[str | None] = mapped_column(String(1_000))
 
-    incident: Mapped[IncidentSeries] = relationship(foreign_keys=[incident_id])
-    episode: Mapped[Episode] = relationship(foreign_keys=[episode_id])
+    incident: Mapped[IncidentSeries | None] = relationship(foreign_keys=[incident_id])
+    episode: Mapped[Episode | None] = relationship(foreign_keys=[episode_id])
     analysis_window: Mapped[AgentAnalysisWindow | None] = relationship(
         back_populates="source_packages"
     )
     items: Mapped[list[AgentSourcePackageItem]] = relationship(
         back_populates="package", cascade="all, delete-orphan", order_by="AgentSourcePackageItem.id"
+    )
+    public_contribution: Mapped[PublicContributionSubmission | None] = relationship(
+        back_populates="source_package",
+        uselist=False,
+        foreign_keys="PublicContributionSubmission.source_package_id",
     )
 
     __table_args__ = (
@@ -1219,11 +1311,22 @@ class AgentSourcePackage(Base, TimestampMixin):
         CheckConstraint("analysis_authorized", name="ck_agent_source_package_analysis_authorized"),
         CheckConstraint("NOT publication_authorized", name="ck_agent_source_package_not_public"),
         CheckConstraint(
+            "(incident_id IS NULL AND episode_id IS NULL) OR "
+            "(incident_id IS NOT NULL AND episode_id IS NOT NULL)",
+            name="ck_agent_source_package_incident_episode_pair",
+        ),
+        CheckConstraint(
             sha256_hex_check("consent_evidence_sha256"),
             name="ck_agent_source_package_consent_hash",
         ),
         CheckConstraint(
             sha256_hex_check("request_hash"), name="ck_agent_source_package_request_hash"
+        ),
+        CheckConstraint(
+            "subject_reference_hash IS NULL OR ("
+            + sha256_hex_check("subject_reference_hash")
+            + ")",
+            name="ck_agent_source_package_subject_hash",
         ),
     )
 

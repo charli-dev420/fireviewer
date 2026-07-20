@@ -207,7 +207,7 @@ def test_readiness_requires_current_schema_and_spatial_runtime(client, session) 
     assert ready.json() == {
         "status": "ready",
         "database": "ok",
-        "schema_revision": "a3d7e9f1b520",
+        "schema_revision": "b4e8f2a6c730",
         "spatial_index": "ok",
     }
 

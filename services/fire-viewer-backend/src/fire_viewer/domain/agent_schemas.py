@@ -290,8 +290,8 @@ class AgentSourcePackageItemResponse(StrictAgentModel):
 
 class AgentSourcePackageResponse(StrictAgentModel):
     package_id: SafeIdentifier
-    fire_id: str = Field(pattern=r"^FR-[0-9A-Z]{2,3}-[0-9]{5}$")
-    episode_id: SafeIdentifier
+    fire_id: str | None = Field(default=None, pattern=r"^FR-[0-9A-Z]{2,3}-[0-9]{5}$")
+    episode_id: SafeIdentifier | None = None
     state: AgentSourcePackageState
     known_start_date: date
     known_end_date: date

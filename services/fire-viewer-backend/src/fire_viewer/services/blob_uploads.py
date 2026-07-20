@@ -77,6 +77,7 @@ _ALLOWED_SOURCE_SUFFIXES = frozenset(
     }
 )
 _ALLOWED_GALLERY_SUFFIXES = frozenset({".jpg", ".png"})
+_ALLOWED_PUBLIC_CONTRIBUTION_SUFFIXES = frozenset({".jpg", ".jpeg", ".png", ".webp"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +140,7 @@ def create_source_blob_upload_grant(
     actor: Actor,
     settings: Settings,
     upload_id: str | None = None,
+    purpose: str = "source_package",
 ) -> BlobUploadGrant:
     token = _read_write_token(settings)
     if file_count > settings.agent_source_package_max_files:
@@ -161,7 +163,7 @@ def create_source_blob_upload_grant(
             "package_id": package_id,
             "file_count": file_count,
             "total_size_bytes": total_size_bytes,
-            "purpose": "source_package",
+            "purpose": purpose,
         },
         token,
         algorithm="HS256",
@@ -269,6 +271,10 @@ def issue_blob_client_token(
         allowed_suffixes = _ALLOWED_SOURCE_SUFFIXES
         allowed_content_types = ALLOWED_SOURCE_CONTENT_TYPES
         maximum_size = settings.agent_source_package_max_file_bytes
+    elif purpose == "public_contribution":
+        allowed_suffixes = _ALLOWED_PUBLIC_CONTRIBUTION_SUFFIXES
+        allowed_content_types = ("image/jpeg", "image/png", "image/webp")
+        maximum_size = settings.public_contribution_max_image_bytes
     elif purpose == "spatial_package":
         allowed_suffixes = _ALLOWED_SUFFIXES
         allowed_content_types = ALLOWED_PACKAGE_CONTENT_TYPES

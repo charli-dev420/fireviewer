@@ -442,4 +442,68 @@ describe('client API d’administration', () => {
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ gltf_position: [15, 2, -8] }) }),
     );
   });
+
+  it('liste puis qualifie une contribution publique sans autoriser sa publication', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', API_ORIGIN);
+    const contribution = {
+      contribution_id: 'PC-20260720-0001',
+      kind: 'incident_evidence',
+      fire_id: 'FR-26-00001',
+      state: 'PENDING',
+      received_at: '2026-07-20T13:00:00Z',
+      reviewed_at: null,
+      review_reason: null,
+      purge_after: '2026-08-19T13:00:00Z',
+      media_count: 1,
+      location_label: 'Massif de Justin',
+      observation_type: 'Flammes',
+      observed_at: '2026-07-20T12:55:00Z',
+      version: 1,
+      description: 'Front de flammes visible depuis la route.',
+      direct_observation: true,
+      location: {
+        mode: 'place',
+        label: 'Massif de Justin',
+        latitude: null,
+        longitude: null,
+        uncertainty_m: null,
+      },
+      consent_scopes: ['temporary_storage', 'agent_analysis', 'human_review'],
+      contact_provided: false,
+      private_media_urls: ['https://private.invalid/evidence.png'],
+    };
+    const accepted = {
+      ...contribution,
+      state: 'ACCEPTED',
+      reviewed_at: '2026-07-20T13:05:00Z',
+      review_reason: 'Contribution vérifiée et acceptée pour analyse privée.',
+      version: 2,
+    };
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(response({ contributions: [contribution] }))
+      .mockResolvedValueOnce(response({ contribution: accepted, trace_id: 'trace-review-public' }));
+    const client = new AdminApiClient({ session: SESSION, fetchImpl: fetchMock });
+
+    await expect(client.listPublicContributions('PENDING')).resolves.toMatchObject([
+      { contribution_id: 'PC-20260720-0001', state: 'PENDING', private_media_urls: ['https://private.invalid/evidence.png'] },
+    ]);
+    await expect(client.reviewPublicContribution(
+      'PC-20260720-0001',
+      {
+        state: 'ACCEPTED',
+        reason: 'Contribution vérifiée et acceptée pour analyse privée.',
+        expected_version: 1,
+      },
+      { idempotencyKey: 'review-public-0001' },
+    )).resolves.toMatchObject({ contribution: { state: 'ACCEPTED', version: 2 }, trace_id: 'trace-review-public' });
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      `${API_ORIGIN}/api/v1/admin/public-contributions?state=PENDING`,
+      `${API_ORIGIN}/api/v1/admin/public-contributions/PC-20260720-0001/review`,
+    ]);
+    expect(fetchMock.mock.calls[1]?.[1]).toEqual(expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({ 'Idempotency-Key': 'review-public-0001' }),
+    }));
+  });
 });
