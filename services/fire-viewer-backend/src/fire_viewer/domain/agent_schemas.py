@@ -630,6 +630,34 @@ class AnalysisWindowV2(StrictAgentModel):
         return self
 
 
+class DeclaredObservationV2(StrictAgentModel):
+    observed_at: datetime
+    observation_type: str = Field(min_length=2, max_length=128)
+    direct_observation: bool
+    description: str = Field(min_length=20, max_length=4_000)
+    location_mode: Literal["place", "device", "manual"]
+    location_label: str | None = Field(default=None, max_length=500)
+    latitude: float | None = Field(default=None, ge=-90, le=90, allow_inf_nan=False)
+    longitude: float | None = Field(default=None, ge=-180, le=180, allow_inf_nan=False)
+    uncertainty_m: float | None = Field(default=None, gt=0, le=100_000, allow_inf_nan=False)
+    media_captured_at: datetime | None = None
+    media_direction: str | None = Field(default=None, max_length=128)
+
+    @model_validator(mode="after")
+    def validate_declared_observation(self) -> DeclaredObservationV2:
+        if not _is_timezone_aware(self.observed_at):
+            raise ValueError("declared observation time must include a timezone")
+        if self.media_captured_at is not None and not _is_timezone_aware(
+            self.media_captured_at
+        ):
+            raise ValueError("declared media capture time must include a timezone")
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("declared location coordinates must be supplied together")
+        if self.uncertainty_m is not None and self.latitude is None:
+            raise ValueError("declared location uncertainty requires coordinates")
+        return self
+
+
 class SourceProvenanceV2(StrictAgentModel):
     source_key: SafeIdentifier
     source_reference_url: AnyHttpUrl | None = None
@@ -662,6 +690,7 @@ class SourceProvenanceV2(StrictAgentModel):
         | None
     ) = None
     claim_types: list[str] = Field(default_factory=list, max_length=32)
+    declared_observation: DeclaredObservationV2 | None = None
 
 
 class CameraMetadataV2(StrictAgentModel):

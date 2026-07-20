@@ -63,9 +63,13 @@ function safeReport(dailyPackage) {
     corpus_id: dailyPackage.corpusId,
     day: dailyPackage.day,
     available_days: dailyPackage.availableDays,
-    file_count: dailyPackage.materials.length,
-    total_size_bytes: dailyPackage.totalSizeBytes,
-    files: dailyPackage.materials.map((material) => ({
+    admin_source_package_file_count: dailyPackage.materials.length,
+    public_contribution_count: dailyPackage.publicContributions.length,
+    source_research_reference_count: dailyPackage.researchReferences.length,
+    evaluation_reference_count: dailyPackage.evaluationReferences.length,
+    admin_source_package_size_bytes: dailyPackage.totalSizeBytes,
+    public_contribution_size_bytes: dailyPackage.publicContributionSizeBytes,
+    admin_files: dailyPackage.materials.map((material) => ({
       group_index: material.manifest.group_index,
       element_id: material.manifest.element_id,
       captured_at: material.manifest.captured_at ?? null,
@@ -79,6 +83,11 @@ function safeReport(dailyPackage) {
 }
 
 async function uploadPackage(options, dailyPackage) {
+  if (!dailyPackage.materials.length) {
+    throw new IncidentSourceCorpusError(
+      `La journée ${dailyPackage.day} ne contient aucun fichier destiné au package administrateur.`,
+    );
+  }
   const session = await authenticateAdmin(options.apiOrigin, options.credentialsFile);
   const idempotencyBase = `corpus:${dailyPackage.corpusId}:${options.fireId}:${dailyPackage.day}:v1`;
   const opened = await adminPost(

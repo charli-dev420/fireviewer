@@ -72,6 +72,35 @@ class FrameInput(StrictModel):
     working_file_url: AnyHttpUrl
 
 
+class DeclaredObservationV2(StrictModel):
+    observed_at: datetime
+    observation_type: str = Field(min_length=2, max_length=128)
+    direct_observation: bool
+    description: str = Field(min_length=20, max_length=4_000)
+    location_mode: Literal["place", "device", "manual"]
+    location_label: str | None = Field(default=None, max_length=500)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    uncertainty_m: float | None = Field(default=None, gt=0, le=100_000)
+    media_captured_at: datetime | None = None
+    media_direction: str | None = Field(default=None, max_length=128)
+
+    @model_validator(mode="after")
+    def validate_declared_observation(self) -> DeclaredObservationV2:
+        if self.observed_at.tzinfo is None or self.observed_at.utcoffset() is None:
+            raise ValueError("declared observation time must include a timezone")
+        if self.media_captured_at is not None and (
+            self.media_captured_at.tzinfo is None
+            or self.media_captured_at.utcoffset() is None
+        ):
+            raise ValueError("declared media capture time must include a timezone")
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("declared location coordinates must be supplied together")
+        if self.uncertainty_m is not None and self.latitude is None:
+            raise ValueError("declared location uncertainty requires coordinates")
+        return self
+
+
 class SourceContext(StrictModel):
     source_reference_url: AnyHttpUrl | None = None
     attribution: str | None = Field(default=None, max_length=500)
@@ -80,6 +109,7 @@ class SourceContext(StrictModel):
     source_confidence: Literal["A+", "A", "B", "lead"] | None = None
     publication_policy: str | None = Field(default=None, max_length=64)
     claim_types: tuple[str, ...] = Field(default=(), max_length=32)
+    declared_observation: DeclaredObservationV2 | None = None
 
 
 class BatchItem(StrictModel):
@@ -296,6 +326,7 @@ class SourceProvenanceV2(StrictModel):
         | None
     ) = None
     claim_types: tuple[str, ...] = Field(default=(), max_length=32)
+    declared_observation: DeclaredObservationV2 | None = None
 
 
 class CameraMetadataV2(StrictModel):

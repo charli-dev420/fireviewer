@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from firewarning_worker.contracts import FactProposalV2, WorkerInputV2, WorkerItemResultV2
-from firewarning_worker.v2_runner import _fact_category, _report
+from firewarning_worker.v2_runner import _fact_category, _report, to_legacy_input
 
 EXAMPLES = Path(__file__).resolve().parents[3] / "contracts" / "agent-worker" / "v2" / "examples"
 
@@ -53,3 +53,30 @@ def test_situational_fact_types_route_to_expected_report_categories() -> None:
     assert _fact_category("public_relief_and_donations") == "resources"
     assert _fact_category("access_restriction") == "access"
     assert _fact_category("burned_area") == "burned_area"
+
+
+def test_public_declared_observation_reaches_the_sequential_model_context() -> None:
+    payload = json.loads((EXAMPLES / "valid-input.json").read_text(encoding="utf-8"))
+    payload["items"][0]["provenance"]["declared_observation"] = {
+        "observed_at": "2026-07-10T09:00:00+02:00",
+        "observation_type": "front de flammes",
+        "direct_observation": True,
+        "description": "Un front de flammes est visible sur le versant au-dessus de Die.",
+        "location_mode": "place",
+        "location_label": "Die, massif de Justin",
+        "latitude": None,
+        "longitude": None,
+        "uncertainty_m": None,
+        "media_captured_at": "2026-07-10T08:58:00+02:00",
+        "media_direction": "vers le nord-est",
+    }
+    payload["items"][0]["camera"] = None
+
+    legacy = to_legacy_input(WorkerInputV2.model_validate(payload))
+
+    declared = legacy.items[0].source_context.declared_observation
+    assert declared is not None
+    assert declared.description.startswith("Un front de flammes")
+    assert declared.location_label == "Die, massif de Justin"
+    assert legacy.items[0].metadata.latitude is None
+    assert legacy.items[0].metadata.longitude is None

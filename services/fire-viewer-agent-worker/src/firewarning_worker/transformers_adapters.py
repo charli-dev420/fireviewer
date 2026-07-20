@@ -321,6 +321,8 @@ Keep every number, unit, status and time in description. Do not merge contradict
 source_context describes provenance, not truth. A source_confidence=lead statement may be extracted
 for the private draft only as a reported claim; it must not be rewritten as confirmed. A media
 license controls republication, not whether the media may be privately analysed.
+declared_observation contains the contributor's unverified statement and declared time/location.
+It may support a metadata-attributed reported claim, but never a camera pose or inferred fire point.
 Place/time fields: literal, evidence_kind, evidence_id. JSON only."""
 
     def load(self) -> None:

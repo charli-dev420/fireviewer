@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 
 from fire_viewer.core.security import Actor
 from fire_viewer.db.models import (
+    AgentDispatch,
     AgentMediaBatch,
     AgentMediaConsent,
     AgentMediaItem,
@@ -141,7 +142,8 @@ def test_public_incident_evidence_uses_private_user_media_and_human_review(
 ) -> None:
     seed_incident(fire_id="FR-26-00001", sequence=1, lon=5.37, lat=44.75)
     store, content = _configure_upload(monkeypatch, settings)
-    opened = _open(client, _payload(content_size=len(content)), key="public-evidence-die-0001")
+    payload = _payload(content_size=len(content))
+    opened = _open(client, payload, key="public-evidence-die-0001")
     assert opened["state"] == "OPEN"
     assert opened["upload"]["allowed_content_types"] == [
         "image/jpeg",
@@ -170,6 +172,27 @@ def test_public_incident_evidence_uses_private_user_media_and_human_review(
     assert batch.schema_version == "2.0"
     assert batch.batch_type == AgentBatchType.USER_MEDIA
     assert batch.incident_id is not None and batch.analysis_window_id is not None
+    media_item = session.scalar(select(AgentMediaItem))
+    assert media_item is not None
+    declared = media_item.metadata_payload["provenance"]["declared_observation"]
+    assert datetime.fromisoformat(declared["observed_at"].replace("Z", "+00:00")) == (
+        datetime.fromisoformat(payload["observation"]["observed_at"])
+    )
+    assert {key: value for key, value in declared.items() if key != "observed_at"} == {
+        "observation_type": "front de flammes",
+        "direct_observation": True,
+        "description": "Un front de flammes est visible sur le versant au-dessus de Die.",
+        "location_mode": "place",
+        "location_label": "Die, massif de Justin",
+        "latitude": None,
+        "longitude": None,
+        "uncertainty_m": None,
+        "media_captured_at": None,
+        "media_direction": "vers le nord-est",
+    }
+    assert datetime.fromisoformat(
+        media_item.metadata_payload["captured_at"].replace("Z", "+00:00")
+    ) == datetime.fromisoformat(payload["observation"]["observed_at"])
     consent = session.scalar(select(AgentMediaConsent))
     assert consent is not None
     assert consent.state == AgentConsentState.GRANTED
@@ -184,6 +207,22 @@ def test_public_incident_evidence_uses_private_user_media_and_human_review(
     assert row is not None
     assert row.contact_reference_hash is not None
     assert "Temoin@example.fr" not in str(row.submission_payload)
+
+    settings.agent_dispatch_enabled = True
+    launched = client.post(
+        "/api/v2/admin/agent-batches/incidents/FR-26-00001/operations/user_media/run",
+        json={"local_date": batch.analysis_window.local_date.isoformat()},
+    )
+    assert launched.status_code == 200, launched.text
+    dispatch = session.scalar(select(AgentDispatch))
+    assert dispatch is not None
+    dispatched_item = dispatch.payload["items"][0]
+    assert datetime.fromisoformat(dispatched_item["captured_at"].replace("Z", "+00:00")) == (
+        datetime.fromisoformat(payload["observation"]["observed_at"])
+    )
+    assert dispatched_item["provenance"]["declared_observation"] == {
+        key: value for key, value in declared.items() if value is not None
+    }
 
     pending = client.get("/api/v1/admin/public-contributions?state=PENDING")
     assert pending.status_code == 200, pending.text
@@ -301,6 +340,20 @@ def test_public_blob_callback_only_grants_private_image_contract(client, setting
         headers={"X-Blob-Upload-Grant": grant.token},
     )
     assert denied.status_code == 400
+
+
+def test_public_media_capture_time_requires_timezone(client, seed_incident) -> None:
+    seed_incident(fire_id="FR-26-00001", sequence=1, lon=5.37, lat=44.75)
+    payload = _payload(content_size=1_024)
+    payload["media"]["captured_at"] = "2026-07-10T09:00:00"
+
+    response = client.post(
+        "/api/v1/contributions/open",
+        headers={"Idempotency-Key": "public-naive-capture-0001"},
+        json=payload,
+    )
+
+    assert response.status_code == 422, response.text
 
 
 def test_tracking_token_idempotency_rate_limit_and_withdrawal(

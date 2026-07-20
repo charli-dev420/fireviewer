@@ -5,6 +5,16 @@ import { extname, resolve, sep } from 'node:path';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+const TIMEZONE_PATTERN = /(?:Z|[+-]\d{2}:\d{2})$/u;
+const MAX_CONTEXT_DOCUMENT_BYTES = 100_000;
+const MAX_CONTEXT_FEATURE_DETAILS = 512;
+const INGESTION_ROUTES = new Set([
+  'public_contribution',
+  'admin_source_package',
+  'source_research_reference',
+  'evaluation_reference',
+]);
+const PUBLIC_IMAGE_CONTENT_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const DIRECT_MEDIA_TYPES = new Map([
   ['.jpg', 'image/jpeg'],
   ['.jpeg', 'image/jpeg'],
@@ -48,6 +58,152 @@ function sha256(content) {
   return createHash('sha256').update(content).digest('hex');
 }
 
+function assertTimestamp(value, label, { required = false } = {}) {
+  if (value === undefined || value === null || value === '') {
+    if (required) throw new IncidentSourceCorpusError(`${label} est absent du manifeste.`);
+    return null;
+  }
+  if (typeof value !== 'string' || !TIMEZONE_PATTERN.test(value) || !Number.isFinite(Date.parse(value))) {
+    throw new IncidentSourceCorpusError(`${label} doit être une date ISO-8601 avec fuseau horaire.`);
+  }
+  return value;
+}
+
+function assertBoundedString(value, label, minimum, maximum, { required = true } = {}) {
+  if (value === undefined || value === null || value === '') {
+    if (required) throw new IncidentSourceCorpusError(`${label} est absent du manifeste.`);
+    return null;
+  }
+  if (typeof value !== 'string' || value.trim().length < minimum || value.trim().length > maximum) {
+    throw new IncidentSourceCorpusError(`${label} doit contenir entre ${minimum} et ${maximum} caractères.`);
+  }
+  return value.trim();
+}
+
+function validateRouteMetadata(row, lineNumber, ingestionRoute) {
+  const suffix = `ligne ${lineNumber}`;
+  if (ingestionRoute === 'public_contribution') {
+    if (typeof row.direct_observation !== 'boolean') {
+      throw new IncidentSourceCorpusError(`direct_observation invalide à la ${suffix}.`);
+    }
+    return {
+      observed_at: assertTimestamp(row.observed_at, `observed_at ${suffix}`, { required: true }),
+      media_captured_at: assertTimestamp(row.media_captured_at, `media_captured_at ${suffix}`),
+      location_label: assertBoundedString(row.location_label, `location_label ${suffix}`, 2, 240),
+      observation_type: assertBoundedString(row.observation_type, `observation_type ${suffix}`, 2, 128),
+      description: assertBoundedString(row.description, `description ${suffix}`, 20, 4_000),
+      media_direction: assertBoundedString(
+        row.media_direction,
+        `media_direction ${suffix}`,
+        2,
+        128,
+        { required: false },
+      ),
+      direct_observation: row.direct_observation,
+    };
+  }
+  if (ingestionRoute === 'source_research_reference') {
+    const sourceUrl = assertBoundedString(row.source_url, `source_url ${suffix}`, 8, 2_048);
+    let parsed;
+    try {
+      parsed = new URL(sourceUrl);
+    } catch {
+      throw new IncidentSourceCorpusError(`source_url invalide à la ${suffix}.`);
+    }
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
+      throw new IncidentSourceCorpusError(`source_url doit être une URL HTTPS publique à la ${suffix}.`);
+    }
+    return {
+      source_url: parsed.href,
+      published_at: assertTimestamp(row.published_at, `published_at ${suffix}`),
+    };
+  }
+  return {};
+}
+
+function validPublicImage(contentType, content) {
+  if (!PUBLIC_IMAGE_CONTENT_TYPES.has(contentType)) return false;
+  if (contentType === 'image/jpeg') {
+    return content.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]));
+  }
+  if (contentType === 'image/png') {
+    return content.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  }
+  return content.subarray(0, 4).toString('ascii') === 'RIFF'
+    && content.subarray(8, 12).toString('ascii') === 'WEBP';
+}
+
+function coordinateSummary(value, summary) {
+  if (!Array.isArray(value)) return;
+  if (
+    value.length >= 2
+    && typeof value[0] === 'number'
+    && Number.isFinite(value[0])
+    && typeof value[1] === 'number'
+    && Number.isFinite(value[1])
+  ) {
+    const [x, y] = value;
+    summary.coordinate_points += 1;
+    summary.bbox[0] = Math.min(summary.bbox[0], x);
+    summary.bbox[1] = Math.min(summary.bbox[1], y);
+    summary.bbox[2] = Math.max(summary.bbox[2], x);
+    summary.bbox[3] = Math.max(summary.bbox[3], y);
+    return;
+  }
+  for (const child of value) coordinateSummary(child, summary);
+}
+
+function boundedProperties(properties) {
+  if (!properties || typeof properties !== 'object' || Array.isArray(properties)) return {};
+  return Object.fromEntries(Object.entries(properties).map(([key, value]) => {
+    if (value === null || ['boolean', 'number'].includes(typeof value)) return [key, value];
+    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+    return [key, serialized.length <= 512 ? serialized : `${serialized.slice(0, 509)}...`];
+  }));
+}
+
+function summarizeGeometry(row, decoded) {
+  let source;
+  try {
+    source = JSON.parse(decoded);
+  } catch {
+    throw new IncidentSourceCorpusError(`GeoJSON invalide pour ${row.element_id}.`);
+  }
+  if (
+    !source
+    || typeof source !== 'object'
+    || source.type !== 'FeatureCollection'
+    || !Array.isArray(source.features)
+  ) {
+    throw new IncidentSourceCorpusError(`FeatureCollection attendue pour ${row.element_id}.`);
+  }
+
+  const global = { coordinate_points: 0, bbox: [Infinity, Infinity, -Infinity, -Infinity] };
+  const features = source.features.map((feature, index) => {
+    const featureSummary = { coordinate_points: 0, bbox: [Infinity, Infinity, -Infinity, -Infinity] };
+    coordinateSummary(feature?.geometry?.coordinates, featureSummary);
+    coordinateSummary(feature?.geometry?.coordinates, global);
+    return {
+      index,
+      geometry_type: feature?.geometry?.type ?? null,
+      coordinate_points: featureSummary.coordinate_points,
+      bbox: featureSummary.coordinate_points ? featureSummary.bbox : null,
+      properties: boundedProperties(feature?.properties),
+    };
+  });
+  const retainedFeatures = features.slice(0, MAX_CONTEXT_FEATURE_DETAILS);
+  return {
+    source_type: source.type,
+    feature_count: features.length,
+    retained_feature_details: retainedFeatures.length,
+    omitted_feature_details: features.length - retainedFeatures.length,
+    coordinate_points: global.coordinate_points,
+    bbox: global.coordinate_points ? global.bbox : null,
+    geometry_types: [...new Set(features.map((feature) => feature.geometry_type).filter(Boolean))].sort(),
+    features: retainedFeatures,
+  };
+}
+
 function parseManifestLine(line, lineNumber) {
   let row;
   try {
@@ -70,14 +226,36 @@ function parseManifestLine(line, lineNumber) {
   if (!SHA256_PATTERN.test(digest)) {
     throw new IncidentSourceCorpusError(`sha256 invalide à la ligne ${lineNumber}.`);
   }
+  if (row.pipeline_input !== undefined && typeof row.pipeline_input !== 'boolean') {
+    throw new IncidentSourceCorpusError(`pipeline_input invalide à la ligne ${lineNumber}.`);
+  }
+  if (row.evaluation_reference !== undefined && typeof row.evaluation_reference !== 'boolean') {
+    throw new IncidentSourceCorpusError(`evaluation_reference invalide à la ligne ${lineNumber}.`);
+  }
+  const pipelineInput = row.pipeline_input !== false;
+  const evaluationReference = row.evaluation_reference === true;
+  const ingestionRoute = row.ingestion_route
+    ?? (evaluationReference || !pipelineInput ? 'evaluation_reference' : 'admin_source_package');
+  if (!INGESTION_ROUTES.has(ingestionRoute)) {
+    throw new IncidentSourceCorpusError(`ingestion_route invalide à la ligne ${lineNumber}.`);
+  }
+  const directPipelineInput = ['public_contribution', 'admin_source_package'].includes(ingestionRoute);
+  if (pipelineInput !== directPipelineInput || evaluationReference !== (ingestionRoute === 'evaluation_reference')) {
+    throw new IncidentSourceCorpusError(`Rôle de pipeline incohérent à la ligne ${lineNumber}.`);
+  }
+  const routeMetadata = validateRouteMetadata(row, lineNumber, ingestionRoute);
   return {
     ...row,
+    ...routeMetadata,
     element_id: assertString(row.element_id, `element_id ligne ${lineNumber}`),
     group_date: groupDate,
     group_index: groupIndex,
     kind: assertString(row.kind, `kind ligne ${lineNumber}`),
     local_path: assertString(row.local_path, `local_path ligne ${lineNumber}`),
     media_type: assertString(row.media_type, `media_type ligne ${lineNumber}`),
+    pipeline_input: pipelineInput,
+    evaluation_reference: evaluationReference,
+    ingestion_route: ingestionRoute,
     sha256: digest,
   };
 }
@@ -146,7 +324,17 @@ function contextualDocument(row, sourceContent) {
     } catch {
       throw new IncidentSourceCorpusError(`Géométrie gzip invalide pour ${row.element_id}.`);
     }
-    sections.push('', '## Géométrie officielle fournie', '```json', decoded, '```');
+    const geometrySummary = summarizeGeometry(row, decoded);
+    sections.push(
+      '',
+      '## Résumé géométrique déterministe de la source officielle',
+      '',
+      'Le GeoJSON brut a été vérifié avec l’empreinte du manifeste. Pour borner le contexte du modèle,',
+      'ce document conserve les propriétés, emprises et nombres de sommets, sans recopier les coordonnées brutes.',
+      '```json',
+      JSON.stringify(geometrySummary, null, 2),
+      '```',
+    );
   } else if (['product_metadata', 'signed_spatial_reference'].includes(row.kind)) {
     sections.push('', '## Contenu source fourni', '```json', sourceContent.toString('utf8'), '```');
   } else if (row.kind === 'map_pdf') {
@@ -157,7 +345,7 @@ function contextualDocument(row, sourceContent) {
   }
 
   const content = Buffer.from(`${sections.join('\n')}\n`, 'utf8');
-  if (content.length > 100_000) {
+  if (content.length > MAX_CONTEXT_DOCUMENT_BYTES) {
     throw new IncidentSourceCorpusError(`Document contextuel trop volumineux pour ${row.element_id}.`);
   }
   return content;
@@ -185,10 +373,49 @@ export async function buildDailySourcePackage(corpusRoot, requestedDay) {
   }
 
   const materials = [];
+  const publicContributions = [];
+  const researchReferences = [];
+  const evaluationReferences = [];
   for (const row of dailyRows) {
     const { content, sourcePath } = await verifiedSourceContent(corpusRoot, row);
+    const reference = {
+      element_id: row.element_id,
+      kind: row.kind,
+      media_type: row.media_type,
+      sha256: row.sha256,
+      source_id: row.source_id ?? null,
+      source_url: row.source_url ?? null,
+      captured_at: row.captured_at ?? null,
+      published_at: row.published_at ?? null,
+    };
+    if (row.ingestion_route === 'evaluation_reference') {
+      evaluationReferences.push(reference);
+      continue;
+    }
+    if (row.ingestion_route === 'source_research_reference') {
+      researchReferences.push(reference);
+      continue;
+    }
     const extension = extname(sourcePath).toLowerCase();
     const contentType = DIRECT_MEDIA_TYPES.get(extension);
+    if (row.ingestion_route === 'public_contribution') {
+      if (!contentType || !validPublicImage(contentType, content)) {
+        throw new IncidentSourceCorpusError(
+          `La contribution publique ${row.element_id} doit être une image JPG, PNG ou WebP valide.`,
+        );
+      }
+      publicContributions.push({
+        name: outputName(row, extension),
+        content,
+        contentType,
+        manifest: row,
+        transformed: false,
+      });
+      continue;
+    }
+    if (row.ingestion_route !== 'admin_source_package') {
+      throw new IncidentSourceCorpusError(`Route non gérée pour ${row.element_id}.`);
+    }
     if (contentType && row.kind !== 'map_pdf') {
       materials.push({
         name: outputName(row, extension),
@@ -212,7 +439,14 @@ export async function buildDailySourcePackage(corpusRoot, requestedDay) {
     day,
     availableDays,
     corpusId: dailyRows[0]?.corpus_id ?? null,
+    evaluationReferences,
     materials,
+    publicContributions,
+    publicContributionSizeBytes: publicContributions.reduce(
+      (total, contribution) => total + contribution.content.length,
+      0,
+    ),
+    researchReferences,
     totalSizeBytes: materials.reduce((total, material) => total + material.content.length, 0),
   };
 }

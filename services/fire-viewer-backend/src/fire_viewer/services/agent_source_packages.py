@@ -156,6 +156,7 @@ def _load_package(session: Session, package_id: str) -> AgentSourcePackage:
         .options(
             selectinload(AgentSourcePackage.incident),
             selectinload(AgentSourcePackage.episode),
+            selectinload(AgentSourcePackage.public_contribution),
             selectinload(AgentSourcePackage.items)
             .selectinload(AgentSourcePackageItem.agent_media_item)
             .selectinload(AgentMediaItem.batch),
@@ -410,6 +411,25 @@ def _create_media_batches(
     unique_items: list[tuple[AgentSourcePackageItem, bytes]],
     settings: Settings,
 ) -> None:
+    declared_observation: dict[str, object] | None = None
+    if package.public_contribution is not None:
+        submission = package.public_contribution.submission_payload
+        observation = submission["observation"]
+        location = submission["location"]
+        media = submission.get("media") or {}
+        declared_observation = {
+            "observed_at": observation["observed_at"],
+            "observation_type": observation["observation_type"],
+            "direct_observation": observation["direct_observation"],
+            "description": observation["description"],
+            "location_mode": location["mode"],
+            "location_label": location.get("label"),
+            "latitude": location.get("latitude"),
+            "longitude": location.get("longitude"),
+            "uncertainty_m": location.get("uncertainty_m"),
+            "media_captured_at": media.get("captured_at"),
+            "media_direction": media.get("direction"),
+        }
     by_date: dict[date, list[tuple[AgentSourcePackageItem, bytes]]] = {}
     for item, content in unique_items:
         item_date = (
@@ -456,6 +476,15 @@ def _create_media_batches(
             )
             session.add(batch)
             for package_item, content in chunk:
+                captured_at = (
+                    declared_observation.get("media_captured_at")
+                    if declared_observation is not None
+                    else None
+                )
+                if captured_at is None and package_item.captured_at is not None:
+                    captured_at = as_utc(package_item.captured_at).isoformat()
+                if captured_at is None and declared_observation is not None:
+                    captured_at = declared_observation["observed_at"]
                 proxy_url = create_private_media_url(
                     source_kind="source_package",
                     source_id=package.package_id,
@@ -496,12 +525,9 @@ def _create_media_batches(
                             "license_identifier": "USER_PRIVATE_ANALYSIS",
                             "attribution": package.location_hint,
                             "trust": "unverified",
+                            "declared_observation": declared_observation,
                         },
-                        "captured_at": (
-                            as_utc(package_item.captured_at).isoformat()
-                            if package_item.captured_at
-                            else None
-                        ),
+                        "captured_at": captured_at,
                         "camera": None,
                         "satellite": None,
                         "private_source_package": {

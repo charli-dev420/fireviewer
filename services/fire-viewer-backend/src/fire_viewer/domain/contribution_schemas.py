@@ -44,6 +44,14 @@ class PublicContributionMediaDeclaration(StrictContributionModel):
     captured_at: datetime | None = None
     direction: str | None = Field(default=None, max_length=128)
 
+    @model_validator(mode="after")
+    def validate_capture_time(self) -> PublicContributionMediaDeclaration:
+        if self.captured_at is not None and (
+            self.captured_at.tzinfo is None or self.captured_at.utcoffset() is None
+        ):
+            raise ValueError("media capture date must include a timezone")
+        return self
+
 
 class PublicContributionConsents(StrictContributionModel):
     private_analysis: Literal[True]

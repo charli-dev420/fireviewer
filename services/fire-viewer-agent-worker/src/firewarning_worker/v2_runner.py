@@ -81,6 +81,7 @@ def to_legacy_input(batch: WorkerInputV2) -> WorkerInput:
                             "source_confidence",
                             "publication_policy",
                             "claim_types",
+                            "declared_observation",
                         },
                         exclude_none=True,
                     ),
