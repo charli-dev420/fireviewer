@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import os
 import secrets
 import subprocess
 import sys
 import time
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from hashlib import sha256
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -25,6 +26,7 @@ RUNTIME_MODULES = {
     "pod_validation": "firewarning_worker.pod_validation",
 }
 _RESEARCH_CHILDREN: list[subprocess.Popen[bytes]] = []
+MODEL_STORAGE_GIDS_ENV = "FW_MODEL_STORAGE_GIDS"
 
 
 def report_runtime_dependencies() -> None:
@@ -138,7 +140,38 @@ def ensure_model_cache() -> None:
             raise RuntimeError(f"mounted model cache remains incomplete: {missing}")
 
 
-def secure_model_storage() -> None:
+def _model_storage_gids() -> tuple[int, ...]:
+    values = os.getenv(MODEL_STORAGE_GIDS_ENV, "").split(",")
+    return tuple(sorted({int(value) for value in values if value.strip()}))
+
+
+def _assert_broker_cannot_read_models(storage_gids: set[int]) -> None:
+    import pwd
+
+    broker = cast(_PwdModule, pwd).getpwnam("broker")
+    broker_gids = set(os.getgrouplist("broker", broker.pw_gid))  # type: ignore[attr-defined]
+    overlap = storage_gids & broker_gids
+    if overlap:
+        raise RuntimeError(
+            "mounted model storage uses a group available to the network broker: "
+            + ",".join(str(gid) for gid in sorted(overlap))
+        )
+
+
+def _secure_storage_path(path: Path, *, model_gid: int, directory: bool) -> int:
+    """Apply group-only access, tolerating mounts that reject chgrp.
+
+    RunPod persistent volumes can expose a fixed host-side group and return
+    EPERM for chown/chgrp. In that case the fixed group is granted only to the
+    worker and researcher processes; the broker is checked separately.
+    """
+    with suppress(PermissionError):
+        os.chown(path, -1, model_gid)  # type: ignore[attr-defined]
+    os.chmod(path, 0o750 if directory else 0o640)
+    return path.stat().st_gid
+
+
+def secure_model_storage() -> tuple[int, ...]:
     """Keep weights readable by inference users and inaccessible to the broker user."""
     get_euid = getattr(os, "geteuid", None)
     if get_euid is None or get_euid() != 0:
@@ -149,25 +182,48 @@ def secure_model_storage() -> None:
     roma_root = Path(os.getenv("FW_ROMA_ROOT", str(DEFAULT_ROMA_ROOT))).resolve()
     manifest = cache_root.parent / "firewarning-model-cache.json"
     fingerprint = sha256(manifest.read_bytes()).hexdigest()
-    marker = cache_root.parent / ".firewarning-model-permissions-v1"
-    if marker.is_file() and marker.read_text(encoding="ascii").strip() == fingerprint:
-        return
+    marker = cache_root.parent / ".firewarning-model-permissions-v2.json"
+    if marker.is_file():
+        try:
+            payload = json.loads(marker.read_text(encoding="ascii"))
+        except (OSError, ValueError, TypeError):
+            payload = {}
+        if payload.get("fingerprint") == fingerprint:
+            storage_gids = {int(gid) for gid in payload.get("storage_gids", [])}
+            if storage_gids:
+                _assert_broker_cannot_read_models(storage_gids)
+                return tuple(sorted(storage_gids))
     model_gid = cast(_GrpModule, grp).getgrnam("firewarning-model").gr_gid
+    storage_gids: set[int] = set()
     for root in (cache_root.parent, roma_root):
         for directory, names, filenames in os.walk(root, followlinks=False):
             directory_path = Path(directory)
-            os.chown(directory_path, 0, model_gid)  # type: ignore[attr-defined]
-            os.chmod(directory_path, 0o750)  # noqa: S103 - no access for broker/other
+            storage_gids.add(
+                _secure_storage_path(directory_path, model_gid=model_gid, directory=True)
+            )
             for name in (*names, *filenames):
                 path = directory_path / name
                 if path.is_symlink():
-                    os.chown(path, 0, model_gid, follow_symlinks=False)  # type: ignore[attr-defined]
                     continue
-                os.chown(path, 0, model_gid)  # type: ignore[attr-defined]
-                os.chmod(path, 0o750 if path.is_dir() else 0o640)
-    marker.write_text(f"{fingerprint}\n", encoding="ascii")
-    os.chown(marker, 0, model_gid)  # type: ignore[attr-defined]
-    os.chmod(marker, 0o640)
+                storage_gids.add(
+                    _secure_storage_path(path, model_gid=model_gid, directory=path.is_dir())
+                )
+    _assert_broker_cannot_read_models(storage_gids)
+    marker.write_text(
+        json.dumps(
+            {"fingerprint": fingerprint, "storage_gids": sorted(storage_gids)},
+            separators=(",", ":"),
+        )
+        + "\n",
+        encoding="ascii",
+    )
+    os.chmod(marker, 0o600)
+    print(
+        "firewarning bootstrap: model storage secured "
+        f"groups={','.join(str(gid) for gid in sorted(storage_gids))}",
+        flush=True,
+    )
+    return tuple(sorted(storage_gids))
 
 
 def _drop_runtime_privileges() -> None:
@@ -182,6 +238,7 @@ def _drop_runtime_privileges() -> None:
     username = os.getenv("FW_RUNTIME_USER", "worker")
     account = cast(_PwdModule, pwd).getpwnam(username)
     os.initgroups(username, account.pw_gid)  # type: ignore[attr-defined]
+    os.setgroups(sorted(set(os.getgroups()) | set(_model_storage_gids())))
     os.setgid(account.pw_gid)  # type: ignore[attr-defined]
     os.setuid(account.pw_uid)  # type: ignore[attr-defined]
     os.environ["HOME"] = account.pw_dir
@@ -197,6 +254,8 @@ def _demote_to(username: str) -> Callable[[], None]:
         account = cast(_PwdModule, pwd).getpwnam(username)
         shared_gid = cast(_GrpModule, grp).getgrnam("firewarning").gr_gid
         os.initgroups(username, shared_gid)  # type: ignore[attr-defined]
+        if username == "researcher":
+            os.setgroups(sorted(set(os.getgroups()) | set(_model_storage_gids())))
         os.setgid(shared_gid)  # type: ignore[attr-defined]
         os.setuid(account.pw_uid)  # type: ignore[attr-defined]
         os.umask(0o077)
@@ -362,7 +421,8 @@ def main() -> None:
         ensure_model_cache()
         if status_server is not None:
             status_server.status.update("securing_model_storage")
-        secure_model_storage()
+        storage_gids = secure_model_storage()
+        os.environ[MODEL_STORAGE_GIDS_ENV] = ",".join(str(gid) for gid in storage_gids)
         if runtime_module != RUNTIME_MODULES["pod_validation"] and _enabled(
             os.getenv("FW_ENABLE_SOURCE_RESEARCH"), default=True
         ):

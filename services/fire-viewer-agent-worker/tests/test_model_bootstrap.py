@@ -110,6 +110,40 @@ def test_rtdetr_baseline_changes_the_persisted_model_set(
     assert len(with_detector) == len(without_detector) + 1
 
 
+def test_fixed_gid_mount_falls_back_without_weakening_other_permissions(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    model_file = tmp_path / "model.safetensors"
+    model_file.write_bytes(b"weights")
+    chmod_calls: list[int] = []
+
+    def reject_chgrp(*_args: object, **_kwargs: object) -> None:
+        raise PermissionError(1, "Operation not permitted")
+
+    monkeypatch.setattr(bootstrap.os, "chown", reject_chgrp, raising=False)
+    monkeypatch.setattr(
+        bootstrap.os,
+        "chmod",
+        lambda _path, mode: chmod_calls.append(mode),
+    )
+
+    mounted_gid = bootstrap._secure_storage_path(
+        model_file,
+        model_gid=10001,
+        directory=False,
+    )
+
+    assert mounted_gid == model_file.stat().st_gid
+    assert chmod_calls == [0o640]
+
+
+def test_model_storage_groups_are_normalized(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(bootstrap.MODEL_STORAGE_GIDS_ENV, "10001,0,10001")
+
+    assert bootstrap._model_storage_gids() == (0, 10001)
+
+
 def test_provisioner_reuses_only_marked_complete_snapshots(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
