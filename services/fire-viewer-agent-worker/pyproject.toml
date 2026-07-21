@@ -18,7 +18,7 @@ runtime = [
   "einops==0.8.2",
   "huggingface-hub==0.36.2",
   "httpx==0.28.1",
-  "pillow==12.1.1",
+  "pillow==12.3.0",
   "qwen-vl-utils==0.0.14",
   "runpod==1.10.1",
   "safetensors==0.8.0",
@@ -38,13 +38,13 @@ corpus = [
   "httpx==0.28.1",
   "imagehash==4.3.2",
   "openpyxl==3.1.5",
-  "pillow==12.1.1",
+  "pillow==12.3.0",
 ]
 spatial-training = [
   "huggingface-hub==0.36.2",
   "httpx==0.28.1",
   "numpy==2.4.6",
-  "pillow==12.1.1",
+  "pillow==12.3.0",
   "pyproj==3.7.2",
   "rasterio==1.4.4",
 ]
@@ -63,14 +63,14 @@ training = [
   "evaluate==0.4.6",
   "huggingface-hub==0.36.2",
   "imagehash==4.3.2",
-  "pillow==12.1.1",
+  "pillow==12.3.0",
   "pycocotools==2.0.10",
   "safetensors==0.8.0",
   "torchmetrics==1.8.2",
   "transformers==4.57.6",
 ]
 dev = [
-  "pytest==9.0.2",
+  "pytest==9.0.3",
   "ruff==0.15.21",
   "mypy==2.2.0",
 ]
